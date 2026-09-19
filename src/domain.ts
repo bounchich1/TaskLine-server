@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { consentKeyboard } from './integrations/max/index.js';
 import { invalidateLearning } from './modules/learning/index.js';
+import { addMessage, reviseClientMessage, type NewMessage } from './modules/messages/index.js';
 import { parseRating } from './rating.js';
 import type { Config } from './shared/config.js';
 import { createCtx } from './shared/context.js';
@@ -428,35 +429,21 @@ export class Domain {
   async addMessage(
     tx: Sql,
     ticket: Ticket,
-    author: string,
+    author: NewMessage['author'],
     authorId: string | null,
     text: string,
     providerRef: string | null,
     state: string,
     timestamp?: number,
   ): Promise<Message> {
-    const row = await one(
-      tx,
-      'UPDATE tickets SET last_message_seq=last_message_seq+1,updated_at=now(),version=version+1 WHERE id=$1 RETURNING last_message_seq,version',
-      [ticket.id],
-    );
-    ticket.last_message_seq = Number(row!.last_message_seq);
-    ticket.version = Number(row!.version);
-    return (await one<Message>(
-      tx,
-      'INSERT INTO messages(org_id,ticket_id,seq,author_type,author_id,text,provider_ref,delivery_state,provider_sent_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
-      [
-        this.org,
-        ticket.id,
-        ticket.last_message_seq,
-        author,
-        authorId,
-        text,
-        providerRef,
-        state,
-        timestamp && Number.isFinite(timestamp) ? new Date(timestamp) : null,
-      ],
-    ))!;
+    return addMessage(tx, this.ctx, ticket, {
+      author,
+      authorId,
+      text,
+      providerRef,
+      state,
+      timestamp,
+    });
   }
 
   async rate(tx: Sql, client: Client, ticket: Ticket, input: ClientInput, receivedAt: string) {
@@ -577,49 +564,7 @@ export class Domain {
   }
 
   async reviseMessage(tx: Sql, client: Client, input: ClientInput) {
-    if (client.consent_state !== 'granted') {
-      return;
-    }
-    const message = await one<Message>(
-      tx,
-      "SELECT m.* FROM messages m JOIN tickets t ON t.id=m.ticket_id WHERE m.org_id=$1 AND t.client_id=$2 AND m.provider_ref=$3 AND m.author_type='client' FOR UPDATE OF m",
-      [this.org, client.id, input.messageId],
-    );
-    if (!message) {
-      await audit(tx, this.org, null, 'message.deferred_revision', client.id, {
-        provider_ref: input.messageId,
-        source_key: input.sourceKey,
-      });
-      await enqueue(tx, this.org, `revision:${input.sourceKey}`, 'message_revision', client.id, {
-        input: encrypt(input, this.config.ENCRYPTION_KEY),
-      });
-      return;
-    }
-    await tx.query(
-      'INSERT INTO message_revisions(message_id,revision,encrypted_previous,source_key,deleted) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
-      [
-        message.id,
-        message.revision,
-        encrypt({ text: message.text }, this.config.ENCRYPTION_KEY),
-        input.sourceKey,
-        input.kind === 'delete',
-      ],
-    );
-    await tx.query('UPDATE messages SET text=$2,revision=revision+1,deleted=$3 WHERE id=$1', [
-      message.id,
-      input.kind === 'delete' ? '' : (input.text ?? '').slice(0, 16000),
-      input.kind === 'delete',
-    ]);
-    await tx.query(
-      'UPDATE tickets SET suggestion_stale=true,version=version+1,description=CASE WHEN $2=1 THEN $3 ELSE description END WHERE id=$1',
-      [
-        message.ticket_id,
-        message.seq,
-        input.kind === 'delete' ? 'Сообщение удалено клиентом' : (input.text ?? ''),
-      ],
-    );
-    await this.invalidateLearning(tx, message.ticket_id, 'message_changed');
-    await emit(tx, this.org, 'message.changed', message.ticket_id, { message_id: message.id });
+    await reviseClientMessage(tx, this.ctx, client, input);
   }
 
   async command(
