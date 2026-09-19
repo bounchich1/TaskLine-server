@@ -1,5 +1,6 @@
 export {
   findActiveDictionaryEntry,
+  findActiveDictionaryLabel,
   snapshotActiveDictionaries,
   type DictionaryDimension,
 } from './dictionaries.js';

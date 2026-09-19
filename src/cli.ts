@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import { Memory } from './ai/memory.js';
 import { MaxClient } from './integrations/max/index.js';
+import { Memory } from './modules/ai/index.js';
 import { seed } from './seed.js';
 import { readConfig } from './shared/config.js';
 import { Postgres, migrate, one } from './shared/db.js';

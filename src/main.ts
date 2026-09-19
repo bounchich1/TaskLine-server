@@ -1,4 +1,4 @@
-import { buildGateway } from './ai/gateway.js';
+import { buildGateway } from './app/gateway/build-gateway.js';
 import { buildApi } from './app/http/build-api.js';
 import { readConfig } from './shared/config.js';
 import { Postgres } from './shared/db.js';

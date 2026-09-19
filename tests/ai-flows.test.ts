@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 
-import { buildGateway, Gateway, GatewayClient, type ModelReply } from '../src/ai/gateway.js';
-import { Workflows } from '../src/ai/workflows.js';
+import { buildGateway } from '../src/app/gateway/build-gateway.js';
+import { Gateway, GatewayClient, Workflows, type ModelReply } from '../src/modules/ai/index.js';
 import { one } from '../src/shared/db.js';
 import type { Job, Row } from '../src/shared/types/entities.js';
 

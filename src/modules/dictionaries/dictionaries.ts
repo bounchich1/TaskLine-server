@@ -26,6 +26,20 @@ export async function findActiveDictionaryEntry(
   );
 }
 
+/** Label and version of an active entry: what a ticket stores next to a classification code. */
+export async function findActiveDictionaryLabel(
+  tx: Sql,
+  org: string,
+  dimension: DictionaryDimension,
+  code: unknown,
+): Promise<Row | undefined> {
+  return one(
+    tx,
+    'SELECT label,version FROM dictionaries WHERE org_id=$1 AND dimension=$2 AND code=$3 AND active',
+    [org, dimension, code],
+  );
+}
+
 /** Every entry, active or not, for the classification pickers and the admin console. */
 export async function listDictionaries(db: Sql, org: string) {
   const result = await db.query(

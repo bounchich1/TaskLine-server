@@ -1,10 +1,8 @@
 import { Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 
-import { GatewayClient, type Model } from './ai/gateway.js';
-import { Memory } from './ai/memory.js';
-import { Workflows } from './ai/workflows.js';
 import { MaxClient } from './integrations/max/index.js';
+import { GatewayClient, Memory, Workflows, type Model } from './modules/ai/index.js';
 import { PreconsentExpiry } from './modules/consent/index.js';
 import { DeliveryWorker } from './modules/delivery/index.js';
 import { Files } from './modules/files/index.js';

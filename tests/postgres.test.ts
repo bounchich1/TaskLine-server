@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
-import { Gateway } from '../src/ai/gateway.js';
+import { Gateway } from '../src/modules/ai/index.js';
 import { Postgres, migrate, one } from '../src/shared/db.js';
 import type { Client, Job } from '../src/shared/types/entities.js';
 

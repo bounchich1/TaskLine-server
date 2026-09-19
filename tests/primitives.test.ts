@@ -2,8 +2,8 @@ import { createHmac } from 'node:crypto';
 
 import { describe, it, expect } from 'vitest';
 
-import { planChunks, confirmedResolution } from '../src/ai/workflows.js';
 import { normalizeUpdate } from '../src/integrations/max/index.js';
+import { planChunks, confirmedResolution } from '../src/modules/ai/index.js';
 import { parseRating } from '../src/modules/ratings/index.js';
 import { verifyLaunch } from '../src/modules/staff/index.js';
 import { readConfig } from '../src/shared/config.js';

@@ -1,8 +1,6 @@
 import { beforeEach, afterEach, it, expect } from 'vitest';
 
-import { Gateway } from '../src/ai/gateway.js';
-import { Memory, type MemoryTransport } from '../src/ai/memory.js';
-import { Workflows } from '../src/ai/workflows.js';
+import { Gateway, Memory, Workflows, type MemoryTransport } from '../src/modules/ai/index.js';
 import { hash } from '../src/shared/crypto.js';
 import { one } from '../src/shared/db.js';
 import type { Resolution } from '../src/shared/types/ai.js';
