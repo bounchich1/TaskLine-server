@@ -1,0 +1,13 @@
+dist
+node_modules
+coverage
+.data
+.sql-trace
+package-lock.json
+.env*
+# Model prompts: their content hash is recorded in audit rows, so formatting would change behavior.
+agent-skills
+# Versioned contracts and SQL are reviewed byte-for-byte.
+contracts
+migrations
+infra
