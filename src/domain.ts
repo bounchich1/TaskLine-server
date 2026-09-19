@@ -3,6 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { consentKeyboard } from './integrations/max/index.js';
 import { invalidateLearning } from './modules/learning/index.js';
 import { addMessage, reviseClientMessage, type NewMessage } from './modules/messages/index.js';
+import {
+  cancelClientDeliveries,
+  cancelCycleDeliveries,
+  queueBotMessage,
+  queueCallbackAnswer,
+  queueHistoryPage,
+  queueStaffReply,
+} from './modules/outbox/index.js';
 import { parseRating } from './rating.js';
 import type { Config } from './shared/config.js';
 import { createCtx } from './shared/context.js';
@@ -12,7 +20,6 @@ import { ensure } from './shared/errors.js';
 import { audit, emit, enqueue } from './shared/events.js';
 import type { ClientInput } from './shared/types/client-input.js';
 import type { Client, Closure, Employee, Message, Row, Ticket } from './shared/types/entities.js';
-import { render } from './templates.js';
 
 export class Domain {
   constructor(
@@ -125,30 +132,7 @@ export class Domain {
     cycleId?: string,
     extra: Row = {},
   ) {
-    if (await one(tx, 'SELECT id FROM deliveries WHERE logical_key=$1', [key])) {
-      return;
-    }
-    const text = await render(tx, this.org, code, {
-      ticket_number: ticket?.ticket_number.toString().padStart(6, '0') ?? '',
-      policy_url: this.config.POLICY_URL,
-      alternative_contact: this.config.ALTERNATIVE_CONTACT,
-    });
-    const message = ticket
-      ? await this.addMessage(tx, ticket, 'bot', null, text, null, 'queued')
-      : undefined;
-    await tx.query(
-      'INSERT INTO deliveries(org_id,client_id,ticket_id,message_id,cycle_id,logical_key,kind,body) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
-      [
-        this.org,
-        client.id,
-        ticket?.id ?? null,
-        message?.id ?? null,
-        cycleId ?? null,
-        key,
-        code,
-        JSON.stringify({ text, ...extra }),
-      ],
-    );
+    await queueBotMessage(tx, this.ctx, { client, template: code, key, ticket, cycleId, extra });
   }
 
   async consentPrompt(tx: Sql, client: Client, sourceKey: string) {
@@ -176,18 +160,11 @@ export class Domain {
         'SELECT * FROM callback_actions WHERE nonce=$1 AND org_id=$2 AND client_id=$3 AND expires_at>now() FOR UPDATE',
         [input.callbackPayload ?? '', this.org, client.id],
       );
-      await tx.query(
-        `INSERT INTO deliveries(org_id,client_id,logical_key,kind,body) VALUES($1,$2,$3,'callback_answer',$4) ON CONFLICT DO NOTHING`,
-        [
-          this.org,
-          client.id,
-          `answer:${input.sourceKey}`,
-          JSON.stringify({
-            callback_id: input.callbackId,
-            notification: action ? 'Принято' : 'Кнопка устарела',
-          }),
-        ],
-      );
+      await queueCallbackAnswer(tx, this.ctx, client, {
+        sourceKey: input.sourceKey,
+        callbackId: input.callbackId,
+        notification: action ? 'Принято' : 'Кнопка устарела',
+      });
       if (!action || action.used_at) {
         return;
       }
@@ -281,10 +258,7 @@ export class Domain {
             .map((t) => `№${String(t.ticket_number).padStart(6, '0')} — ${status[t.status]}`)
             .join('\n')
         : 'У вас пока нет обращений.';
-      await tx.query(
-        "INSERT INTO deliveries(org_id,client_id,logical_key,kind,body) VALUES($1,$2,$3,'history_page',$4) ON CONFLICT DO NOTHING",
-        [this.org, client.id, `history:${input.sourceKey}`, JSON.stringify({ text })],
-      );
+      await queueHistoryPage(tx, this.ctx, client, { sourceKey: input.sourceKey, text });
       return;
     }
     const slot = await one<Ticket>(
@@ -486,14 +460,7 @@ export class Domain {
   }
 
   async cancelRatingPrompts(tx: Sql, cycleId: string) {
-    await tx.query(
-      "UPDATE messages SET delivery_state='canceled' WHERE id IN (SELECT message_id FROM deliveries WHERE cycle_id=$1 AND state IN ('queued','retry_wait'))",
-      [cycleId],
-    );
-    await tx.query(
-      "UPDATE deliveries SET state='canceled' WHERE cycle_id=$1 AND state IN ('queued','retry_wait')",
-      [cycleId],
-    );
+    await cancelCycleDeliveries(tx, cycleId);
   }
   async finishRating(
     tx: Sql,
@@ -533,14 +500,7 @@ export class Domain {
     }
     await tx.query('DELETE FROM preconsent_buffers WHERE client_id=$1', [client.id]);
     await tx.query('DELETE FROM callback_actions WHERE client_id=$1', [client.id]);
-    await tx.query(
-      "UPDATE deliveries SET state='canceled' WHERE client_id=$1 AND state IN ('queued','retry_wait')",
-      [client.id],
-    );
-    await tx.query(
-      "UPDATE messages SET delivery_state='canceled' WHERE id IN(SELECT message_id FROM deliveries WHERE client_id=$1 AND state='canceled')",
-      [client.id],
-    );
+    await cancelClientDeliveries(tx, client.id);
     const tickets = (
       await tx.query<Ticket>('SELECT * FROM tickets WHERE org_id=$1 AND client_id=$2 FOR UPDATE', [
         this.org,
@@ -705,19 +665,14 @@ export class Domain {
         for (const id of ids) {
           await tx.query('UPDATE attachments SET message_id=$2 WHERE id=$1', [id, message.id]);
         }
-        await tx.query(
-          "INSERT INTO deliveries(org_id,client_id,ticket_id,message_id,logical_key,kind,body,staff_id,staff_version) VALUES($1,$2,$3,$4,$5,'staff',$6,$7,$8)",
-          [
-            this.org,
-            client.id,
-            ticket.id,
-            message.id,
-            `staff:${message.id}`,
-            JSON.stringify({ text, attachment_ids: ids }),
-            actor.id,
-            actor.version,
-          ],
-        );
+        await queueStaffReply(tx, this.ctx, {
+          client,
+          ticket,
+          message,
+          actor,
+          text,
+          attachmentIds: ids,
+        });
       } else if (name === 'close') {
         own();
         ensure(ticket.status === 'in_progress', 'ticket_closed');

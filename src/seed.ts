@@ -1,6 +1,6 @@
+import { DEFAULT_TEMPLATES } from './modules/templates/index.js';
 import type { Config } from './shared/config.js';
 import type { Database } from './shared/db.js';
-import { templates } from './templates.js';
 export async function seed(db: Database, c: Config) {
   await db.tx(async (tx) => {
     await tx.query(
@@ -29,7 +29,7 @@ export async function seed(db: Database, c: Config) {
         [c.ORG_ID, dimension, code, label, rank],
       );
     }
-    for (const [code, body] of Object.entries(templates)) {
+    for (const [code, body] of Object.entries(DEFAULT_TEMPLATES)) {
       await tx.query(
         'INSERT INTO templates(org_id,code,body) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
         [c.ORG_ID, code, body],

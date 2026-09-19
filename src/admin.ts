@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
+import { DEFAULT_TEMPLATES, validateTemplate } from './modules/templates/index.js';
 import { hash } from './shared/crypto.js';
 import { one, type Database, type Sql } from './shared/db.js';
 import { ensure } from './shared/errors.js';
 import { audit, emit } from './shared/events.js';
 import type { Employee, Row } from './shared/types/entities.js';
-import { templates, validateTemplate } from './templates.js';
 
 export const employeeBody = z
   .object({
@@ -168,7 +168,7 @@ export class Admin {
       .strict()
       .parse(raw);
     validateTemplate(body.body);
-    ensure(code in templates, 'unknown_template', 422);
+    ensure(code in DEFAULT_TEMPLATES, 'unknown_template', 422);
     return this.mutate(actor, `admin.template:${code}`, key, expected, body, async (tx) => {
       const row = await one(
         tx,

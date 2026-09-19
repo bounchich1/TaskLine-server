@@ -1,8 +1,8 @@
-import { type Sql, one } from './shared/db.js';
-import { ensure } from './shared/errors.js';
-export const templates: Record<string, string> = {
+/** Built-in bot message texts; an organization can override any of them (templates table). */
+export const DEFAULT_TEMPLATES: Readonly<Partial<Record<string, string>>> = {
   consent_request:
-    'Для обращения в поддержку необходимо согласие на обработку данных. Политика: {policy_url}\nВыберите «Согласен» или «Отказаться».',
+    'Для обращения в поддержку необходимо согласие на обработку данных. Политика: {policy_url}\n' +
+    'Выберите «Согласен» или «Отказаться».',
   consent_accepted: 'Согласие принято. Опишите вашу проблему или отправьте файл.',
   consent_declined: 'Без согласия мы не можем обработать обращение. {alternative_contact}',
   consent_withdrawn:
@@ -28,22 +28,3 @@ export const templates: Record<string, string> = {
   technical_error: 'Не удалось обработать действие. Пожалуйста, повторите позже.',
   expired_button: 'Эта кнопка больше не действует. Используйте актуальное сообщение бота.',
 };
-const allowed = new Set(['ticket_number', 'policy_url', 'alternative_contact']);
-export function validateTemplate(body: string) {
-  ensure(body.trim().length > 0 && body.length <= 3000, 'invalid_template', 422);
-  for (const match of body.matchAll(/\{([^{}]+)\}/g)) {
-    ensure(allowed.has(match[1]), 'invalid_placeholder', 422);
-  }
-}
-export async function render(
-  db: Sql,
-  org: string,
-  code: string,
-  values: Record<string, string>,
-): Promise<string> {
-  const row = await one(db, 'SELECT body FROM templates WHERE org_id=$1 AND code=$2', [org, code]);
-  const text = String(row?.body ?? templates[code] ?? '');
-  const result = text.replace(/\{([^{}]+)\}/g, (_, key: string) => values[key] ?? '');
-  ensure(result.length <= 4000, 'template_too_long', 422);
-  return result;
-}
