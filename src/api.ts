@@ -9,11 +9,12 @@ import { Admin } from './admin.js';
 import { DeliveryWorker } from './delivery.js';
 import { Files, safeFilename } from './files.js';
 import { MaxClient, type MaxTransport, normalizeUpdate } from './integrations/max/index.js';
+import { adminDiagnostics } from './modules/admin/index.js';
+import { publicAttachment } from './modules/files/index.js';
 import { Inbox } from './modules/inbox/index.js';
 import { authenticate, capabilities, issueSession, verifyLaunch } from './modules/staff/index.js';
-import { TicketCommands } from './modules/tickets/index.js';
+import { TicketCommands, filtersSchema, TicketQueries } from './modules/tickets/index.js';
 import { openapi } from './openapi.js';
-import { filtersSchema, publicAttachment, Queries } from './queries.js';
 import type { Config } from './shared/config.js';
 import { equal, hash, token } from './shared/crypto.js';
 import { one, type Database } from './shared/db.js';
@@ -91,7 +92,7 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
   });
   const inbox = new Inbox(db, c);
   const ticketCommands = new TicketCommands(db, c);
-  const queries = new Queries(db, c.ORG_ID);
+  const queries = new TicketQueries(db, c.ORG_ID);
   const admin = new Admin(db, c.ORG_ID);
   const files = new Files(db, c);
   const deliveries = new DeliveryWorker(db, c, transport ?? new MaxClient(c), files);
@@ -324,7 +325,11 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
       })
       .strict()
       .parse(request.query);
-    return queries.messages(paramsId(request), q.before, q.after, q.limit);
+    return queries.messages(paramsId(request), {
+      before: q.before,
+      after: q.after,
+      limit: q.limit,
+    });
   });
   for (const [name, schema] of Object.entries(commandSchemas)) {
     app.route({
@@ -551,7 +556,7 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
   );
   app.get('/v1/admin/diagnostics', async (request) => {
     requireOps(request);
-    return queries.diagnostics();
+    return adminDiagnostics(db, c.ORG_ID);
   });
   app.get('/v1/admin/audit', async (request) => {
     requireAdmin(request);
