@@ -78,6 +78,7 @@ export default tseslint.config(
       'max-depth': ['error', 3],
       'max-nested-callbacks': ['error', 3],
       '@typescript-eslint/max-params': ['error', { max: 4 }],
+      '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
       'max-statements-per-line': ['error', { max: 1 }],
       'max-len': [
         'error',

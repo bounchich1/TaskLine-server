@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
 import { consentKeyboard } from './integrations/max/index.js';
+import { invalidateLearning } from './modules/learning/index.js';
 import { parseRating } from './rating.js';
 import type { Config } from './shared/config.js';
+import { createCtx } from './shared/context.js';
 import { decrypt, encrypt, hash, token } from './shared/crypto.js';
 import { one, type Database, type Sql } from './shared/db.js';
 import { ensure } from './shared/errors.js';
@@ -16,6 +18,9 @@ export class Domain {
     readonly db: Database,
     readonly config: Config,
   ) {}
+  get ctx() {
+    return createCtx(this.config);
+  }
   get org() {
     return this.config.ORG_ID;
   }
@@ -568,29 +573,7 @@ export class Domain {
   }
 
   async invalidateLearning(tx: Sql, ticketId: string, reason: string) {
-    await tx.query(
-      "UPDATE closures SET invalidated=true,learning_status='invalidated' WHERE ticket_id=$1",
-      [ticketId],
-    );
-    const records = (
-      await tx.query(
-        'UPDATE memory_records SET eligible=false,reason=$2 WHERE ticket_id=$1 RETURNING id',
-        [ticketId, reason],
-      )
-    ).rows;
-    for (const record of records) {
-      await enqueue(
-        tx,
-        this.org,
-        `memory-delete:${record.id}:${reason}`,
-        'memory_delete',
-        String(record.id),
-      );
-    }
-    await tx.query(
-      "UPDATE jobs SET state='canceled',reason=$2 WHERE (ref_id=$1 OR ref_id IN(SELECT id FROM closures WHERE ticket_id=$1)) AND kind IN('triage','learning') AND state IN('pending','running')",
-      [ticketId, reason],
-    );
+    await invalidateLearning(tx, this.ctx, ticketId, reason);
   }
 
   async reviseMessage(tx: Sql, client: Client, input: ClientInput) {

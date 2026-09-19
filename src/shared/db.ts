@@ -68,3 +68,19 @@ export async function migrate(db: Database) {
     }
   });
 }
+
+/**
+ * Like one(), for queries that must yield a row: a row locked or returned by an earlier step of
+ * the same transaction, or an INSERT/UPDATE ... RETURNING.
+ */
+export async function requireOne<T extends Record<string, unknown> = Record<string, unknown>>(
+  db: Sql,
+  sql: string,
+  params: unknown[] = [],
+): Promise<T> {
+  const row = await one<T>(db, sql, params);
+  if (!row) {
+    throw new Error('Expected the query to return a row');
+  }
+  return row;
+}
