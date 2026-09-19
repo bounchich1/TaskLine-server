@@ -1,5 +1,5 @@
-import type { Config } from './config.js';
-import type { Database } from './db.js';
+import type { Config } from './shared/config.js';
+import type { Database } from './shared/db.js';
 import { templates } from './templates.js';
 export async function seed(db: Database, c: Config) {
   await db.tx(async (tx) => {

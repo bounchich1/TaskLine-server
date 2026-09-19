@@ -4,16 +4,17 @@ import { Redis } from 'ioredis';
 import { GatewayClient, type Model } from './ai/gateway.js';
 import { Memory } from './ai/memory.js';
 import { Workflows } from './ai/workflows.js';
-import type { Config } from './config.js';
-import { decrypt } from './crypto.js';
-import { one, type Database } from './db.js';
 import { DeliveryWorker } from './delivery.js';
 import { Domain } from './domain.js';
-import { AppError } from './errors.js';
-import { emit } from './events.js';
 import { Files } from './files.js';
-import { MaxClient } from './max/client.js';
-import type { ClientInput, Job } from './types.js';
+import { MaxClient } from './integrations/max/index.js';
+import type { Config } from './shared/config.js';
+import { decrypt } from './shared/crypto.js';
+import { one, type Database } from './shared/db.js';
+import { AppError } from './shared/errors.js';
+import { emit } from './shared/events.js';
+import type { ClientInput } from './shared/types/client-input.js';
+import type { Client, Job } from './shared/types/entities.js';
 
 const queueFor = (kind: string) =>
   ['triage', 'learning'].includes(kind)
@@ -82,7 +83,7 @@ export class JobRunner {
             throw new AppError('original_not_received', 503);
           }
           await this.db.tx(async (tx) => {
-            const client = await one<import('./types.js').Client>(
+            const client = await one<Client>(
               tx,
               'SELECT * FROM clients WHERE id=$1 AND org_id=$2 FOR UPDATE',
               [job.ref_id, this.c.ORG_ID],

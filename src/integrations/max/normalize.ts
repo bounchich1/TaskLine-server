@@ -1,6 +1,6 @@
-import { hash } from '../crypto.js';
-import { decimalId, object, strictJson } from '../json.js';
-import type { ClientInput, InputAttachment } from '../types.js';
+import { hash } from '../../shared/crypto.js';
+import { decimalId, object, strictJson } from '../../shared/json.js';
+import type { ClientInput, InputAttachment } from '../../shared/types/client-input.js';
 
 export function normalizeUpdate(raw: string): ClientInput {
   const update = object(strictJson(raw, true, 1024 * 1024));

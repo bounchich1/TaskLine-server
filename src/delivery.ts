@@ -1,10 +1,10 @@
-import type { Config } from './config.js';
-import { one, type Database } from './db.js';
-import { ensure } from './errors.js';
-import { emit, audit } from './events.js';
 import type { Files } from './files.js';
-import { TransportFailure, type MaxTransport } from './max/client.js';
-import type { Client, Employee, Row, Ticket } from './types.js';
+import { TransportFailure, type MaxTransport } from './integrations/max/index.js';
+import type { Config } from './shared/config.js';
+import { one, type Database } from './shared/db.js';
+import { ensure } from './shared/errors.js';
+import { emit, audit } from './shared/events.js';
+import type { Client, Employee, Row, Ticket } from './shared/types/entities.js';
 
 type Delivery = Row & {
   id: string;

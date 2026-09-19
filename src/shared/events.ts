@@ -1,5 +1,4 @@
-import type { Sql } from './db.js';
-import { one } from './db.js';
+import { type Sql, one } from './db.js';
 export async function audit(
   tx: Sql,
   org: string,

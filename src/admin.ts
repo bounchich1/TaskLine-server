@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
-import { hash } from './crypto.js';
-import { one, type Database, type Sql } from './db.js';
-import { ensure } from './errors.js';
-import { audit, emit } from './events.js';
+import { hash } from './shared/crypto.js';
+import { one, type Database, type Sql } from './shared/db.js';
+import { ensure } from './shared/errors.js';
+import { audit, emit } from './shared/events.js';
+import type { Employee, Row } from './shared/types/entities.js';
 import { templates, validateTemplate } from './templates.js';
-import type { Employee, Row } from './types.js';
 
 export const employeeBody = z
   .object({

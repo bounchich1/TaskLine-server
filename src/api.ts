@@ -7,19 +7,18 @@ import { z, ZodError } from 'zod';
 
 import { Admin } from './admin.js';
 import { authenticate, capabilities, issueSession, verifyLaunch, type Session } from './auth.js';
-import type { Config } from './config.js';
-import { equal, hash, token } from './crypto.js';
-import { one, type Database } from './db.js';
 import { DeliveryWorker } from './delivery.js';
 import { Domain } from './domain.js';
-import { AppError, ensure } from './errors.js';
 import { Files, safeFilename } from './files.js';
-import { strictJson } from './json.js';
-import { MaxClient, type MaxTransport } from './max/client.js';
-import { normalizeUpdate } from './max/normalize.js';
+import { MaxClient, type MaxTransport, normalizeUpdate } from './integrations/max/index.js';
 import { openapi } from './openapi.js';
 import { filtersSchema, publicAttachment, Queries } from './queries.js';
-import type { Row } from './types.js';
+import type { Config } from './shared/config.js';
+import { equal, hash, token } from './shared/crypto.js';
+import { one, type Database } from './shared/db.js';
+import { AppError, ensure } from './shared/errors.js';
+import { strictJson } from './shared/json.js';
+import type { Row } from './shared/types/entities.js';
 
 declare module 'fastify' {
   interface FastifyRequest {

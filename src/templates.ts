@@ -1,6 +1,5 @@
-import type { Sql } from './db.js';
-import { one } from './db.js';
-import { ensure } from './errors.js';
+import { type Sql, one } from './shared/db.js';
+import { ensure } from './shared/errors.js';
 export const templates: Record<string, string> = {
   consent_request:
     'Для обращения в поддержку необходимо согласие на обработку данных. Политика: {policy_url}\nВыберите «Согласен» или «Отказаться».',

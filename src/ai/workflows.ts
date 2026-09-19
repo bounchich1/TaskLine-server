@@ -2,22 +2,6 @@ import { readFileSync } from 'node:fs';
 
 import { z } from 'zod';
 
-import type { Config } from '../config.js';
-import { decrypt, encrypt, hash } from '../crypto.js';
-import { one, type Database } from '../db.js';
-import { ensure, AppError } from '../errors.js';
-import { audit, emit, enqueue } from '../events.js';
-import { object, strictJson } from '../json.js';
-import type {
-  Closure,
-  Job,
-  Message,
-  Resolution,
-  Row,
-  SnapshotEntry,
-  Ticket,
-  TriageResult,
-} from '../types.js';
 import {
   parseResolution,
   parseTriage,
@@ -27,13 +11,19 @@ import {
 } from './contracts.js';
 import { eligibleJob, type Model, type ModelMessage } from './gateway.js';
 import type { Recall, CaseEvidence } from './memory.js';
+import type { Config } from '../shared/config.js';
+import { decrypt, encrypt, hash } from '../shared/crypto.js';
+import { one, type Database } from '../shared/db.js';
+import { ensure, AppError } from '../shared/errors.js';
+import { audit, emit, enqueue } from '../shared/events.js';
+import { object, strictJson } from '../shared/json.js';
+import { serverFile } from '../shared/paths.js';
+import type { Resolution, SnapshotEntry, TriageResult } from '../shared/types/ai.js';
+import type { Closure, Job, Message, Row, Ticket } from '../shared/types/entities.js';
 
-const triageSkill = readFileSync(
-  new URL('../../agent-skills/support-triage/SKILL.md', import.meta.url),
-  'utf8',
-);
+const triageSkill = readFileSync(serverFile('agent-skills/support-triage/SKILL.md'), 'utf8');
 const learningSkill = readFileSync(
-  new URL('../../agent-skills/support-close-learning/SKILL.md', import.meta.url),
+  serverFile('agent-skills/support-close-learning/SKILL.md'),
   'utf8',
 );
 const fallback = (version: string, id: string): TriageResult => ({

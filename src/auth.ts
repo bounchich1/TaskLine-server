@@ -1,12 +1,11 @@
 import { createHmac } from 'node:crypto';
 
-import type { Config } from './config.js';
-import { equal, hash, token } from './crypto.js';
-import type { Database, Sql } from './db.js';
-import { one } from './db.js';
-import { ensure } from './errors.js';
-import { decimalId, object, strictJson } from './json.js';
-import type { Employee } from './types.js';
+import type { Config } from './shared/config.js';
+import { equal, hash, token } from './shared/crypto.js';
+import { type Database, type Sql, one } from './shared/db.js';
+import { ensure } from './shared/errors.js';
+import { decimalId, object, strictJson } from './shared/json.js';
+import type { Employee } from './shared/types/entities.js';
 
 function form(raw: string): Map<string, string> {
   const result = new Map<string, string>();

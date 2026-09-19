@@ -1,13 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { openAsBlob } from 'node:fs';
 
-import { Keyboard } from '@maxhub/max-bot-api';
 import { fetch, FormData } from 'undici';
 
-import type { Config } from '../config.js';
-import { object, strictJson } from '../json.js';
-import { boundedText, mediaFetch } from '../network.js';
-import type { Row } from '../types.js';
+import type { Config } from '../../shared/config.js';
+import { object, strictJson } from '../../shared/json.js';
+import { boundedText, mediaFetch } from '../../shared/network.js';
+import type { Row } from '../../shared/types/entities.js';
 
 export class TransportFailure extends Error {
   constructor(
@@ -23,9 +22,6 @@ export interface MaxTransport {
   answer(callbackId: string, text: string): Promise<void>;
   upload(kind: string, path: string, name: string, mime: string): Promise<Row>;
 }
-export const consentKeyboard = (buttons: { text: string; payload: string }[]) =>
-  Keyboard.inlineKeyboard([buttons.map((b) => Keyboard.button.callback(b.text, b.payload))]);
-
 export class MaxClient implements MaxTransport {
   constructor(
     private c: Config,

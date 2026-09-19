@@ -27,9 +27,6 @@
     }
   },
   "src/ai/gateway.ts": {
-    "@typescript-eslint/consistent-type-definitions": {
-      "count": 3
-    },
     "@typescript-eslint/no-base-to-string": {
       "count": 2
     },
@@ -65,9 +62,6 @@
     }
   },
   "src/ai/memory.ts": {
-    "@typescript-eslint/consistent-type-definitions": {
-      "count": 1
-    },
     "@typescript-eslint/no-non-null-assertion": {
       "count": 1
     },
@@ -91,9 +85,6 @@
     }
   },
   "src/ai/workflows.ts": {
-    "@typescript-eslint/consistent-type-definitions": {
-      "count": 1
-    },
     "@typescript-eslint/max-params": {
       "count": 1
     },
@@ -170,9 +161,6 @@
     }
   },
   "src/auth.ts": {
-    "@typescript-eslint/consistent-type-definitions": {
-      "count": 1
-    },
     "@typescript-eslint/no-non-null-assertion": {
       "count": 1
     },
@@ -194,30 +182,6 @@
       "count": 1
     },
     "id-length": {
-      "count": 1
-    },
-    "max-len": {
-      "count": 1
-    }
-  },
-  "src/config.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "id-length": {
-      "count": 2
-    }
-  },
-  "src/crypto.ts": {
-    "@typescript-eslint/no-unnecessary-type-parameters": {
-      "count": 1
-    },
-    "id-length": {
-      "count": 2
-    }
-  },
-  "src/db.ts": {
-    "@typescript-eslint/no-unnecessary-type-parameters": {
       "count": 1
     },
     "max-len": {
@@ -294,17 +258,6 @@
       "count": 5
     }
   },
-  "src/events.ts": {
-    "@typescript-eslint/max-params": {
-      "count": 3
-    },
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 3
-    },
-    "max-len": {
-      "count": 2
-    }
-  },
   "src/files.ts": {
     "@typescript-eslint/no-empty-function": {
       "count": 1
@@ -340,23 +293,7 @@
       "count": 2
     }
   },
-  "src/json.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    }
-  },
-  "src/main.ts": {
-    "id-length": {
-      "count": 1
-    }
-  },
-  "src/max/client.ts": {
+  "src/integrations/max/client.ts": {
     "@typescript-eslint/no-base-to-string": {
       "count": 1
     },
@@ -370,10 +307,10 @@
       "count": 1
     },
     "id-length": {
-      "count": 2
+      "count": 1
     }
   },
-  "src/max/normalize.ts": {
+  "src/integrations/max/normalize.ts": {
     "@typescript-eslint/no-base-to-string": {
       "count": 5
     },
@@ -387,21 +324,9 @@
       "count": 1
     }
   },
-  "src/network.ts": {
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
-    "@typescript-eslint/restrict-plus-operands": {
-      "count": 1
-    },
-    "complexity": {
-      "count": 1
-    },
+  "src/main.ts": {
     "id-length": {
-      "count": 3
+      "count": 1
     }
   },
   "src/openapi.ts": {
@@ -445,6 +370,69 @@
       "count": 1
     }
   },
+  "src/shared/config.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 2
+    }
+  },
+  "src/shared/crypto.ts": {
+    "@typescript-eslint/no-unnecessary-type-parameters": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 2
+    }
+  },
+  "src/shared/db.ts": {
+    "@typescript-eslint/no-unnecessary-type-parameters": {
+      "count": 1
+    },
+    "max-len": {
+      "count": 1
+    }
+  },
+  "src/shared/events.ts": {
+    "@typescript-eslint/max-params": {
+      "count": 3
+    },
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 3
+    },
+    "max-len": {
+      "count": 2
+    }
+  },
+  "src/shared/json.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "src/shared/network.ts": {
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-member-access": {
+      "count": 1
+    },
+    "@typescript-eslint/restrict-plus-operands": {
+      "count": 1
+    },
+    "complexity": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 3
+    }
+  },
   "src/templates.ts": {
     "@typescript-eslint/no-base-to-string": {
       "count": 1
@@ -456,15 +444,7 @@
       "count": 1
     }
   },
-  "src/types.ts": {
-    "@typescript-eslint/consistent-type-definitions": {
-      "count": 5
-    }
-  },
   "src/workers.ts": {
-    "@typescript-eslint/consistent-type-imports": {
-      "count": 1
-    },
     "@typescript-eslint/no-empty-function": {
       "count": 3
     },

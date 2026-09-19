@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 
 import { Memory } from './ai/memory.js';
-import { readConfig } from './config.js';
-import { Postgres, migrate, one } from './db.js';
-import { ensure } from './errors.js';
-import { audit } from './events.js';
-import { MaxClient } from './max/client.js';
+import { MaxClient } from './integrations/max/index.js';
 import { seed } from './seed.js';
+import { readConfig } from './shared/config.js';
+import { Postgres, migrate, one } from './shared/db.js';
+import { ensure } from './shared/errors.js';
+import { audit } from './shared/events.js';
 const c = readConfig();
 const db = new Postgres(c.DATABASE_URL);
 try {

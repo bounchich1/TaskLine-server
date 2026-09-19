@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
-import { one, type Database } from './db.js';
-import { ensure } from './errors.js';
-import type { Row, Ticket } from './types.js';
+import { one, type Database } from './shared/db.js';
+import { ensure } from './shared/errors.js';
+import type { Row, Ticket } from './shared/types/entities.js';
 
 export const filtersSchema = z
   .object({

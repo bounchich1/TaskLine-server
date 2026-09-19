@@ -15,13 +15,14 @@ import {
 } from '@aws-sdk/client-s3';
 import { fileTypeFromFile } from 'file-type';
 
-import type { Config } from './config.js';
-import { decrypt } from './crypto.js';
-import { one, type Database } from './db.js';
-import { ensure } from './errors.js';
-import { emit, enqueue } from './events.js';
-import { mediaFetch } from './network.js';
-import type { Employee, InputAttachment, Row, Ticket } from './types.js';
+import type { Config } from './shared/config.js';
+import { decrypt } from './shared/crypto.js';
+import { one, type Database } from './shared/db.js';
+import { ensure } from './shared/errors.js';
+import { emit, enqueue } from './shared/events.js';
+import { mediaFetch } from './shared/network.js';
+import type { InputAttachment } from './shared/types/client-input.js';
+import type { Employee, Row, Ticket } from './shared/types/entities.js';
 
 type Attachment = Row & {
   id: string;

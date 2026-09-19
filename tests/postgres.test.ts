@@ -4,8 +4,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
 import { fixture, testConfig } from './helpers.js';
 import { Gateway } from '../src/ai/gateway.js';
-import { Postgres, migrate, one } from '../src/db.js';
-import type { Client, Job } from '../src/types.js';
+import { Postgres, migrate, one } from '../src/shared/db.js';
+import type { Client, Job } from '../src/shared/types/entities.js';
 describe.runIf(process.env.RUN_POSTGRES_TESTS === '1')('real PostgreSQL concurrency', () => {
   const schema = `test_${randomUUID().replaceAll('-', '')}`;
   const c = testConfig();

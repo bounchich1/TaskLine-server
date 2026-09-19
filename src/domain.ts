@@ -1,14 +1,15 @@
 import { randomUUID } from 'node:crypto';
 
-import type { Config } from './config.js';
-import { decrypt, encrypt, hash, token } from './crypto.js';
-import { one, type Database, type Sql } from './db.js';
-import { ensure } from './errors.js';
-import { audit, emit, enqueue } from './events.js';
-import { consentKeyboard } from './max/client.js';
+import { consentKeyboard } from './integrations/max/index.js';
 import { parseRating } from './rating.js';
+import type { Config } from './shared/config.js';
+import { decrypt, encrypt, hash, token } from './shared/crypto.js';
+import { one, type Database, type Sql } from './shared/db.js';
+import { ensure } from './shared/errors.js';
+import { audit, emit, enqueue } from './shared/events.js';
+import type { ClientInput } from './shared/types/client-input.js';
+import type { Client, Closure, Employee, Message, Row, Ticket } from './shared/types/entities.js';
 import { render } from './templates.js';
-import type { Client, ClientInput, Closure, Employee, Message, Row, Ticket } from './types.js';
 
 export class Domain {
   constructor(

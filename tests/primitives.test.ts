@@ -5,12 +5,12 @@ import { describe, it, expect } from 'vitest';
 import { testConfig } from './helpers.js';
 import { planChunks, confirmedResolution } from '../src/ai/workflows.js';
 import { verifyLaunch } from '../src/auth.js';
-import { readConfig } from '../src/config.js';
-import { strictJson } from '../src/json.js';
-import { normalizeUpdate } from '../src/max/normalize.js';
-import { publicAddress } from '../src/network.js';
+import { normalizeUpdate } from '../src/integrations/max/index.js';
 import { parseRating } from '../src/rating.js';
-import type { SnapshotEntry, Resolution } from '../src/types.js';
+import { readConfig } from '../src/shared/config.js';
+import { strictJson } from '../src/shared/json.js';
+import { publicAddress } from '../src/shared/network.js';
+import type { Resolution, SnapshotEntry } from '../src/shared/types/ai.js';
 describe('rating grammar', () => {
   for (const [text, n] of [
     ['1', 1],

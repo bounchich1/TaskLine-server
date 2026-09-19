@@ -1,7 +1,7 @@
 import { buildGateway } from './ai/gateway.js';
 import { buildApi } from './api.js';
-import { readConfig } from './config.js';
-import { Postgres } from './db.js';
+import { readConfig } from './shared/config.js';
+import { Postgres } from './shared/db.js';
 import { startWorkers } from './workers.js';
 const c = readConfig();
 const db = new Postgres(c.DATABASE_URL);

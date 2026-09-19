@@ -1,12 +1,13 @@
 import { fetch } from 'undici';
 
-import type { Config } from '../config.js';
-import { one, type Database } from '../db.js';
-import { AppError, ensure } from '../errors.js';
-import { emit } from '../events.js';
-import { object, strictJson } from '../json.js';
-import { boundedText } from '../network.js';
-import type { Resolution, Row } from '../types.js';
+import type { Config } from '../shared/config.js';
+import { one, type Database } from '../shared/db.js';
+import { AppError, ensure } from '../shared/errors.js';
+import { emit } from '../shared/events.js';
+import { object, strictJson } from '../shared/json.js';
+import { boundedText } from '../shared/network.js';
+import type { Resolution } from '../shared/types/ai.js';
+import type { Row } from '../shared/types/entities.js';
 
 export type MemoryRecord = Row & {
   id: string;

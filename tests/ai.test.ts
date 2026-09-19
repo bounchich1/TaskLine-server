@@ -4,9 +4,10 @@ import { fixture } from './helpers.js';
 import { Gateway } from '../src/ai/gateway.js';
 import { Memory, type MemoryTransport } from '../src/ai/memory.js';
 import { Workflows } from '../src/ai/workflows.js';
-import { hash } from '../src/crypto.js';
-import { one } from '../src/db.js';
-import type { Job, Row, Resolution } from '../src/types.js';
+import { hash } from '../src/shared/crypto.js';
+import { one } from '../src/shared/db.js';
+import type { Resolution } from '../src/shared/types/ai.js';
+import type { Job, Row } from '../src/shared/types/entities.js';
 let f: Awaited<ReturnType<typeof fixture>>;
 beforeEach(async () => {
   f = await fixture();

@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
 
 import pg from 'pg';
+
+import { serverFile } from './paths.js';
 export interface Sql {
   query<T extends Record<string, unknown> = Record<string, unknown>>(
     sql: string,
@@ -54,10 +56,7 @@ export async function one<T extends Record<string, unknown> = Record<string, unk
   return (await db.query<T>(sql, params)).rows[0];
 }
 export async function migrate(db: Database) {
-  const migration = await readFile(
-    new URL('../migrations/001_initial.sql', import.meta.url),
-    'utf8',
-  );
+  const migration = await readFile(serverFile('migrations/001_initial.sql'), 'utf8');
   await db.tx(async (tx) => {
     await tx.query('SELECT pg_advisory_xact_lock(7136001)');
     await tx.query(

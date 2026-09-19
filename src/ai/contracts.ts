@@ -2,15 +2,17 @@ import { readFileSync } from 'node:fs';
 
 import { Ajv2020, type AnySchema } from 'ajv/dist/2020.js';
 
-import { ensure } from '../errors.js';
-import { strictJson } from '../json.js';
-import type { Resolution, Row, TriageResult } from '../types.js';
+import { ensure } from '../shared/errors.js';
+import { strictJson } from '../shared/json.js';
+import { serverFile } from '../shared/paths.js';
+import type { Resolution, TriageResult } from '../shared/types/ai.js';
+import type { Row } from '../shared/types/entities.js';
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 export const triageSchema = JSON.parse(
-  readFileSync(new URL('../../contracts/triage-result.schema.json', import.meta.url), 'utf8'),
+  readFileSync(serverFile('contracts/triage-result.schema.json'), 'utf8'),
 ) as Row;
 export const resolutionSchema = JSON.parse(
-  readFileSync(new URL('../../contracts/memorize-resolution.schema.json', import.meta.url), 'utf8'),
+  readFileSync(serverFile('contracts/memorize-resolution.schema.json'), 'utf8'),
 ) as Row;
 const validateTriage = ajv.compile(triageSchema as AnySchema);
 const validateResolution = ajv.compile(resolutionSchema as AnySchema);

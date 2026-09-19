@@ -4,13 +4,13 @@ import Fastify from 'fastify';
 import { fetch } from 'undici';
 import { z } from 'zod';
 
-import type { Config } from '../config.js';
-import { decrypt, encrypt, equal, hash } from '../crypto.js';
-import { one, type Database, type Sql } from '../db.js';
-import { AppError, ensure } from '../errors.js';
-import { object, strictJson } from '../json.js';
-import { boundedText } from '../network.js';
-import type { Job, Row } from '../types.js';
+import type { Config } from '../shared/config.js';
+import { decrypt, encrypt, equal, hash } from '../shared/crypto.js';
+import { one, type Database, type Sql } from '../shared/db.js';
+import { AppError, ensure } from '../shared/errors.js';
+import { object, strictJson } from '../shared/json.js';
+import { boundedText } from '../shared/network.js';
+import type { Job, Row } from '../shared/types/entities.js';
 
 export type ModelMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool';

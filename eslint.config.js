@@ -95,11 +95,13 @@ export default tseslint.config(
         'error',
         { min: 2, exceptions: ['_', 'i', 'j', 'x', 'y'], properties: 'never' },
       ],
-      '@typescript-eslint/consistent-type-imports': 'error',
+      // `type` and `interface` are both fine; forcing interfaces drops implicit index signatures.
+      '@typescript-eslint/consistent-type-definitions': 'off',
+      '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'inline-type-imports' }],
       '@typescript-eslint/consistent-type-exports': 'error',
       'import-x/no-cycle': 'error',
       'import-x/no-self-import': 'error',
-      'import-x/no-duplicates': 'error',
+      'import-x/no-duplicates': ['error', { 'prefer-inline': true }],
       'import-x/no-useless-path-segments': 'error',
       'import-x/no-default-export': 'error',
       'import-x/order': [
