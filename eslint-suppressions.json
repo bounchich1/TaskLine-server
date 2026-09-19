@@ -4,20 +4,6 @@
       "count": 2
     }
   },
-  "src/admin.ts": {
-    "@typescript-eslint/max-params": {
-      "count": 3
-    },
-    "@typescript-eslint/no-base-to-string": {
-      "count": 1
-    },
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 2
-    },
-    "max-len": {
-      "count": 2
-    }
-  },
   "src/ai/contracts.ts": {
     "@typescript-eslint/max-params": {
       "count": 1

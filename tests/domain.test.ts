@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto';
 
 import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 
-import { Admin } from '../src/admin.js';
 import { DeliveryWorker } from '../src/delivery.js';
 import { MaxClient, TransportFailure } from '../src/integrations/max/index.js';
+import { Admin } from '../src/modules/admin/index.js';
 import { one } from '../src/shared/db.js';
 import type { Client, Employee } from '../src/shared/types/entities.js';
 
@@ -230,21 +230,21 @@ describe('delivery and admin safeguards', () => {
   it('protects last administrator and reserved dictionary defaults', async () => {
     const admin = new Admin(f.db, f.c.ORG_ID);
     await expect(
-      admin.employee(
-        f.admin,
-        f.admin.id,
-        { max_user_id: '2', name: 'Admin', role: 'support', blocked: false },
-        f.admin.version,
-        randomUUID(),
-      ),
+      admin.employee({
+        actor: f.admin,
+        employeeId: f.admin.id,
+        body: { max_user_id: '2', name: 'Admin', role: 'support', blocked: false },
+        expectedVersion: f.admin.version,
+        idempotencyKey: randomUUID(),
+      }),
     ).rejects.toMatchObject({ code: 'last_admin' });
     await expect(
-      admin.dictionary(
-        f.admin,
-        { dimension: 'tag', code: 'undefined', label: 'Other', rank: 0, active: false },
-        1,
-        randomUUID(),
-      ),
+      admin.dictionary({
+        actor: f.admin,
+        body: { dimension: 'tag', code: 'undefined', label: 'Other', rank: 0, active: false },
+        expectedVersion: 1,
+        idempotencyKey: randomUUID(),
+      }),
     ).rejects.toMatchObject({ code: 'protected_default' });
   });
 });

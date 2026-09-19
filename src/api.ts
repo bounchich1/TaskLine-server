@@ -5,11 +5,10 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyRequest } from 'fastify';
 import { z, ZodError } from 'zod';
 
-import { Admin } from './admin.js';
 import { DeliveryWorker } from './delivery.js';
 import { Files, safeFilename } from './files.js';
 import { MaxClient, type MaxTransport, normalizeUpdate } from './integrations/max/index.js';
-import { adminDiagnostics } from './modules/admin/index.js';
+import { Admin, adminDiagnostics } from './modules/admin/index.js';
 import { publicAttachment } from './modules/files/index.js';
 import { Inbox } from './modules/inbox/index.js';
 import { authenticate, capabilities, issueSession, verifyLaunch } from './modules/staff/index.js';
@@ -504,29 +503,33 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
     };
   });
   app.post('/v1/admin/employees', async (request) =>
-    admin.employee(
-      request.staff!.employee,
-      undefined,
-      request.body,
-      version(request),
-      key(request),
-    ),
+    admin.employee({
+      actor: request.staff!.employee,
+      body: request.body,
+      expectedVersion: version(request),
+      idempotencyKey: key(request),
+    }),
   );
   app.patch('/v1/admin/employees/:id', async (request) =>
-    admin.employee(
-      request.staff!.employee,
-      paramsId(request),
-      request.body,
-      version(request),
-      key(request),
-    ),
+    admin.employee({
+      actor: request.staff!.employee,
+      employeeId: paramsId(request),
+      body: request.body,
+      expectedVersion: version(request),
+      idempotencyKey: key(request),
+    }),
   );
   app.get('/v1/admin/roles', async (request) => {
     requireAdmin(request);
     return { items: ['support', 'supervisor', 'admin'].map((role) => ({ code: role })) };
   });
   app.put('/v1/admin/dictionaries', async (request) =>
-    admin.dictionary(request.staff!.employee, request.body, version(request), key(request)),
+    admin.dictionary({
+      actor: request.staff!.employee,
+      body: request.body,
+      expectedVersion: version(request),
+      idempotencyKey: key(request),
+    }),
   );
   app.get('/v1/admin/templates', async (request) => {
     requireAdmin(request);
@@ -539,20 +542,25 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
     };
   });
   app.put('/v1/admin/templates/:code', async (request) =>
-    admin.template(
-      request.staff!.employee,
-      String((request.params as Row).code),
-      request.body,
-      version(request),
-      key(request),
-    ),
+    admin.template({
+      actor: request.staff!.employee,
+      code: String((request.params as Row).code),
+      body: request.body,
+      expectedVersion: version(request),
+      idempotencyKey: key(request),
+    }),
   );
   app.get('/v1/admin/settings', async (request) => {
     requireAdmin(request);
     return one(db, 'SELECT name,timezone,version FROM organizations WHERE id=$1', [c.ORG_ID]);
   });
   app.put('/v1/admin/settings', async (request) =>
-    admin.settings(request.staff!.employee, request.body, version(request), key(request)),
+    admin.settings({
+      actor: request.staff!.employee,
+      body: request.body,
+      expectedVersion: version(request),
+      idempotencyKey: key(request),
+    }),
   );
   app.get('/v1/admin/diagnostics', async (request) => {
     requireOps(request);
