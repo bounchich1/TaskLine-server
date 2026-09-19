@@ -157,35 +157,6 @@
       "count": 1
     }
   },
-  "src/delivery.ts": {
-    "@typescript-eslint/no-base-to-string": {
-      "count": 1
-    },
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 3
-    },
-    "@typescript-eslint/prefer-optional-chain": {
-      "count": 1
-    },
-    "complexity": {
-      "count": 2
-    },
-    "max-depth": {
-      "count": 2
-    },
-    "max-len": {
-      "count": 7
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 4
-    },
-    "no-nested-ternary": {
-      "count": 1
-    }
-  },
   "src/integrations/max/client.ts": {
     "@typescript-eslint/no-base-to-string": {
       "count": 1

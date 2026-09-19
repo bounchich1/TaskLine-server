@@ -5,9 +5,9 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyRequest } from 'fastify';
 import { z, ZodError } from 'zod';
 
-import { DeliveryWorker } from './delivery.js';
 import { MaxClient, type MaxTransport, normalizeUpdate } from './integrations/max/index.js';
 import { Admin, adminDiagnostics } from './modules/admin/index.js';
+import { DeliveryWorker } from './modules/delivery/index.js';
 import { Files, publicAttachment, safeFilename } from './modules/files/index.js';
 import { Inbox } from './modules/inbox/index.js';
 import { authenticate, capabilities, issueSession, verifyLaunch } from './modules/staff/index.js';

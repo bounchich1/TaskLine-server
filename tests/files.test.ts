@@ -6,8 +6,8 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 
 import { buildApi } from '../src/api.js';
-import { DeliveryWorker } from '../src/delivery.js';
 import { MaxClient } from '../src/integrations/max/index.js';
+import { DeliveryWorker } from '../src/modules/delivery/index.js';
 import { Files } from '../src/modules/files/index.js';
 import { one } from '../src/shared/db.js';
 import { JobRunner } from '../src/workers.js';
