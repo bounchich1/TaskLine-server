@@ -3,7 +3,7 @@ import { openAsBlob } from 'node:fs';
 
 import { fetch, FormData } from 'undici';
 
-import type { Config } from '../../shared/config.js';
+import { mediaHosts, type Config } from '../../shared/config.js';
 import { object, strictJson } from '../../shared/json.js';
 import { boundedText, mediaFetch } from '../../shared/network.js';
 import type { Row } from '../../shared/types/entities.js';
@@ -109,13 +109,10 @@ export class MaxClient implements MaxTransport {
     }
     const form = new FormData();
     form.set('data', await openAsBlob(path, { type: mime }), name);
-    const media = await mediaFetch(
-      allocation.url,
-      this.c.MAX_MEDIA_HOSTS.split(',')
-        .map((h) => h.trim())
-        .filter(Boolean),
-      { method: 'POST', body: form },
-    );
+    const media = await mediaFetch(allocation.url, mediaHosts(this.c), {
+      method: 'POST',
+      body: form,
+    });
     try {
       if (!media.response.ok) {
         throw new TransportFailure('retry', 'upload_failed');

@@ -186,41 +186,6 @@
       "count": 1
     }
   },
-  "src/files.ts": {
-    "@typescript-eslint/no-empty-function": {
-      "count": 1
-    },
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 1
-    },
-    "@typescript-eslint/prefer-includes": {
-      "count": 2
-    },
-    "@typescript-eslint/prefer-optional-chain": {
-      "count": 2
-    },
-    "complexity": {
-      "count": 1
-    },
-    "id-length": {
-      "count": 1
-    },
-    "max-len": {
-      "count": 5
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    },
-    "no-control-regex": {
-      "count": 1
-    },
-    "no-nested-ternary": {
-      "count": 2
-    }
-  },
   "src/integrations/max/client.ts": {
     "@typescript-eslint/no-base-to-string": {
       "count": 1
@@ -229,9 +194,6 @@
       "count": 1
     },
     "complexity": {
-      "count": 1
-    },
-    "id-length": {
       "count": 1
     }
   },

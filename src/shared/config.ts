@@ -88,3 +88,10 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
   return c;
 }
+
+/** Hosts MAX serves client media from (the only hosts media is fetched from or uploaded to). */
+export function mediaHosts(config: Config): string[] {
+  return config.MAX_MEDIA_HOSTS.split(',')
+    .map((host) => host.trim())
+    .filter(Boolean);
+}

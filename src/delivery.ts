@@ -1,5 +1,5 @@
-import type { Files } from './files.js';
 import { TransportFailure, type MaxTransport } from './integrations/max/index.js';
+import type { Files } from './modules/files/index.js';
 import type { Config } from './shared/config.js';
 import { one, type Database } from './shared/db.js';
 import { ensure } from './shared/errors.js';

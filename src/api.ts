@@ -6,10 +6,9 @@ import Fastify, { type FastifyRequest } from 'fastify';
 import { z, ZodError } from 'zod';
 
 import { DeliveryWorker } from './delivery.js';
-import { Files, safeFilename } from './files.js';
 import { MaxClient, type MaxTransport, normalizeUpdate } from './integrations/max/index.js';
 import { Admin, adminDiagnostics } from './modules/admin/index.js';
-import { publicAttachment } from './modules/files/index.js';
+import { Files, publicAttachment, safeFilename } from './modules/files/index.js';
 import { Inbox } from './modules/inbox/index.js';
 import { authenticate, capabilities, issueSession, verifyLaunch } from './modules/staff/index.js';
 import { TicketCommands, filtersSchema, TicketQueries } from './modules/tickets/index.js';
@@ -405,17 +404,20 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
       })
       .strict()
       .parse(request.body);
-    return files.prepare(request.staff!.employee, body.ticket_id, body.filename, body.kind);
+    return files.prepare(request.staff!.employee, {
+      ticketId: body.ticket_id,
+      filename: body.filename,
+      kind: body.kind,
+    });
   });
   app.put('/v1/uploads/:id/content', { bodyLimit: 101 * 1024 * 1024 }, async (request) => {
     const file = await request.file();
     ensure(file, 'file_required', 422);
-    return files.receive(
-      request.staff!.employee,
-      paramsId(request),
-      file.file,
-      () => file.file.truncated,
-    );
+    return files.receive(request.staff!.employee, {
+      id: paramsId(request),
+      stream: file.file,
+      isTruncated: () => file.file.truncated,
+    });
   });
   app.post('/v1/uploads/:id/complete', async (request) => {
     const row = await one(
