@@ -157,20 +157,6 @@
       "count": 2
     }
   },
-  "src/auth.ts": {
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 1
-    },
-    "id-length": {
-      "count": 6
-    },
-    "max-len": {
-      "count": 1
-    },
-    "no-nested-ternary": {
-      "count": 1
-    }
-  },
   "src/cli.ts": {
     "@typescript-eslint/no-non-null-assertion": {
       "count": 1

@@ -6,11 +6,11 @@ import Fastify, { type FastifyRequest } from 'fastify';
 import { z, ZodError } from 'zod';
 
 import { Admin } from './admin.js';
-import { authenticate, capabilities, issueSession, verifyLaunch, type Session } from './auth.js';
 import { DeliveryWorker } from './delivery.js';
 import { Files, safeFilename } from './files.js';
 import { MaxClient, type MaxTransport, normalizeUpdate } from './integrations/max/index.js';
 import { Inbox } from './modules/inbox/index.js';
+import { authenticate, capabilities, issueSession, verifyLaunch } from './modules/staff/index.js';
 import { TicketCommands } from './modules/tickets/index.js';
 import { openapi } from './openapi.js';
 import { filtersSchema, publicAttachment, Queries } from './queries.js';
@@ -21,11 +21,6 @@ import { AppError, ensure } from './shared/errors.js';
 import { strictJson } from './shared/json.js';
 import type { Row } from './shared/types/entities.js';
 
-declare module 'fastify' {
-  interface FastifyRequest {
-    staff?: Session;
-  }
-}
 const uuid = z.uuid();
 const commandSchemas: Record<string, z.ZodType> = {
   assign: z.object({}).strict(),
