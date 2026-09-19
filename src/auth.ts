@@ -52,7 +52,7 @@ export async function issueSession(db: Database, c: Config, userId: string, laun
     ensure(Number(recent?.n) < 5,'launch_replay_limit',429,'Слишком много входов. Откройте приложение заново.');
     const secret = token(); const csrf = token();
     await tx.query('INSERT INTO staff_sessions(hash,org_id,employee_id,employee_version,csrf_hash,launch_hash) VALUES($1,$2,$3,$4,$5,$6)',[hash(secret),c.ORG_ID,employee.id,employee.version,hash(csrf),launchHash]);
-    await tx.query("INSERT INTO audit(org_id,actor_id,action,object_id) VALUES($1,$2,'auth.login',$2)",[c.ORG_ID,employee.id]);
+    await tx.query("INSERT INTO audit(org_id,actor_id,action,object_id) VALUES($1,$2,'auth.login',$3)",[c.ORG_ID,employee.id,employee.id]);
     return { token: secret, csrf, employee, organization: {name:c.ORG_NAME,timezone:c.ORG_TIMEZONE}, capabilities: capabilities(employee) };
   });
 }
