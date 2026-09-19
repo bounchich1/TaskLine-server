@@ -216,21 +216,6 @@
   },
   "src/domain.ts": {
     "@typescript-eslint/max-params": {
-      "count": 2
-    },
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 6
-    },
-    "complexity": {
-      "count": 1
-    },
-    "max-depth": {
-      "count": 1
-    },
-    "max-len": {
-      "count": 3
-    },
-    "max-lines-per-function": {
       "count": 1
     }
   },
