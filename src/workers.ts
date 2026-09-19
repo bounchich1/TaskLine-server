@@ -5,10 +5,14 @@ import { GatewayClient, type Model } from './ai/gateway.js';
 import { Memory } from './ai/memory.js';
 import { Workflows } from './ai/workflows.js';
 import { DeliveryWorker } from './delivery.js';
-import { Domain } from './domain.js';
 import { Files } from './files.js';
 import { MaxClient } from './integrations/max/index.js';
+import { PreconsentExpiry } from './modules/consent/index.js';
+import { Inbox } from './modules/inbox/index.js';
+import { reviseClientMessage } from './modules/messages/index.js';
+import { RatingTimers } from './modules/ratings/index.js';
 import type { Config } from './shared/config.js';
+import { createCtx } from './shared/context.js';
 import { decrypt } from './shared/crypto.js';
 import { one, type Database } from './shared/db.js';
 import { AppError } from './shared/errors.js';
@@ -25,7 +29,7 @@ const queueFor = (kind: string) =>
         ? 'file-processing'
         : 'maintenance';
 export class JobRunner {
-  readonly domain: Domain;
+  readonly inbox: Inbox;
   readonly files: Files;
   readonly memory: Memory;
   readonly workflows: Workflows;
@@ -35,7 +39,7 @@ export class JobRunner {
     model: Model = new GatewayClient(c),
     memory?: Memory,
   ) {
-    this.domain = new Domain(db, c);
+    this.inbox = new Inbox(db, c);
     this.files = new Files(db, c);
     this.memory = memory ?? new Memory(db, c);
     this.workflows = new Workflows(db, c, model, this.memory);
@@ -89,7 +93,7 @@ export class JobRunner {
               [job.ref_id, this.c.ORG_ID],
             );
             if (client) {
-              await this.domain.reviseMessage(tx, client, input);
+              await reviseClientMessage(tx, createCtx(this.c), client, input);
             }
           });
           break;
@@ -151,7 +155,9 @@ export class JobRunner {
     }
   }
   async maintenance() {
-    await this.domain.timers();
+    // Rating timers first, then pre-consent expiry.
+    await new RatingTimers(this.db, this.c).run();
+    await new PreconsentExpiry(this.db, this.c).run();
     await this.db.tx(async (tx) => {
       const expired = (
         await tx.query(
@@ -232,7 +238,7 @@ export async function startWorkers(db: Database, c: Config) {
           )
         ).rows;
         for (const client of clients) {
-          await runner.domain.processClient(client.client_id);
+          await runner.inbox.processClient(client.client_id);
         }
         const outgoing = (
           await db.query<{ client_id: string }>(

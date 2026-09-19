@@ -8,9 +8,10 @@ import { z, ZodError } from 'zod';
 import { Admin } from './admin.js';
 import { authenticate, capabilities, issueSession, verifyLaunch, type Session } from './auth.js';
 import { DeliveryWorker } from './delivery.js';
-import { Domain } from './domain.js';
 import { Files, safeFilename } from './files.js';
 import { MaxClient, type MaxTransport, normalizeUpdate } from './integrations/max/index.js';
+import { Inbox } from './modules/inbox/index.js';
+import { TicketCommands } from './modules/tickets/index.js';
 import { openapi } from './openapi.js';
 import { filtersSchema, publicAttachment, Queries } from './queries.js';
 import type { Config } from './shared/config.js';
@@ -93,7 +94,8 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
             },
           },
   });
-  const domain = new Domain(db, c);
+  const inbox = new Inbox(db, c);
+  const ticketCommands = new TicketCommands(db, c);
   const queries = new Queries(db, c.ORG_ID);
   const admin = new Admin(db, c.ORG_ID);
   const files = new Files(db, c);
@@ -224,7 +226,7 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
     } catch {
       input = { kind: 'unknown' as const, sourceKey: `malformed:${hash(String(request.body))}` };
     }
-    await domain.ingest(input);
+    await inbox.ingest(input);
     return reply.code(200).send({ ok: true });
   });
   app.post(
@@ -334,14 +336,17 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
       method: name === 'classification' ? 'PATCH' : 'POST',
       url: `/v1/tickets/:id/${name}`,
       handler: async (request, reply) => {
-        const result = await domain.command(
-          request.staff!.employee,
-          paramsId(request),
+        // Argument evaluation order matters: it decides which validation error wins.
+        const ticketId = paramsId(request);
+        const body = schema.parse(request.body ?? {}) as Row;
+        const result = await ticketCommands.run({
+          actor: request.staff!.employee,
+          ticketId,
           name,
-          schema.parse(request.body ?? {}) as Row,
-          version(request),
-          key(request),
-        );
+          body,
+          expectedVersion: version(request),
+          idempotencyKey: key(request),
+        });
         if (name === 'messages') {
           reply.code(202);
         }
@@ -657,7 +662,7 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
         })
         .strict()
         .parse(request.body);
-      await domain.ingest({
+      await inbox.ingest({
         kind: 'message',
         userId: input.user_id,
         chatId: input.user_id,

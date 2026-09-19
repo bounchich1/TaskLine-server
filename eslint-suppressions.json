@@ -214,11 +214,6 @@
       "count": 1
     }
   },
-  "src/domain.ts": {
-    "@typescript-eslint/max-params": {
-      "count": 1
-    }
-  },
   "src/files.ts": {
     "@typescript-eslint/no-empty-function": {
       "count": 1

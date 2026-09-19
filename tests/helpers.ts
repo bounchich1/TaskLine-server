@@ -2,11 +2,15 @@ import { randomUUID } from 'node:crypto';
 
 import { PGlite } from '@electric-sql/pglite';
 
-import { Domain } from '../src/domain.js';
+import { PreconsentExpiry } from '../src/modules/consent/index.js';
+import { Inbox } from '../src/modules/inbox/index.js';
+import { RatingTimers } from '../src/modules/ratings/index.js';
+import { TicketCommands } from '../src/modules/tickets/index.js';
 import { seed } from '../src/seed.js';
 import { readConfig, type Config } from '../src/shared/config.js';
 import { migrate, one, type Database, type Sql } from '../src/shared/db.js';
-import type { Client, Employee, Ticket } from '../src/shared/types/entities.js';
+import type { ClientInput } from '../src/shared/types/client-input.js';
+import type { Client, Employee, Row, Ticket } from '../src/shared/types/entities.js';
 
 import { traceSql, traceTransaction } from './support/sql-trace.js';
 
@@ -60,10 +64,37 @@ export async function memoryDb(): Promise<Database> {
   await migrate(db);
   return db;
 }
+/** Positional arguments of the pre-refactor `Domain.command` that the tests still use. */
+type LegacyCommandArgs = [
+  actor: Employee,
+  ticketId: string,
+  name: string,
+  body: Row,
+  expectedVersion: number,
+  idempotencyKey: string,
+];
+
+/** The pre-refactor `Domain` facade the tests are written against, over the new services. */
+function domainAdapter(db: Database, config: Config) {
+  const inbox = new Inbox(db, config);
+  const commands = new TicketCommands(db, config);
+  return {
+    ingest: (input: ClientInput) => inbox.ingest(input),
+    processClient: (clientId: string) => inbox.processClient(clientId),
+    command: (
+      ...[actor, ticketId, name, body, expectedVersion, idempotencyKey]: LegacyCommandArgs
+    ) => commands.run({ actor, ticketId, name, body, expectedVersion, idempotencyKey }),
+    timers: async () => {
+      await new RatingTimers(db, config).run();
+      await new PreconsentExpiry(db, config).run();
+    },
+  };
+}
+
 export async function fixture(db?: Database, c = testConfig()) {
   db = db ?? (await memoryDb());
   await seed(db, c);
-  const domain = new Domain(db, c);
+  const domain = domainAdapter(db, c);
   const staff = (await one<Employee>(
     db,
     "INSERT INTO employees(org_id,max_user_id,name,role) VALUES($1,'1','Анна','support') RETURNING *",
