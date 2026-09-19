@@ -188,6 +188,12 @@ export default tseslint.config(
     },
   },
 
+  // Fastify route plugins and handlers are async by contract, whether or not they await.
+  {
+    files: ['src/**/*.routes.ts'],
+    rules: { '@typescript-eslint/require-await': 'off' },
+  },
+
   {
     files: ['tests/**/*.ts'],
     plugins: { vitest },

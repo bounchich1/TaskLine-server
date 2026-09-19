@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { beforeEach, afterEach, it, expect } from 'vitest';
 
-import { buildApi } from '../src/api.js';
+import { buildApi } from '../src/app/http/build-api.js';
 import { one } from '../src/shared/db.js';
 
 import { fixture } from './helpers.js';

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
-import { buildApi } from '../src/api.js';
+import { buildApi } from '../src/app/http/build-api.js';
 
 import { fixture } from './helpers.js';
 

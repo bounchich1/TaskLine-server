@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, expect, it } from 'vitest';
 
-import { buildApi } from '../src/api.js';
+import { buildApi } from '../src/app/http/build-api.js';
 import { one } from '../src/shared/db.js';
 
 import { fixture, testConfig } from './helpers.js';

@@ -4,8 +4,11 @@ import type { Config } from '../../shared/config.js';
 import { createCtx } from '../../shared/context.js';
 import type { Database } from '../../shared/db.js';
 import type { Employee } from '../../shared/types/entities.js';
+import type { Session } from '../../shared/types/session.js';
 
-import type { FileDeps } from './attachment.js';
+import type { Attachment, FileDeps } from './attachment.js';
+import { findSentAttachment, grantDownload, redeemDownloadGrant } from './downloads.js';
+import { cancelDraftUpload, draftUploadStatus } from './draft-uploads.js';
 import { downloadInbound } from './inbound-download.js';
 import { materialize, type MaterializedFile } from './materialize.js';
 import { scanAttachment } from './scan.js';
@@ -33,6 +36,26 @@ export class Files {
     upload: { id: string; stream: Readable; isTruncated?: () => boolean },
   ) {
     return receiveUpload(this.deps, employee, upload);
+  }
+
+  async draftStatus(employee: Employee, id: string) {
+    return draftUploadStatus(this.deps, { employeeId: employee.id, id });
+  }
+
+  async cancelDraft(employee: Employee, id: string): Promise<void> {
+    await cancelDraftUpload(this.deps, { employeeId: employee.id, id });
+  }
+
+  async sentAttachment(id: string): Promise<Attachment> {
+    return findSentAttachment(this.deps, id);
+  }
+
+  async grantDownload(session: Session, attachmentId: string) {
+    return grantDownload(this.deps, { attachmentId, session });
+  }
+
+  async redeemGrant(grant: string): Promise<Attachment> {
+    return redeemDownloadGrant(this.deps, grant);
   }
 
   async downloadInbound(id: string): Promise<void> {

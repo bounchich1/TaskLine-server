@@ -4,6 +4,14 @@ import type { Employee } from '../../shared/types/entities.js';
 import { DEFAULT_TEMPLATES, validateTemplate } from '../templates/index.js';
 
 import { runAdminMutation } from './admin-mutation.js';
+import {
+  listAllEmployees,
+  listTemplates,
+  readSettings,
+  recentAudit,
+  retryFailedJob,
+} from './admin-queries.js';
+import { adminDiagnostics } from './diagnostics.js';
 import { dictionaryBody, publishDictionaryEntry } from './dictionaries.js';
 import { createEmployee, employeeBody, updateEmployee } from './employees.js';
 import {
@@ -71,5 +79,29 @@ export class Admin {
       { ...request, route: 'admin.settings', body: settings },
       (tx) => updateSettings(tx, this.org, { settings, expectedVersion: request.expectedVersion }),
     );
+  }
+
+  async employees() {
+    return listAllEmployees(this.db, this.org);
+  }
+
+  async templates() {
+    return listTemplates(this.db, this.org);
+  }
+
+  async currentSettings() {
+    return readSettings(this.db, this.org);
+  }
+
+  async audit() {
+    return recentAudit(this.db, this.org);
+  }
+
+  async diagnostics() {
+    return adminDiagnostics(this.db, this.org);
+  }
+
+  async retryJob(jobId: string): Promise<void> {
+    await retryFailedJob(this.db, this.org, jobId);
   }
 }

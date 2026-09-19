@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, expect, it } from 'vitest';
 
-import { buildApi } from '../src/api.js';
+import { buildApi } from '../src/app/http/build-api.js';
 import { MaxClient } from '../src/integrations/max/index.js';
 import { DeliveryWorker } from '../src/modules/delivery/index.js';
 import { Files } from '../src/modules/files/index.js';

@@ -86,3 +86,35 @@ export async function issueSession(
     };
   });
 }
+
+/** Logout: the session stops working immediately. */
+export async function revokeSession(db: Sql, sessionHash: string): Promise<void> {
+  await db.query('UPDATE staff_sessions SET revoked=true WHERE hash=$1', [sessionHash]);
+}
+
+/** Replaces the session and CSRF tokens of a live session; the old token stops working. */
+export async function rotateSession(
+  db: Database,
+  sessionHash: string,
+): Promise<{ token: string; csrf: string }> {
+  const secret = token();
+  const csrf = token();
+  await db.tx(async (tx) => {
+    const row = await tx.query(
+      `UPDATE staff_sessions SET hash=$2,csrf_hash=$3,last_seen_at=now()
+       WHERE hash=$1 AND NOT revoked AND expires_at>now() RETURNING hash`,
+      [sessionHash, hash(secret), hash(csrf)],
+    );
+    ensure(row.rows.length, 'unauthorized', 401);
+  });
+  return { token: secret, csrf };
+}
+
+/** The signed-in employee, what they may do, and their organization (GET /v1/me). */
+export async function describeSession(db: Sql, org: string, employee: Employee) {
+  return {
+    employee,
+    capabilities: capabilities(employee),
+    organization: await one(db, 'SELECT name,timezone FROM organizations WHERE id=$1', [org]),
+  };
+}

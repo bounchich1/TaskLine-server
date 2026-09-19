@@ -25,3 +25,12 @@ export async function findActiveDictionaryEntry(
     [org, dimension, code],
   );
 }
+
+/** Every entry, active or not, for the classification pickers and the admin console. */
+export async function listDictionaries(db: Sql, org: string) {
+  const result = await db.query(
+    'SELECT * FROM dictionaries WHERE org_id=$1 ORDER BY dimension,rank DESC,code',
+    [org],
+  );
+  return { items: result.rows };
+}

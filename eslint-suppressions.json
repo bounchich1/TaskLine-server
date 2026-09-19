@@ -108,41 +108,6 @@
       "count": 1
     }
   },
-  "src/api.ts": {
-    "@typescript-eslint/no-base-to-string": {
-      "count": 1
-    },
-    "@typescript-eslint/no-confusing-void-expression": {
-      "count": 2
-    },
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 21
-    },
-    "@typescript-eslint/require-await": {
-      "count": 3
-    },
-    "@typescript-eslint/restrict-template-expressions": {
-      "count": 1
-    },
-    "complexity": {
-      "count": 1
-    },
-    "id-length": {
-      "count": 4
-    },
-    "max-depth": {
-      "count": 1
-    },
-    "max-len": {
-      "count": 5
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    }
-  },
   "src/cli.ts": {
     "@typescript-eslint/no-non-null-assertion": {
       "count": 1
@@ -184,14 +149,6 @@
   },
   "src/main.ts": {
     "id-length": {
-      "count": 1
-    }
-  },
-  "src/openapi.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unnecessary-type-assertion": {
       "count": 1
     }
   },

@@ -55,7 +55,7 @@ for (const [path, method] of [
   ['/v1/admin/audit', 'get'],
 ]) {
   paths[path] = {
-    ...((paths[path] as object) ?? {}),
+    ...(paths[path] as object | undefined),
     [method]: {
       summary: path.split('/').at(-1),
       security: path === '/v1/auth/max' ? [] : [{ bearerAuth: [] }],

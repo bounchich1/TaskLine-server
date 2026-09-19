@@ -1,2 +1,2 @@
 export { Admin, type AdminRequest } from './admin.js';
-export { adminDiagnostics } from './diagnostics.js';
+export { adminRoutes, opsRoutes } from './admin.routes.js';
