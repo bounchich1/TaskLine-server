@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Format, lint (incl. architecture boundaries), typecheck, knip, unit tests, build.
+      - run: npm run check
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.3-alpine
+        env:
+          POSTGRES_USER: support
+          POSTGRES_PASSWORD: support
+          POSTGRES_DB: support
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U support -d support"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      RUN_POSTGRES_TESTS: '1'
+      DATABASE_URL: postgres://support:support@localhost:5432/support
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:integration

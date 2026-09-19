@@ -1,7 +1,7 @@
 import type { Config } from '../../shared/config.js';
 import type { Database } from '../../shared/db.js';
 
-export interface CliContext {
+interface CliContext {
   db: Database;
   config: Config;
   /** Arguments after the command name. */

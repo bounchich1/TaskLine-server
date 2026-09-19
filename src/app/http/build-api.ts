@@ -4,7 +4,7 @@ import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance } from 'fastify';
 
-import { MaxClient, type MaxTransport } from '../../integrations/max/index.js';
+import { MaxClient } from '../../integrations/max/index.js';
 import { Admin, adminRoutes, opsRoutes } from '../../modules/admin/index.js';
 import { deliveryRoutes, DeliveryWorker } from '../../modules/delivery/index.js';
 import { dictionariesRoutes } from '../../modules/dictionaries/index.js';
@@ -32,11 +32,7 @@ const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
  * any route plugin, so every plugin inherits them (and unknown /v1 routes still answer 401).
  * Route plugins use full paths, no prefixes.
  */
-export async function buildApi(
-  db: Database,
-  config: Config,
-  transport?: MaxTransport,
-): Promise<FastifyInstance> {
+export async function buildApi(db: Database, config: Config): Promise<FastifyInstance> {
   const app = Fastify({
     bodyLimit: MAX_BODY_BYTES,
     trustProxy: false,
@@ -47,7 +43,7 @@ export async function buildApi(
   app.setErrorHandler(handleError);
   addOriginHook(app, config);
   addSessionHook(app, db, config);
-  await registerRoutes(app, { db, config, transport });
+  await registerRoutes(app, db, config);
   return app;
 }
 
@@ -60,15 +56,12 @@ async function registerInfrastructure(app: FastifyInstance): Promise<void> {
   });
 }
 
-async function registerRoutes(
-  app: FastifyInstance,
-  { db, config, transport }: { db: Database; config: Config; transport?: MaxTransport },
-): Promise<void> {
+async function registerRoutes(app: FastifyInstance, db: Database, config: Config): Promise<void> {
   const org = config.ORG_ID;
   const inbox = new Inbox(db, config);
   const files = new Files(db, config);
   const admin = new Admin(db, org);
-  const deliveries = new DeliveryWorker(db, config, transport ?? new MaxClient(config), files);
+  const deliveries = new DeliveryWorker(db, config, new MaxClient(config), files);
   const queries = new TicketQueries(db, org);
   const commands = new TicketCommands(db, config);
 

@@ -136,8 +136,6 @@ export default tseslint.config(
           partialMatch: false,
         },
         { type: 'shared', pattern: 'src/shared', partialMatch: false },
-        // Temporary: files not yet moved into the layout above. Nothing new may depend on them.
-        { type: 'legacy', pattern: 'src', partialMatch: false },
       ],
     },
     rules: {
@@ -172,14 +170,7 @@ export default tseslint.config(
                   { element: { type: 'shared' } },
                   publicApi('integration'),
                   publicApi('module'),
-                  { element: { type: 'legacy' } },
                 ],
-              },
-            },
-            {
-              from: { element: { type: 'legacy' } },
-              allow: {
-                to: { element: { type: ['legacy', 'shared', 'integration', 'module', 'app'] } },
               },
             },
           ],

@@ -1,5 +1,5 @@
-export { handleClientContent, type ClientContent } from './client-content.js';
+export { handleClientContent } from './client-content.js';
 export { sendTicketHistory } from './client-history.js';
-export { TicketCommands, type TicketCommandRequest } from './commands/ticket-commands.js';
-export { TicketQueries, type MessagePage } from './queries/ticket-queries.js';
+export { TicketCommands } from './commands/ticket-commands.js';
+export { TicketQueries } from './queries/ticket-queries.js';
 export { ticketRoutes } from './ticket.routes.js';

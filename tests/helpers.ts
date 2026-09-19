@@ -36,7 +36,7 @@ export function testConfig(): Config {
   });
 }
 /** In-memory PostgreSQL (PGlite) with the schema applied; every statement is traced. */
-export async function memoryDb(): Promise<Database> {
+async function memoryDb(): Promise<Database> {
   const pg = new PGlite();
   const adapt = (connection: Pick<PGlite, 'query' | 'exec'>): Sql => ({
     // Same contract as Sql.query: the row type is the caller's claim.
