@@ -1,0 +1,607 @@
+{
+  "scripts/init-env.mjs": {
+    "curly": {
+      "count": 2
+    }
+  },
+  "src/admin.ts": {
+    "@typescript-eslint/max-params": {
+      "count": 3
+    },
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 2
+    },
+    "max-len": {
+      "count": 2
+    }
+  },
+  "src/ai/contracts.ts": {
+    "@typescript-eslint/max-params": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 2
+    }
+  },
+  "src/ai/gateway.ts": {
+    "@typescript-eslint/consistent-type-definitions": {
+      "count": 3
+    },
+    "@typescript-eslint/no-base-to-string": {
+      "count": 2
+    },
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 4
+    },
+    "@typescript-eslint/no-unnecessary-condition": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 2
+    },
+    "@typescript-eslint/prefer-optional-chain": {
+      "count": 2
+    },
+    "complexity": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 1
+    },
+    "max-len": {
+      "count": 3
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-nested-ternary": {
+      "count": 1
+    }
+  },
+  "src/ai/memory.ts": {
+    "@typescript-eslint/consistent-type-definitions": {
+      "count": 1
+    },
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "@typescript-eslint/restrict-template-expressions": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 7
+    },
+    "max-len": {
+      "count": 5
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/ai/workflows.ts": {
+    "@typescript-eslint/consistent-type-definitions": {
+      "count": 1
+    },
+    "@typescript-eslint/max-params": {
+      "count": 1
+    },
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 3
+    },
+    "@typescript-eslint/restrict-template-expressions": {
+      "count": 5
+    },
+    "complexity": {
+      "count": 3
+    },
+    "id-length": {
+      "count": 21
+    },
+    "max-depth": {
+      "count": 3
+    },
+    "max-len": {
+      "count": 6
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 4
+    },
+    "no-nested-ternary": {
+      "count": 1
+    },
+    "prefer-const": {
+      "count": 1
+    }
+  },
+  "src/api.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "@typescript-eslint/no-confusing-void-expression": {
+      "count": 2
+    },
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 21
+    },
+    "@typescript-eslint/require-await": {
+      "count": 3
+    },
+    "@typescript-eslint/restrict-template-expressions": {
+      "count": 2
+    },
+    "complexity": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 4
+    },
+    "max-depth": {
+      "count": 1
+    },
+    "max-len": {
+      "count": 5
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "src/auth.ts": {
+    "@typescript-eslint/consistent-type-definitions": {
+      "count": 1
+    },
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 6
+    },
+    "max-len": {
+      "count": 1
+    },
+    "no-nested-ternary": {
+      "count": 1
+    }
+  },
+  "src/cli.ts": {
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-condition": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 1
+    },
+    "max-len": {
+      "count": 1
+    }
+  },
+  "src/config.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 2
+    }
+  },
+  "src/crypto.ts": {
+    "@typescript-eslint/no-unnecessary-type-parameters": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 2
+    }
+  },
+  "src/db.ts": {
+    "@typescript-eslint/no-unnecessary-type-parameters": {
+      "count": 1
+    },
+    "max-len": {
+      "count": 1
+    }
+  },
+  "src/delivery.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 3
+    },
+    "@typescript-eslint/prefer-optional-chain": {
+      "count": 1
+    },
+    "complexity": {
+      "count": 2
+    },
+    "max-depth": {
+      "count": 2
+    },
+    "max-len": {
+      "count": 7
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 4
+    },
+    "no-nested-ternary": {
+      "count": 1
+    }
+  },
+  "src/domain.ts": {
+    "@typescript-eslint/max-params": {
+      "count": 5
+    },
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "@typescript-eslint/no-confusing-void-expression": {
+      "count": 1
+    },
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 24
+    },
+    "@typescript-eslint/prefer-nullish-coalescing": {
+      "count": 2
+    },
+    "@typescript-eslint/prefer-optional-chain": {
+      "count": 1
+    },
+    "@typescript-eslint/restrict-template-expressions": {
+      "count": 3
+    },
+    "complexity": {
+      "count": 3
+    },
+    "id-length": {
+      "count": 3
+    },
+    "max-depth": {
+      "count": 1
+    },
+    "max-len": {
+      "count": 25
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 5
+    }
+  },
+  "src/events.ts": {
+    "@typescript-eslint/max-params": {
+      "count": 3
+    },
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 3
+    },
+    "max-len": {
+      "count": 2
+    }
+  },
+  "src/files.ts": {
+    "@typescript-eslint/no-empty-function": {
+      "count": 1
+    },
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 1
+    },
+    "@typescript-eslint/prefer-includes": {
+      "count": 2
+    },
+    "@typescript-eslint/prefer-optional-chain": {
+      "count": 2
+    },
+    "complexity": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 1
+    },
+    "max-len": {
+      "count": 5
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-control-regex": {
+      "count": 1
+    },
+    "no-nested-ternary": {
+      "count": 2
+    }
+  },
+  "src/json.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "src/main.ts": {
+    "id-length": {
+      "count": 1
+    }
+  },
+  "src/max/client.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "@typescript-eslint/no-empty-function": {
+      "count": 1
+    },
+    "@typescript-eslint/restrict-template-expressions": {
+      "count": 1
+    },
+    "complexity": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 2
+    }
+  },
+  "src/max/normalize.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 5
+    },
+    "@typescript-eslint/restrict-template-expressions": {
+      "count": 1
+    },
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/network.ts": {
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-member-access": {
+      "count": 1
+    },
+    "@typescript-eslint/restrict-plus-operands": {
+      "count": 1
+    },
+    "complexity": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 3
+    }
+  },
+  "src/openapi.ts": {
+    "@typescript-eslint/no-unnecessary-condition": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/queries.ts": {
+    "@typescript-eslint/restrict-template-expressions": {
+      "count": 5
+    },
+    "complexity": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 4
+    },
+    "max-len": {
+      "count": 5
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-nested-ternary": {
+      "count": 2
+    }
+  },
+  "src/rating.ts": {
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/seed.ts": {
+    "id-length": {
+      "count": 1
+    }
+  },
+  "src/templates.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-condition": {
+      "count": 1
+    },
+    "max-len": {
+      "count": 1
+    }
+  },
+  "src/types.ts": {
+    "@typescript-eslint/consistent-type-definitions": {
+      "count": 5
+    }
+  },
+  "src/workers.ts": {
+    "@typescript-eslint/consistent-type-imports": {
+      "count": 1
+    },
+    "@typescript-eslint/no-empty-function": {
+      "count": 3
+    },
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 6
+    },
+    "@typescript-eslint/no-unnecessary-condition": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-member-access": {
+      "count": 1
+    },
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "complexity": {
+      "count": 2
+    },
+    "id-length": {
+      "count": 4
+    },
+    "max-depth": {
+      "count": 5
+    },
+    "max-len": {
+      "count": 9
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    },
+    "no-nested-ternary": {
+      "count": 6
+    }
+  },
+  "tests/ai.test.ts": {
+    "@typescript-eslint/require-await": {
+      "count": 12
+    },
+    "@typescript-eslint/restrict-template-expressions": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 6
+    },
+    "max-len": {
+      "count": 1
+    }
+  },
+  "tests/api.test.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unsafe-member-access": {
+      "count": 8
+    },
+    "@typescript-eslint/restrict-template-expressions": {
+      "count": 2
+    },
+    "id-length": {
+      "count": 1
+    },
+    "vitest/no-standalone-expect": {
+      "count": 1
+    }
+  },
+  "tests/domain.test.ts": {
+    "@typescript-eslint/no-empty-function": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-conversion": {
+      "count": 1
+    },
+    "@typescript-eslint/require-await": {
+      "count": 2
+    },
+    "id-length": {
+      "count": 2
+    }
+  },
+  "tests/helpers.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 3
+    },
+    "@typescript-eslint/no-unnecessary-type-parameters": {
+      "count": 1
+    },
+    "@typescript-eslint/restrict-template-expressions": {
+      "count": 2
+    },
+    "@typescript-eslint/unbound-method": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 1
+    },
+    "max-len": {
+      "count": 1
+    },
+    "no-empty": {
+      "count": 2
+    }
+  },
+  "tests/postgres.test.ts": {
+    "@typescript-eslint/no-unnecessary-condition": {
+      "count": 2
+    },
+    "@typescript-eslint/restrict-template-expressions": {
+      "count": 4
+    },
+    "id-length": {
+      "count": 3
+    },
+    "max-depth": {
+      "count": 1
+    },
+    "max-len": {
+      "count": 2
+    }
+  },
+  "tests/primitives.test.ts": {
+    "@typescript-eslint/array-type": {
+      "count": 1
+    },
+    "@typescript-eslint/no-confusing-void-expression": {
+      "count": 3
+    },
+    "@typescript-eslint/restrict-template-expressions": {
+      "count": 1
+    },
+    "id-length": {
+      "count": 10
+    },
+    "max-len": {
+      "count": 1
+    }
+  }
+}

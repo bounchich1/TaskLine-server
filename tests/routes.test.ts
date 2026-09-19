@@ -6,18 +6,18 @@ import { buildApi } from '../src/api.js';
 // Refactoring safety net: the HTTP surface (paths and methods) must not change while routes move
 // into feature modules. The route tree is flattened and sorted so registration order is irrelevant.
 
-let f: Awaited<ReturnType<typeof fixture>>;
+let context: Awaited<ReturnType<typeof fixture>>;
 let app: Awaited<ReturnType<typeof buildApi>>;
 
 beforeAll(async () => {
-  f = await fixture();
-  app = await buildApi(f.db, f.c);
+  context = await fixture();
+  app = await buildApi(context.db, context.c);
   await app.ready();
 });
 
 afterAll(async () => {
   await app.close();
-  await f.db.close();
+  await context.db.close();
 });
 
 function flattenRouteTree(tree: string): string[] {
@@ -28,7 +28,9 @@ function flattenRouteTree(tree: string): string[] {
     if (!match) {
       continue;
     }
-    const [, indent = '', segment = '', methods] = match;
+    const [, indent = '', segment = ''] = match;
+    // The method group is optional: intermediate tree nodes have no handlers of their own.
+    const methods = match.at(3);
     const depth = indent.length / 4;
     const path = (depth > 0 ? (prefixes[depth - 1] ?? '') : '') + segment;
     prefixes[depth] = path;

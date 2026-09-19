@@ -2,8 +2,8 @@
 import js from '@eslint/js';
 import vitest from '@vitest/eslint-plugin';
 import prettier from 'eslint-config-prettier';
-import boundaries from 'eslint-plugin-boundaries';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
+import boundaries from 'eslint-plugin-boundaries';
 import importX from 'eslint-plugin-import-x';
 import unicorn from 'eslint-plugin-unicorn';
 import globals from 'globals';
