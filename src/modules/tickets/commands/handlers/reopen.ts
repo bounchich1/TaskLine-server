@@ -1,0 +1,81 @@
+import type { Ctx } from '../../../../shared/context.js';
+import { one, type Sql } from '../../../../shared/db.js';
+import { ensure } from '../../../../shared/errors.js';
+import { formatTicketNumber } from '../../../../shared/ticket-number.js';
+import type { Ticket } from '../../../../shared/types/entities.js';
+import { invalidateLearning } from '../../../learning/index.js';
+import { addMessage } from '../../../messages/index.js';
+import { cancelCycleDeliveries, queueBotMessage } from '../../../outbox/index.js';
+import { requireOwner, type TicketCommand, type TicketCommandHandler } from '../command-context.js';
+
+/**
+ * Reopen a closed ticket (or one awaiting its rating) with a reason. Starts a new lifecycle:
+ * the rating cycle is abandoned and the previous resolution is withdrawn from learning.
+ */
+export const reopen: TicketCommandHandler = async (tx, ctx, command) => {
+  const { actor, client, ticket, body } = command;
+  requireOwner(command);
+  ensure(['awaiting_rating', 'closed'].includes(ticket.status), 'already_open');
+  ensure(typeof body.reason === 'string' && body.reason.trim().length > 0, 'reason_required', 422);
+  await ensureConversationSlotFree(tx, command);
+  if (ticket.current_cycle_id) {
+    await cancelCycleDeliveries(tx, ticket.current_cycle_id);
+  }
+  await invalidateLearning(tx, ctx, ticket.id, 'reopened');
+  const assigneeId = await resolveAssignee(tx, ctx, command);
+  await tx.query(
+    `UPDATE tickets SET status='in_progress',assignee_id=$2,closed_at=NULL,closed_by=NULL,
+       current_cycle_id=NULL,lifecycle=lifecycle+1,suggestion_stale=true
+     WHERE id=$1`,
+    [ticket.id, assigneeId],
+  );
+  await addMessage(tx, ctx, ticket, {
+    author: 'system',
+    authorId: actor.id,
+    text: `Переоткрыто: ${body.reason}`,
+    providerRef: null,
+    state: 'internal',
+  });
+  await queueBotMessage(tx, ctx, {
+    client,
+    template: 'ticket_reopened',
+    // `ticket.lifecycle` is the value before the UPDATE above.
+    key: `reopened:${ticket.id}:${ticket.lifecycle + 1}`,
+    ticket,
+  });
+};
+
+/** A client has at most one open ticket (their single conversation with support). */
+async function ensureConversationSlotFree(
+  tx: Sql,
+  { client, ticket }: TicketCommand,
+): Promise<void> {
+  const conflict = await one<Ticket>(
+    tx,
+    "SELECT * FROM tickets WHERE client_id=$1 AND id<>$2 AND status<>'closed'",
+    [client.id, ticket.id],
+  );
+  ensure(
+    !conflict,
+    'conversation_slot_conflict',
+    409,
+    `У клиента уже есть обращение №${formatTicketNumber(conflict?.ticket_number ?? '')}.`,
+  );
+}
+
+/** Reopened tickets go to the requested employee; support staff may only reopen to themselves. */
+async function resolveAssignee(tx: Sql, ctx: Ctx, { actor, body }: TicketCommand): Promise<string> {
+  const assigneeId = typeof body.employee_id === 'string' ? body.employee_id : actor.id;
+  if (actor.role === 'support') {
+    ensure(assigneeId === actor.id, 'forbidden', 403);
+  }
+  ensure(
+    await one(tx, 'SELECT id FROM employees WHERE org_id=$1 AND id=$2 AND NOT blocked', [
+      ctx.org,
+      assigneeId,
+    ]),
+    'invalid_employee',
+    422,
+  );
+  return assigneeId;
+}
