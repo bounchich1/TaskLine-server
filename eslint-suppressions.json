@@ -225,10 +225,10 @@
       "count": 1
     },
     "@typescript-eslint/no-non-null-assertion": {
-      "count": 17
+      "count": 14
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 2
+      "count": 1
     },
     "@typescript-eslint/prefer-optional-chain": {
       "count": 1
@@ -246,7 +246,7 @@
       "count": 1
     },
     "max-len": {
-      "count": 14
+      "count": 10
     },
     "max-lines": {
       "count": 1

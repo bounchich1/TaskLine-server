@@ -1,10 +1,16 @@
-import { randomUUID } from 'node:crypto';
-
-import { consentKeyboard } from './integrations/max/index.js';
+import {
+  clearPreconsentBuffers,
+  declineConsent,
+  grantConsent,
+  listPreconsentBuffers,
+  passesConsentGate,
+  PreconsentExpiry,
+  sendConsentPrompt,
+  withdrawConsent,
+} from './modules/consent/index.js';
 import { invalidateLearning } from './modules/learning/index.js';
 import { addMessage, reviseClientMessage, type NewMessage } from './modules/messages/index.js';
 import {
-  cancelClientDeliveries,
   cancelCycleDeliveries,
   queueBotMessage,
   queueCallbackAnswer,
@@ -14,7 +20,7 @@ import {
 import { acceptRatingInput, finishRating, RatingTimers } from './modules/ratings/index.js';
 import type { Config } from './shared/config.js';
 import { createCtx } from './shared/context.js';
-import { decrypt, encrypt, hash, token } from './shared/crypto.js';
+import { decrypt, encrypt, hash } from './shared/crypto.js';
 import { one, type Database, type Sql } from './shared/db.js';
 import { ensure } from './shared/errors.js';
 import { audit, emit, enqueue } from './shared/events.js';
@@ -136,21 +142,7 @@ export class Domain {
   }
 
   async consentPrompt(tx: Sql, client: Client, sourceKey: string) {
-    const buttons = [];
-    for (const [action, label] of [
-      ['accept', 'Согласен'],
-      ['decline', 'Отказаться'],
-    ]) {
-      const nonce = token();
-      await tx.query(
-        'INSERT INTO callback_actions(nonce,org_id,client_id,action,policy_version) VALUES($1,$2,$3,$4,$5)',
-        [nonce, this.org, client.id, action, this.config.POLICY_VERSION],
-      );
-      buttons.push({ type: 'callback', text: label, payload: nonce });
-    }
-    await this.bot(tx, client, 'consent_request', `consent:${sourceKey}`, undefined, undefined, {
-      attachments: [consentKeyboard(buttons)],
-    });
+    await sendConsentPrompt(tx, this.ctx, client, sourceKey);
   }
 
   async route(tx: Sql, client: Client, input: ClientInput, receivedAt: string) {
@@ -176,28 +168,12 @@ export class Domain {
         return;
       }
       if (action.action === 'accept') {
-        if (
-          client.consent_state === 'granted' &&
-          client.consent_version === this.config.POLICY_VERSION
-        ) {
+        const granted = await grantConsent(tx, this.ctx, client, input.sourceKey);
+        if (!granted) {
           return;
         }
-        client = (await one<Client>(
-          tx,
-          "UPDATE clients SET consent_state='granted',consent_version=$2,consent_at=now(),consent_revision=consent_revision+1 WHERE id=$1 RETURNING *",
-          [client.id, this.config.POLICY_VERSION],
-        ))!;
-        await tx.query(
-          "INSERT INTO consent_events(org_id,client_id,action,policy_version) VALUES($1,$2,'grant',$3)",
-          [this.org, client.id, this.config.POLICY_VERSION],
-        );
-        await this.bot(tx, client, 'consent_accepted', `accepted:${input.sourceKey}`);
-        const buffers = (
-          await tx.query<Row & { payload: string; expires_at: string; created_at: string }>(
-            'SELECT * FROM preconsent_buffers WHERE client_id=$1 ORDER BY created_at,id',
-            [client.id],
-          )
-        ).rows;
+        client = granted;
+        const buffers = await listPreconsentBuffers(tx, client.id);
         const now = await one(tx, 'SELECT now() AS now');
         let expired = false;
         for (const buffer of buffers) {
@@ -212,22 +188,12 @@ export class Domain {
             buffer.created_at,
           );
         }
-        await tx.query('DELETE FROM preconsent_buffers WHERE client_id=$1', [client.id]);
+        await clearPreconsentBuffers(tx, client.id);
         if (expired) {
           await this.bot(tx, client, 'buffer_expired', `expired:${input.sourceKey}`);
         }
       } else if (action.action === 'decline') {
-        // An old decline button cannot revoke a consent already granted by a newer action.
-        if (client.consent_state === 'granted') {
-          return;
-        }
-        await tx.query("UPDATE clients SET consent_state='declined' WHERE id=$1", [client.id]);
-        await tx.query('DELETE FROM preconsent_buffers WHERE client_id=$1', [client.id]);
-        await tx.query(
-          "INSERT INTO consent_events(org_id,client_id,action,policy_version) VALUES($1,$2,'decline',$3)",
-          [this.org, client.id, this.config.POLICY_VERSION],
-        );
-        await this.bot(tx, client, 'consent_declined', `declined:${input.sourceKey}`);
+        await declineConsent(tx, this.ctx, client, input.sourceKey);
       }
       return;
     }
@@ -261,38 +227,7 @@ export class Domain {
       await queueHistoryPage(tx, this.ctx, client, { sourceKey: input.sourceKey, text });
       return;
     }
-    const slot = await one<Ticket>(
-      tx,
-      "SELECT * FROM tickets WHERE org_id=$1 AND client_id=$2 AND status<>'closed'",
-      [this.org, client.id],
-    );
-    const consent =
-      client.consent_state === 'granted' &&
-      (slot || client.consent_version === this.config.POLICY_VERSION);
-    if (!consent) {
-      if (input.kind === 'message' && command !== '/start') {
-        const bytes = Buffer.byteLength(JSON.stringify(input));
-        const size = await one(
-          tx,
-          'SELECT count(*)::int AS n,coalesce(sum(byte_count),0)::int AS bytes FROM preconsent_buffers WHERE client_id=$1',
-          [client.id],
-        );
-        if (Number(size!.n) < 5 && Number(size!.bytes) + bytes <= 65536) {
-          await tx.query(
-            'INSERT INTO preconsent_buffers(org_id,client_id,source_key,payload,byte_count) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
-            [
-              this.org,
-              client.id,
-              input.sourceKey,
-              encrypt(input, this.config.ENCRYPTION_KEY),
-              bytes,
-            ],
-          );
-        } else {
-          await this.bot(tx, client, 'buffer_full', `bufferfull:${input.sourceKey}`);
-        }
-      }
-      await this.consentPrompt(tx, client, input.sourceKey);
+    if (!(await passesConsentGate(tx, this.ctx, client, input))) {
       return;
     }
     if (input.kind === 'started' || command === '/start') {
@@ -439,39 +374,7 @@ export class Domain {
   }
 
   async withdraw(tx: Sql, client: Client, key: string) {
-    if (client.consent_state !== 'withdrawn') {
-      await tx.query(
-        "UPDATE clients SET consent_state='withdrawn',consent_revision=consent_revision+1 WHERE id=$1",
-        [client.id],
-      );
-      await tx.query(
-        'INSERT INTO deletion_tombstones(org_id,client_id,consent_revision) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
-        [this.org, client.id, client.consent_revision],
-      );
-      await tx.query(
-        "INSERT INTO consent_events(org_id,client_id,action,policy_version) VALUES($1,$2,'withdraw',$3)",
-        [this.org, client.id, client.consent_version ?? this.config.POLICY_VERSION],
-      );
-    }
-    await tx.query('DELETE FROM preconsent_buffers WHERE client_id=$1', [client.id]);
-    await tx.query('DELETE FROM callback_actions WHERE client_id=$1', [client.id]);
-    await cancelClientDeliveries(tx, client.id);
-    const tickets = (
-      await tx.query<Ticket>('SELECT * FROM tickets WHERE org_id=$1 AND client_id=$2 FOR UPDATE', [
-        this.org,
-        client.id,
-      ])
-    ).rows;
-    for (const ticket of tickets) {
-      await tx.query(
-        "UPDATE tickets SET status='closed',closed_at=coalesce(closed_at,now()),version=version+1,lifecycle=lifecycle+1,suggestion=NULL,ai_status=CASE WHEN ai_status='pending' THEN 'failed' ELSE ai_status END WHERE id=$1",
-        [ticket.id],
-      );
-      await this.invalidateLearning(tx, ticket.id, 'withdrawn');
-      await emit(tx, this.org, 'consent.withdrawn', ticket.id);
-    }
-    await this.bot(tx, client, 'consent_withdrawn', `withdrawn:${key}`);
-    await audit(tx, this.org, null, 'consent.withdrawn', client.id);
+    await withdrawConsent(tx, this.ctx, client, key);
   }
 
   async invalidateLearning(tx: Sql, ticketId: string, reason: string) {
@@ -767,29 +670,6 @@ export class Domain {
 
   async timers() {
     await new RatingTimers(this.db, this.config).run();
-    const expiredBuffers = (
-      await this.db.query<{ client_id: string }>(
-        'SELECT DISTINCT client_id FROM preconsent_buffers WHERE expires_at<=now() LIMIT 100',
-      )
-    ).rows;
-    for (const item of expiredBuffers) {
-      await this.db.tx(async (tx) => {
-        const client = await one<Client>(
-          tx,
-          'SELECT * FROM clients WHERE org_id=$1 AND id=$2 FOR UPDATE',
-          [this.org, item.client_id],
-        );
-        if (!client) {
-          return;
-        }
-        const removed = await tx.query(
-          'DELETE FROM preconsent_buffers WHERE client_id=$1 AND expires_at<=now() RETURNING id',
-          [client.id],
-        );
-        if (removed.rows.length) {
-          await this.bot(tx, client, 'buffer_expired', `buffer-expired:${randomUUID()}`);
-        }
-      });
-    }
+    await new PreconsentExpiry(this.db, this.config).run();
   }
 }
