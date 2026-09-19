@@ -48,12 +48,17 @@ export async function applyTriage(
       !success || result.needs_review,
     ],
   );
-  await audit(tx, ctx.org, null, 'ai.triage', ticket.id, {
-    success,
-    reason: success ? null : failure,
-    skill_hash: hash(TRIAGE_SKILL),
+  await audit(tx, ctx.org, {
+    actor: null,
+    action: 'ai.triage',
+    objectId: ticket.id,
+    detail: {
+      success,
+      reason: success ? null : failure,
+      skill_hash: hash(TRIAGE_SKILL),
+    },
   });
-  await emit(tx, ctx.org, 'ticket.classified', ticket.id);
+  await emit(tx, ctx.org, { type: 'ticket.classified', ticketId: ticket.id });
 }
 
 async function lockTicket(tx: Sql, ctx: Ctx, job: Job): Promise<Ticket | undefined> {

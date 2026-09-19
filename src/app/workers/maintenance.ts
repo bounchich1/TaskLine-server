@@ -32,7 +32,7 @@ async function expireOverdueTriage(tx: Sql, ctx: Ctx): Promise<void> {
        WHERE kind='triage' AND ref_id=$1 AND state IN('pending','running')`,
       [ticket.id],
     );
-    await emit(tx, ctx.org, 'ticket.classified', ticket.id);
+    await emit(tx, ctx.org, { type: 'ticket.classified', ticketId: ticket.id });
   }
 }
 

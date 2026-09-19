@@ -71,5 +71,10 @@ async function recordRating(
     key: `rated:${cycle.id}`,
     ticket,
   });
-  await emit(tx, ctx.org, 'rating.received', ticket.id, { value }, String(cycle.closed_by));
+  await emit(tx, ctx.org, {
+    type: 'rating.received',
+    ticketId: ticket.id,
+    payload: { value },
+    employeeId: String(cycle.closed_by),
+  });
 }

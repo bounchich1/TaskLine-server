@@ -22,9 +22,14 @@ export const permitResolveCommand: CliCommand = async ({ db, config, args }) => 
   await db.tx(async (tx) => {
     const permit = await one(tx, 'SELECT * FROM ai_permits WHERE slot=$1 FOR UPDATE', [slot]);
     ensure(permit?.state === 'uncertain', 'permit_not_uncertain');
-    await audit(tx, config.ORG_ID, null, 'ai.permit.resolved', String(slot), {
-      evidence,
-      holder: permit.holder,
+    await audit(tx, config.ORG_ID, {
+      actor: null,
+      action: 'ai.permit.resolved',
+      objectId: String(slot),
+      detail: {
+        evidence,
+        holder: permit.holder,
+      },
     });
     await tx.query(
       `UPDATE ai_calls SET state='failed',reason='operator_confirmed_ended',finished_at=now()

@@ -31,11 +31,20 @@ export async function resolveDelivery(
     state,
   ]);
   await tx.query('UPDATE messages SET delivery_state=$2 WHERE id=$1', [messageId, state]);
-  await audit(tx, ctx.org, actor.id, `delivery.${action}`, delivery.id, {
-    previous: delivery.state,
-    evidence: evidence ?? null,
+  await audit(tx, ctx.org, {
+    actor: actor.id,
+    action: `delivery.${action}`,
+    objectId: delivery.id,
+    detail: {
+      previous: delivery.state,
+      evidence: evidence ?? null,
+    },
   });
-  await emit(tx, ctx.org, 'delivery.changed', ticket.id, { message_id: messageId, state });
+  await emit(tx, ctx.org, {
+    type: 'delivery.changed',
+    ticketId: ticket.id,
+    payload: { message_id: messageId, state },
+  });
   return { state };
 }
 

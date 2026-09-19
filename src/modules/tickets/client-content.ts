@@ -58,14 +58,12 @@ export async function handleClientContent(
   });
   await storeAttachments(tx, ctx, { ticket, message, attachments });
   if (openTicket) {
-    await emit(
-      tx,
-      ctx.org,
-      'message.from_client',
-      ticket.id,
-      { message_id: message.id },
-      ticket.assignee_id,
-    );
+    await emit(tx, ctx.org, {
+      type: 'message.from_client',
+      ticketId: ticket.id,
+      payload: { message_id: message.id },
+      employeeId: ticket.assignee_id,
+    });
   } else {
     await announceNewTicket(tx, ctx, { client, ticket, message });
   }
@@ -135,7 +133,11 @@ async function storeAttachments(
         'pending',
       ],
     );
-    await enqueue(tx, ctx.org, `file:${attachment.id}`, 'file', attachment.id);
+    await enqueue(tx, ctx.org, {
+      key: `file:${attachment.id}`,
+      kind: 'file',
+      refId: attachment.id,
+    });
   }
 }
 
@@ -152,16 +154,25 @@ async function announceNewTicket(
   });
   const dictionaries = await snapshotActiveDictionaries(tx, ctx.org);
   if (ctx.config.AI_ENABLED) {
-    await enqueue(tx, ctx.org, `triage:${ticket.id}`, 'triage', ticket.id, {
-      message_id: message.id,
-      revision: 1,
-      lifecycle: ticket.lifecycle,
-      consent_revision: client.consent_revision,
-      dictionaries,
-      dictionary_version: hash(JSON.stringify(dictionaries)),
-      field_revisions: { tag: 0, urgency: 0, complexity: 0 },
+    await enqueue(tx, ctx.org, {
+      key: `triage:${ticket.id}`,
+      kind: 'triage',
+      refId: ticket.id,
+      payload: {
+        message_id: message.id,
+        revision: 1,
+        lifecycle: ticket.lifecycle,
+        consent_revision: client.consent_revision,
+        dictionaries,
+        dictionary_version: hash(JSON.stringify(dictionaries)),
+        field_revisions: { tag: 0, urgency: 0, complexity: 0 },
+      },
     });
   }
   // `ticket.version` already includes the bump from appending the first message.
-  await emit(tx, ctx.org, 'ticket.created', ticket.id, { version: ticket.version });
+  await emit(tx, ctx.org, {
+    type: 'ticket.created',
+    ticketId: ticket.id,
+    payload: { version: ticket.version },
+  });
 }

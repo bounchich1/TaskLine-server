@@ -38,14 +38,14 @@ export async function withdrawConsent(
       [ticket.id],
     );
     await invalidateLearning(tx, ctx, ticket.id, 'withdrawn');
-    await emit(tx, ctx.org, 'consent.withdrawn', ticket.id);
+    await emit(tx, ctx.org, { type: 'consent.withdrawn', ticketId: ticket.id });
   }
   await queueBotMessage(tx, ctx, {
     client,
     template: 'consent_withdrawn',
     key: `withdrawn:${key}`,
   });
-  await audit(tx, ctx.org, null, 'consent.withdrawn', client.id);
+  await audit(tx, ctx.org, { actor: null, action: 'consent.withdrawn', objectId: client.id });
 }
 
 async function recordWithdrawal(tx: Sql, ctx: Ctx, client: Client): Promise<void> {

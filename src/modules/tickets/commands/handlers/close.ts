@@ -32,9 +32,14 @@ export const close: TicketCommandHandler = async (tx, ctx, command) => {
     ticket,
     cycleId: cycle.id,
   });
-  await enqueue(tx, ctx.org, `learning:${cycle.id}`, 'learning', cycle.id, {
-    lifecycle: ticket.lifecycle,
-    consent_revision: client.consent_revision,
+  await enqueue(tx, ctx.org, {
+    key: `learning:${cycle.id}`,
+    kind: 'learning',
+    refId: cycle.id,
+    payload: {
+      lifecycle: ticket.lifecycle,
+      consent_revision: client.consent_revision,
+    },
   });
 };
 

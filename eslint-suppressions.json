@@ -58,17 +58,6 @@
       "count": 1
     }
   },
-  "src/shared/events.ts": {
-    "@typescript-eslint/max-params": {
-      "count": 3
-    },
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 3
-    },
-    "max-len": {
-      "count": 2
-    }
-  },
   "src/shared/json.ts": {
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 1

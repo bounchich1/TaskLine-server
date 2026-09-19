@@ -39,8 +39,13 @@ export async function runAdminMutation(
       return claim.response;
     }
     const result = await apply(tx);
-    await audit(tx, org, actor.id, route, auditObjectId(body, org), body);
-    await emit(tx, org, 'admin.changed', null, { route });
+    await audit(tx, org, {
+      actor: actor.id,
+      action: route,
+      objectId: auditObjectId(body, org),
+      detail: body,
+    });
+    await emit(tx, org, { type: 'admin.changed', ticketId: null, payload: { route } });
     await saveCommandResponse(tx, commandKey, result);
     return result;
   });

@@ -26,5 +26,5 @@ export async function finishRating(tx: Sql, ctx: Ctx, finish: UnratedFinish): Pr
     key: `final:${finish.key}`,
     ticket,
   });
-  await emit(tx, ctx.org, 'rating.expired', ticket.id, { reason });
+  await emit(tx, ctx.org, { type: 'rating.expired', ticketId: ticket.id, payload: { reason } });
 }

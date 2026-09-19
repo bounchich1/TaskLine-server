@@ -20,7 +20,11 @@ export async function markStaleSendsUnknown({ db, ctx }: DeliveryDeps): Promise<
         ]);
       }
       if (row.ticket_id) {
-        await emit(tx, ctx.org, 'delivery.changed', row.ticket_id, { state: 'unknown' });
+        await emit(tx, ctx.org, {
+          type: 'delivery.changed',
+          ticketId: row.ticket_id,
+          payload: { state: 'unknown' },
+        });
       }
     }
   });

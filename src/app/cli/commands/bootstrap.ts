@@ -29,7 +29,7 @@ export const bootstrapCommand: CliCommand = async ({ db, config }) => {
       "INSERT INTO employees(id,org_id,max_user_id,name,role) VALUES($1,$2,$3,$4,'admin')",
       [id, config.ORG_ID, config.BOOTSTRAP_MAX_USER_ID, config.BOOTSTRAP_NAME],
     );
-    await audit(tx, config.ORG_ID, null, 'admin.bootstrap', id);
+    await audit(tx, config.ORG_ID, { actor: null, action: 'admin.bootstrap', objectId: id });
   });
   return 'Initial administrator created.';
 };

@@ -31,9 +31,13 @@ export async function recordOutcome(
       );
     }
     if (delivery.ticket_id) {
-      await emit(tx, ctx.org, 'delivery.changed', delivery.ticket_id, {
-        message_id: delivery.message_id,
-        state,
+      await emit(tx, ctx.org, {
+        type: 'delivery.changed',
+        ticketId: delivery.ticket_id,
+        payload: {
+          message_id: delivery.message_id,
+          state,
+        },
       });
     }
   });

@@ -24,5 +24,10 @@ export const transfer: TicketCommandHandler = async (tx, ctx, command) => {
     providerRef: null,
     state: 'internal',
   });
-  await emit(tx, ctx.org, 'ticket.transferred', ticket.id, {}, target.id);
+  await emit(tx, ctx.org, {
+    type: 'ticket.transferred',
+    ticketId: ticket.id,
+    payload: {},
+    employeeId: target.id,
+  });
 };

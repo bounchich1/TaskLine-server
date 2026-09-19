@@ -29,15 +29,17 @@ export async function finishCommand(
     'UPDATE tickets SET version=version+1,updated_at=now() WHERE id=$1 RETURNING *',
     [ticket.id],
   );
-  await audit(
-    tx,
-    ctx.org,
-    actor.id,
-    `ticket.${name}`,
-    ticket.id,
-    auditDetail(name, command, result),
-  );
-  await emit(tx, ctx.org, event, ticket.id, { version: result.version });
+  await audit(tx, ctx.org, {
+    actor: actor.id,
+    action: `ticket.${name}`,
+    objectId: ticket.id,
+    detail: auditDetail(name, command, result),
+  });
+  await emit(tx, ctx.org, {
+    type: event,
+    ticketId: ticket.id,
+    payload: { version: result.version },
+  });
   await saveCommandResponse(tx, commandKey, result);
   return result;
 }

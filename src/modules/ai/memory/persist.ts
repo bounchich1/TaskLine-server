@@ -171,7 +171,11 @@ async function finalizeRecord(
     learningStatus,
   ]);
   await releaseWriter(tx, org, record.id);
-  await emit(tx, org, 'learning.changed', record.ticket_id, { state: learningStatus });
+  await emit(tx, org, {
+    type: 'learning.changed',
+    ticketId: record.ticket_id,
+    payload: { state: learningStatus },
+  });
 }
 
 /** Without an upstream id the write may or may not have happened: mark it unknown. */

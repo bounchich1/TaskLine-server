@@ -77,9 +77,13 @@ async function markClean(
        WHERE id=$1`,
       [file.id, contentType, extracted, coverage],
     );
-    await emit(tx, ctx.org, 'attachment.changed', file.ticket_id, {
-      attachment_id: file.id,
-      status: 'clean',
+    await emit(tx, ctx.org, {
+      type: 'attachment.changed',
+      ticketId: file.ticket_id,
+      payload: {
+        attachment_id: file.id,
+        status: 'clean',
+      },
     });
   });
 }

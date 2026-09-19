@@ -135,7 +135,11 @@ async function storeResolution(
     inputHash: hash(call.arguments),
     coveredIds: allIds,
   });
-  await enqueue(tx, ctx.org, `memory:${String(record.id)}`, 'memory', String(record.id));
+  await enqueue(tx, ctx.org, {
+    key: `memory:${String(record.id)}`,
+    kind: 'memory',
+    refId: String(record.id),
+  });
   await tx.query(
     `UPDATE closures SET learning_status='persistence_pending',coverage=coverage||$2::jsonb
      WHERE id=$1`,
@@ -149,12 +153,21 @@ async function storeResolution(
       }),
     ],
   );
-  await audit(tx, ctx.org, null, 'memory.tool.accepted', String(record.id), {
-    receipt_id: record.receipt_id,
-    skill_hash: hash(LEARNING_SKILL),
-    eligible: confirmed,
+  await audit(tx, ctx.org, {
+    actor: null,
+    action: 'memory.tool.accepted',
+    objectId: String(record.id),
+    detail: {
+      receipt_id: record.receipt_id,
+      skill_hash: hash(LEARNING_SKILL),
+      eligible: confirmed,
+    },
   });
-  await emit(tx, ctx.org, 'learning.changed', ticket.id, { state: 'persistence_pending' });
+  await emit(tx, ctx.org, {
+    type: 'learning.changed',
+    ticketId: ticket.id,
+    payload: { state: 'persistence_pending' },
+  });
 }
 
 /** Idempotent per snapshot: a retried job finds the record it already stored. */

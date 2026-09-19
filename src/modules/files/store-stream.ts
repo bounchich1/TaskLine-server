@@ -50,7 +50,7 @@ export async function storeStream(
         [file.id, key, bytes, digest.digest('hex')],
       );
       if (changed.rows.length) {
-        await enqueue(tx, ctx.org, `scan:${file.id}`, 'scan', file.id);
+        await enqueue(tx, ctx.org, { key: `scan:${file.id}`, kind: 'scan', refId: file.id });
       }
     });
   } finally {

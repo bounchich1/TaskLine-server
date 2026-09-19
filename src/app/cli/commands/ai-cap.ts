@@ -15,7 +15,12 @@ export const aiCapCommand: CliCommand = async ({ db, config, args }) => {
     );
     ensure(Number(busy.n) <= cap, 'drain_required');
     await tx.query('UPDATE ai_settings SET cap=$1 WHERE id=1', [cap]);
-    await audit(tx, config.ORG_ID, null, 'ai.cap.changed', '1', { cap });
+    await audit(tx, config.ORG_ID, {
+      actor: null,
+      action: 'ai.cap.changed',
+      objectId: '1',
+      detail: { cap },
+    });
   });
   return 'Global AI cap updated.';
 };

@@ -23,7 +23,11 @@ export async function invalidateLearning(
     )
   ).rows;
   for (const record of records) {
-    await enqueue(tx, ctx.org, `memory-delete:${record.id}:${reason}`, 'memory_delete', record.id);
+    await enqueue(tx, ctx.org, {
+      key: `memory-delete:${record.id}:${reason}`,
+      kind: 'memory_delete',
+      refId: record.id,
+    });
   }
   await tx.query(
     `UPDATE jobs SET state='canceled',reason=$2

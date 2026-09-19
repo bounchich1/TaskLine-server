@@ -55,15 +55,29 @@ export async function reviseClientMessage(
     [message.ticket_id, message.seq, deleted ? 'Сообщение удалено клиентом' : (input.text ?? '')],
   );
   await invalidateLearning(tx, ctx, message.ticket_id, 'message_changed');
-  await emit(tx, ctx.org, 'message.changed', message.ticket_id, { message_id: message.id });
+  await emit(tx, ctx.org, {
+    type: 'message.changed',
+    ticketId: message.ticket_id,
+    payload: { message_id: message.id },
+  });
 }
 
 async function deferRevision(tx: Sql, ctx: Ctx, client: Client, input: ClientInput) {
-  await audit(tx, ctx.org, null, 'message.deferred_revision', client.id, {
-    provider_ref: input.messageId,
-    source_key: input.sourceKey,
+  await audit(tx, ctx.org, {
+    actor: null,
+    action: 'message.deferred_revision',
+    objectId: client.id,
+    detail: {
+      provider_ref: input.messageId,
+      source_key: input.sourceKey,
+    },
   });
-  await enqueue(tx, ctx.org, `revision:${input.sourceKey}`, 'message_revision', client.id, {
-    input: encrypt(input, ctx.config.ENCRYPTION_KEY),
+  await enqueue(tx, ctx.org, {
+    key: `revision:${input.sourceKey}`,
+    kind: 'message_revision',
+    refId: client.id,
+    payload: {
+      input: encrypt(input, ctx.config.ENCRYPTION_KEY),
+    },
   });
 }

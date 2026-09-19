@@ -95,6 +95,6 @@ export async function recordJobFailure(
       "UPDATE tickets SET ai_status='failed',review_required=true WHERE id=$1 AND ai_status='pending'",
       [job.ref_id],
     );
-    await emit(tx, ctx.org, 'ticket.classified', job.ref_id);
+    await emit(tx, ctx.org, { type: 'ticket.classified', ticketId: job.ref_id });
   }
 }
