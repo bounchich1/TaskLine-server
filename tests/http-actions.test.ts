@@ -6,8 +6,8 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 
 import { buildApi } from '../src/app/http/build-api.js';
+import { JobRunner } from '../src/app/workers/job-runner.js';
 import { one } from '../src/shared/db.js';
-import { JobRunner } from '../src/workers.js';
 
 import { fixture, testConfig } from './helpers.js';
 import { staffLogin, uploadNote } from './support/http-client.js';

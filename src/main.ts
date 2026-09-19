@@ -1,8 +1,8 @@
 import { buildGateway } from './app/gateway/build-gateway.js';
 import { buildApi } from './app/http/build-api.js';
+import { startWorkers } from './app/workers/start-workers.js';
 import { readConfig } from './shared/config.js';
 import { Postgres } from './shared/db.js';
-import { startWorkers } from './workers.js';
 const c = readConfig();
 const db = new Postgres(c.DATABASE_URL);
 const role = process.argv[2] ?? 'api';
@@ -21,7 +21,7 @@ if (role === 'api' || role === 'all') {
   cleanups.push(() => api.close());
 }
 if (role === 'worker' || role === 'all') {
-  cleanups.push(await startWorkers(db, c));
+  cleanups.push(startWorkers(db, c));
 }
 if (!['api', 'worker', 'gateway', 'all'].includes(role)) {
   throw new Error('Unknown process role');

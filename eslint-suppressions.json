@@ -4,20 +4,6 @@
       "count": 2
     }
   },
-  "src/cli.ts": {
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
-    "id-length": {
-      "count": 1
-    },
-    "max-len": {
-      "count": 1
-    }
-  },
   "src/integrations/max/client.ts": {
     "@typescript-eslint/no-base-to-string": {
       "count": 1
@@ -44,11 +30,6 @@
     }
   },
   "src/main.ts": {
-    "id-length": {
-      "count": 1
-    }
-  },
-  "src/seed.ts": {
     "id-length": {
       "count": 1
     }
@@ -114,44 +95,6 @@
     },
     "id-length": {
       "count": 3
-    }
-  },
-  "src/workers.ts": {
-    "@typescript-eslint/no-empty-function": {
-      "count": 3
-    },
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 6
-    },
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
-    "@typescript-eslint/require-await": {
-      "count": 1
-    },
-    "complexity": {
-      "count": 2
-    },
-    "id-length": {
-      "count": 4
-    },
-    "max-depth": {
-      "count": 5
-    },
-    "max-len": {
-      "count": 9
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    },
-    "no-nested-ternary": {
-      "count": 6
     }
   },
   "tests/ai.test.ts": {

@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 
 import { afterEach, beforeEach, expect, it } from 'vitest';
 
+import { JobRunner } from '../src/app/workers/job-runner.js';
 import type { Model } from '../src/modules/ai/index.js';
 import { one } from '../src/shared/db.js';
 import { AppError } from '../src/shared/errors.js';
 import type { Row } from '../src/shared/types/entities.js';
-import { JobRunner } from '../src/workers.js';
 
 import { fixture } from './helpers.js';
 

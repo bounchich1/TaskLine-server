@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 
 import { PGlite } from '@electric-sql/pglite';
 
+import { seed } from '../src/app/bootstrap/seed.js';
 import { PreconsentExpiry } from '../src/modules/consent/index.js';
 import { Inbox } from '../src/modules/inbox/index.js';
 import { RatingTimers } from '../src/modules/ratings/index.js';
 import { TicketCommands } from '../src/modules/tickets/index.js';
-import { seed } from '../src/seed.js';
 import { readConfig, type Config } from '../src/shared/config.js';
 import { migrate, one, type Database, type Sql } from '../src/shared/db.js';
 import type { ClientInput } from '../src/shared/types/client-input.js';
