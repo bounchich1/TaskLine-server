@@ -8,3 +8,4 @@ coverage/
 *.log
 test-results/
 .npm-cache/
+.sql-trace/

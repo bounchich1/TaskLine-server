@@ -5,15 +5,17 @@ import { migrate, one, type Database, type Sql } from '../src/db.js';
 import { seed } from '../src/seed.js';
 import { Domain } from '../src/domain.js';
 import type { Client, Employee, Ticket } from '../src/types.js';
+import { traceSql, traceTransaction } from './support/sql-trace.js';
 
 export function testConfig():Config {return readConfig({...process.env,NODE_ENV:'test',ORG_ID:randomUUID(),AI_ENABLED:'true',AI_MODE:'mock',MEMORY_ENABLED:'true',SCANNER_MODE:'mock',MAX_MODE:'mock',DEV_AUTH_ENABLED:'true',ENCRYPTION_KEY:'ab'.repeat(32),GATEWAY_SECRET:'g'.repeat(40),MAX_WEBHOOK_SECRET:'w'.repeat(40),AGENTMEMORY_SECRET:'m'.repeat(40),DATABASE_URL:process.env.DATABASE_URL ?? 'postgres://unused',POLICY_VERSION:'test-1',POLICY_URL:'https://example.invalid/privacy',ALTERNATIVE_CONTACT:'Поддержка'});}
 export async function memoryDb():Promise<Database> {
   const pg=new PGlite();
   const adapt=(connection:Pick<PGlite,'query'|'exec'>):Sql=>({async query<T extends Record<string,unknown>>(sql:string,params:unknown[]=[]){
+    traceSql(sql,params);
     if(!params.length&&sql.includes(';')) {const results=await connection.exec(sql);const result=results.at(-1);return {rows:(result?.rows ?? []) as T[],rowCount:result?.affectedRows ?? 0};}
     const result=await connection.query<T>(sql,params);return {rows:result.rows,rowCount:result.affectedRows ?? 0};
   }});
-  const db:Database={query:adapt(pg).query,async tx<T>(fn:(sql:Sql)=>Promise<T>){return pg.transaction(async tx=>fn(adapt(tx)));},close:()=>pg.close()};
+  const db:Database={query:adapt(pg).query,async tx<T>(fn:(sql:Sql)=>Promise<T>){traceTransaction('begin');try{return await pg.transaction(async tx=>fn(adapt(tx)));}finally{traceTransaction('end');}},close:()=>pg.close()};
   await migrate(db);return db;
 }
 export async function fixture(db?:Database,c=testConfig()) {
