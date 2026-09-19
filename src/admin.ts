@@ -1,7 +1,8 @@
 import { z } from 'zod';
+
+import { hash } from './crypto.js';
 import { one, type Database, type Sql } from './db.js';
 import { ensure } from './errors.js';
-import { hash } from './crypto.js';
 import { audit, emit } from './events.js';
 import { templates, validateTemplate } from './templates.js';
 import type { Employee, Row } from './types.js';
@@ -58,7 +59,9 @@ export class Admin {
         [actor.id, route, key],
       ))!;
       ensure(prior.request_hash === digest, 'idempotency_conflict');
-      if (prior.response) return prior.response;
+      if (prior.response) {
+        return prior.response;
+      }
       const result = await fn(tx);
       await audit(tx, this.org, actor.id, route, String(body.id ?? body.code ?? this.org), body);
       await emit(tx, this.org, 'admin.changed', null, { route });
@@ -84,12 +87,13 @@ export class Admin {
       expected,
       body,
       async (tx) => {
-        if (!id)
+        if (!id) {
           return one(
             tx,
             'INSERT INTO employees(org_id,max_user_id,name,role,blocked) VALUES($1,$2,$3,$4,$5) RETURNING *',
             [this.org, body.max_user_id, body.name, body.role, body.blocked],
           );
+        }
         const old = await one<Employee>(
           tx,
           'SELECT * FROM employees WHERE org_id=$1 AND id=$2 FOR UPDATE',
@@ -139,7 +143,7 @@ export class Admin {
         );
         ensure(old ? old.version === expected : expected === 0, 'version_conflict');
         // Freeze the historical label before changing the live dictionary.
-        if (old)
+        if (old) {
           await tx.query(
             `UPDATE tickets SET classification_labels=jsonb_set(classification_labels,ARRAY[$2],$4::jsonb) WHERE org_id=$1 AND ${body.dimension}=$3 AND NOT classification_labels ? $2`,
             [
@@ -149,6 +153,7 @@ export class Admin {
               JSON.stringify({ label: old.label, version: old.version }),
             ],
           );
+        }
         return one(
           tx,
           'INSERT INTO dictionaries(org_id,dimension,code,label,rank,active) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(org_id,dimension,code) DO UPDATE SET label=$4,rank=$5,active=$6,version=dictionaries.version+1 RETURNING *',

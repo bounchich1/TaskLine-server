@@ -1,24 +1,25 @@
-import Fastify, { type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
-import rateLimit from '@fastify/rate-limit';
 import multipart from '@fastify/multipart';
+import rateLimit from '@fastify/rate-limit';
+import Fastify, { type FastifyRequest } from 'fastify';
 import { z, ZodError } from 'zod';
-import type { Config } from './config.js';
-import { one, type Database } from './db.js';
-import { Domain } from './domain.js';
-import { authenticate, capabilities, issueSession, verifyLaunch, type Session } from './auth.js';
-import { AppError, ensure } from './errors.js';
-import { equal, hash, token } from './crypto.js';
-import { strictJson } from './json.js';
-import { normalizeUpdate } from './max/normalize.js';
-import { MaxClient, type MaxTransport } from './max/client.js';
-import { DeliveryWorker } from './delivery.js';
-import { Files, safeFilename } from './files.js';
-import { filtersSchema, publicAttachment, Queries } from './queries.js';
+
 import { Admin } from './admin.js';
-import type { Row } from './types.js';
+import { authenticate, capabilities, issueSession, verifyLaunch, type Session } from './auth.js';
+import type { Config } from './config.js';
+import { equal, hash, token } from './crypto.js';
+import { one, type Database } from './db.js';
+import { DeliveryWorker } from './delivery.js';
+import { Domain } from './domain.js';
+import { AppError, ensure } from './errors.js';
+import { Files, safeFilename } from './files.js';
+import { strictJson } from './json.js';
+import { MaxClient, type MaxTransport } from './max/client.js';
+import { normalizeUpdate } from './max/normalize.js';
 import { openapi } from './openapi.js';
+import { filtersSchema, publicAttachment, Queries } from './queries.js';
+import type { Row } from './types.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -117,35 +118,39 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
     }
   });
   app.setErrorHandler((error, request, reply) => {
-    if (error instanceof AppError)
+    if (error instanceof AppError) {
       return reply.code(error.status).send({
         code: error.code,
         message: error.message,
         request_id: request.id,
         retryable: error.retryable,
       });
-    if (error instanceof ZodError || (error as { validation?: unknown }).validation)
+    }
+    if (error instanceof ZodError || (error as { validation?: unknown }).validation) {
       return reply.code(422).send({
         code: 'invalid_input',
         message: 'Проверьте введённые данные.',
         request_id: request.id,
         retryable: false,
       });
-    if ((error as { code?: string }).code === '23505')
+    }
+    if ((error as { code?: string }).code === '23505') {
       return reply.code(409).send({
         code: 'conflict',
         message: 'Данные уже изменились или существуют.',
         request_id: request.id,
         retryable: false,
       });
+    }
     const status = (error as { statusCode?: number }).statusCode;
-    if (status && status >= 400 && status < 500)
+    if (status && status >= 400 && status < 500) {
       return reply.code(status).send({
         code: 'request_rejected',
         message: 'Запрос отклонён.',
         request_id: request.id,
         retryable: false,
       });
+    }
     request.log.error(
       {
         reason: (error as { code?: string }).code ?? (error as Error).name,
@@ -181,12 +186,15 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
     }
     if (request.url.startsWith('/v1/')) {
       reply.header('Cache-Control', 'no-store');
-      if (request.method !== 'GET') ensure(origin === c.APP_ORIGIN, 'origin_denied', 403);
+      if (request.method !== 'GET') {
+        ensure(origin === c.APP_ORIGIN, 'origin_denied', 403);
+      }
     }
   });
   app.addHook('preHandler', async (request) => {
-    if (!request.url.startsWith('/v1/') || ['/v1/auth/max', '/v1/auth/dev'].includes(request.url))
+    if (!request.url.startsWith('/v1/') || ['/v1/auth/max', '/v1/auth/dev'].includes(request.url)) {
       return;
+    }
     request.staff = await authenticate(db, c.ORG_ID, sessionToken(request));
     if (request.method !== 'GET') {
       const csrf = request.headers['x-csrf-token'];
@@ -232,7 +240,9 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
       try {
         launch = verifyLaunch(body.init_data, c.MAX_BOT_TOKEN);
       } catch (error) {
-        if (error instanceof AppError) throw error;
+        if (error instanceof AppError) {
+          throw error;
+        }
         throw new AppError(
           'invalid_launch',
           401,
@@ -320,7 +330,7 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
       .parse(request.query);
     return queries.messages(paramsId(request), q.before, q.after, q.limit);
   });
-  for (const [name, schema] of Object.entries(commandSchemas))
+  for (const [name, schema] of Object.entries(commandSchemas)) {
     app.route({
       method: name === 'classification' ? 'PATCH' : 'POST',
       url: `/v1/tickets/:id/${name}`,
@@ -333,10 +343,13 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
           version(request),
           key(request),
         );
-        if (name === 'messages') reply.code(202);
+        if (name === 'messages') {
+          reply.code(202);
+        }
         return result;
       },
     });
+  }
   app.get('/v1/employees', async () => ({
     items: (
       await db.query(
@@ -368,7 +381,7 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
     );
     return { ok: true };
   });
-  for (const action of ['cancel', 'retry'] as const)
+  for (const action of ['cancel', 'retry'] as const) {
     app.post(`/v1/messages/:id/${action}`, async (request) => {
       key(request);
       const body = z
@@ -377,6 +390,7 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
         .parse(request.body ?? {});
       return deliveries.resolve(request.staff!.employee, paramsId(request), action, body.evidence);
     });
+  }
 
   app.post('/v1/uploads', async (request) => {
     key(request);
@@ -620,16 +634,20 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
           }
           cursor = String(event.cursor);
         }
-        if (++heartbeat % 8 === 0) reply.raw.write(': heartbeat\n\n');
+        if (++heartbeat % 8 === 0) {
+          reply.raw.write(': heartbeat\n\n');
+        }
         await new Promise((resolve) => setTimeout(resolve, 2000));
       }
     } catch {
-      if (!reply.raw.destroyed) reply.raw.write('event: session_expired\ndata: {}\n\n');
+      if (!reply.raw.destroyed) {
+        reply.raw.write('event: session_expired\ndata: {}\n\n');
+      }
     } finally {
       reply.raw.end();
     }
   });
-  if (c.DEV_AUTH_ENABLED && c.NODE_ENV !== 'production')
+  if (c.DEV_AUTH_ENABLED && c.NODE_ENV !== 'production') {
     app.post('/v1/dev/inbound', async (request) => {
       requireOps(request);
       const input = z
@@ -650,6 +668,7 @@ export async function buildApi(db: Database, c: Config, transport?: MaxTransport
       });
       return { ok: true };
     });
+  }
   app.addHook('onClose', async () => {
     await emitShutdown();
   });

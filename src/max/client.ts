@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { openAsBlob } from 'node:fs';
-import { fetch, FormData } from 'undici';
+
 import { Keyboard } from '@maxhub/max-bot-api';
+import { fetch, FormData } from 'undici';
+
 import type { Config } from '../config.js';
-import { boundedText, mediaFetch } from '../network.js';
 import { object, strictJson } from '../json.js';
+import { boundedText, mediaFetch } from '../network.js';
 import type { Row } from '../types.js';
 
 export class TransportFailure extends Error {
@@ -32,7 +34,9 @@ export class MaxClient implements MaxTransport {
   async request(path: string, body: Row, query: Record<string, string> = {}): Promise<Row> {
     await this.rate();
     const url = new URL(path, this.c.MAX_API_URL);
-    for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
+    for (const [key, value] of Object.entries(query)) {
+      url.searchParams.set(key, value);
+    }
     let response;
     try {
       response = await fetch(url, {
@@ -63,19 +67,24 @@ export class MaxClient implements MaxTransport {
     }
     try {
       const result = object(strictJson(await boundedText(response), true, 1024 * 1024));
-      if (result.success === false)
+      if (result.success === false) {
         throw new TransportFailure(
           result.code === 'attachment.not.ready' ? 'retry' : 'failed',
           String(result.code ?? 'max_rejected'),
         );
+      }
       return result;
     } catch (error) {
-      if (error instanceof TransportFailure) throw error;
+      if (error instanceof TransportFailure) {
+        throw error;
+      }
       throw new TransportFailure('unknown', 'max_invalid_response');
     }
   }
   async send(chatId: string, body: Row) {
-    if (this.c.MAX_MODE === 'mock') return `mock-${randomUUID()}`;
+    if (this.c.MAX_MODE === 'mock') {
+      return `mock-${randomUUID()}`;
+    }
     const result = await this.request(
       '/messages',
       { ...body, notify: true },
@@ -83,20 +92,25 @@ export class MaxClient implements MaxTransport {
     );
     const message = object(result.message);
     const responseBody = object(message.body);
-    if (typeof responseBody.mid !== 'string')
+    if (typeof responseBody.mid !== 'string') {
       throw new TransportFailure('unknown', 'max_missing_message_id');
+    }
     return responseBody.mid;
   }
   async answer(callbackId: string, text: string) {
-    if (this.c.MAX_MODE === 'mock') return;
+    if (this.c.MAX_MODE === 'mock') {
+      return;
+    }
     await this.request('/answers', { notification: text }, { callback_id: callbackId });
   }
   async upload(kind: string, path: string, name: string, mime: string): Promise<Row> {
-    if (this.c.MAX_MODE === 'mock')
+    if (this.c.MAX_MODE === 'mock') {
       return { type: kind, payload: { token: `mock-${randomUUID()}` } };
+    }
     const allocation = await this.request('/uploads', {}, { type: kind });
-    if (typeof allocation.url !== 'string')
+    if (typeof allocation.url !== 'string') {
       throw new TransportFailure('failed', 'invalid_upload_url');
+    }
     const form = new FormData();
     form.set('data', await openAsBlob(path, { type: mime }), name);
     const media = await mediaFetch(
@@ -107,22 +121,27 @@ export class MaxClient implements MaxTransport {
       { method: 'POST', body: form },
     );
     try {
-      if (!media.response.ok) throw new TransportFailure('retry', 'upload_failed');
+      if (!media.response.ok) {
+        throw new TransportFailure('retry', 'upload_failed');
+      }
       const result = object(strictJson(await boundedText(media.response), true, 1024 * 1024));
       if (kind === 'video') {
-        if (typeof allocation.token !== 'string')
+        if (typeof allocation.token !== 'string') {
           throw new TransportFailure('failed', 'video_token_missing');
+        }
         return { type: kind, payload: { token: allocation.token } };
       }
       if (kind === 'image') {
         const photos = object(result.photos);
         const photo = object(Object.values(photos)[0]);
-        if (typeof photo.token !== 'string')
+        if (typeof photo.token !== 'string') {
           throw new TransportFailure('failed', 'image_token_missing');
+        }
         return { type: 'image', payload: { token: photo.token } };
       }
-      if (typeof result.token !== 'string')
+      if (typeof result.token !== 'string') {
         throw new TransportFailure('failed', 'file_token_missing');
+      }
       return { type: 'file', payload: { token: result.token } };
     } finally {
       await media.close();

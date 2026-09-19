@@ -1,10 +1,11 @@
 import { fetch } from 'undici';
+
 import type { Config } from '../config.js';
 import { one, type Database } from '../db.js';
 import { AppError, ensure } from '../errors.js';
-import { boundedText } from '../network.js';
-import { object, strictJson } from '../json.js';
 import { emit } from '../events.js';
+import { object, strictJson } from '../json.js';
+import { boundedText } from '../network.js';
 import type { Resolution, Row } from '../types.js';
 
 export type MemoryRecord = Row & {
@@ -61,7 +62,9 @@ export class AgentMemoryClient implements MemoryTransport {
     const result = object(
       strictJson(await boundedText(response, 4 * 1024 * 1024), false, 4 * 1024 * 1024),
     );
-    if (result.success === false) throw new Error('memory_rejected');
+    if (result.success === false) {
+      throw new Error('memory_rejected');
+    }
     return result;
   }
   async remember(content: string, project: string, concepts: string[]) {
@@ -105,12 +108,16 @@ export class AgentMemoryClient implements MemoryTransport {
         'invalid_memory_enumeration',
         503,
       );
-      if (total !== undefined) ensure(total === result.total, 'unstable_memory_enumeration', 503);
+      if (total !== undefined) {
+        ensure(total === result.total, 'unstable_memory_enumeration', 503);
+      }
       total = Number(result.total);
       const page = result.memories.map(object);
       all.push(...page);
       offset += page.length;
-      if (offset >= total) return all;
+      if (offset >= total) {
+        return all;
+      }
       ensure(page.length > 0 && offset < 100000, 'memory_enumeration_limit', 503);
     }
   }
@@ -131,9 +138,13 @@ export class Memory implements Recall {
     readonly upstream: MemoryTransport = new AgentMemoryClient(c),
   ) {}
   async search(query: string): Promise<CaseEvidence[]> {
-    if (!this.c.MEMORY_ENABLED) return [];
+    if (!this.c.MEMORY_ENABLED) {
+      return [];
+    }
     const ids = await this.upstream.search(query);
-    if (!ids.length) return [];
+    if (!ids.length) {
+      return [];
+    }
     const rows = (
       await this.db.query<MemoryRecord>(
         `SELECT r.* ${joins} WHERE ${eligibility} AND r.upstream_id=ANY($2::text[]) LIMIT 5`,
@@ -143,7 +154,9 @@ export class Memory implements Recall {
     return rows.map((r) => this.evidence(r));
   }
   async expand(ids: string[]): Promise<CaseEvidence[]> {
-    if (!this.c.MEMORY_ENABLED || !ids.length) return [];
+    if (!this.c.MEMORY_ENABLED || !ids.length) {
+      return [];
+    }
     const rows = (
       await this.db.query<MemoryRecord>(
         `SELECT r.* ${joins} WHERE ${eligibility} AND r.id=ANY($2::uuid[]) LIMIT 5`,
@@ -165,7 +178,9 @@ export class Memory implements Recall {
     return `${JSON.stringify(r.content)}\nSOURCE_KEY=${r.source_key}\nCONTENT_HASH=${r.content_hash}`;
   }
   async persist(id: string) {
-    if (!this.c.MEMORY_ENABLED) throw new AppError('memory_disabled', 503);
+    if (!this.c.MEMORY_ENABLED) {
+      throw new AppError('memory_disabled', 503);
+    }
     const record = await this.db.tx(async (tx) => {
       const row = await one<MemoryRecord>(
         tx,
@@ -173,7 +188,9 @@ export class Memory implements Recall {
         [this.c.ORG_ID, id],
       );
       ensure(row, 'not_found', 404);
-      if (['persisted', 'deleted'].includes(row.state)) return null;
+      if (['persisted', 'deleted'].includes(row.state)) {
+        return null;
+      }
       const live = await one(
         tx,
         `SELECT r.id ${joins} WHERE r.id=$2 AND r.org_id=$1 AND NOT cl.invalidated AND t.current_cycle_id=cl.id AND c.consent_state='granted' AND c.consent_revision=t.consent_revision`,
@@ -185,8 +202,9 @@ export class Memory implements Recall {
         ]);
         return null;
       }
-      if (['writing', 'write_unknown'].includes(row.state))
+      if (['writing', 'write_unknown'].includes(row.state)) {
         throw new AppError('memory_write_unknown', 409);
+      }
       const lock = await one(
         tx,
         'UPDATE memory_writer SET holder=$2,started_at=now() WHERE org_id=$1 AND (holder IS NULL OR holder=$2) RETURNING org_id',
@@ -199,7 +217,9 @@ export class Memory implements Recall {
         [id],
       ))!;
     });
-    if (!record) return;
+    if (!record) {
+      return;
+    }
     let external: Row;
     let upstreamId = record.upstream_id;
     try {
@@ -219,12 +239,14 @@ export class Memory implements Recall {
           for (const ref of [
             upstreamId,
             ...(Array.isArray(external.supersedes) ? external.supersedes : []),
-          ])
-            if (typeof ref === 'string')
+          ]) {
+            if (typeof ref === 'string') {
               await tx.query(
                 'INSERT INTO memory_external_refs(record_id,upstream_id) VALUES($1,$2) ON CONFLICT DO NOTHING',
                 [id, ref],
               );
+            }
+          }
         });
       }
       const readBack = await this.upstream.get(upstreamId);
@@ -252,18 +274,21 @@ export class Memory implements Recall {
           state: indexed ? 'learned' : 'persistence_pending',
         });
       });
-      if (!indexed) throw new AppError('memory_index_pending', 503);
+      if (!indexed) {
+        throw new AppError('memory_index_pending', 503);
+      }
     } catch (error) {
-      if (!upstreamId)
+      if (!upstreamId) {
         await this.db.query(
           "UPDATE memory_records SET state='write_unknown',reason='write_outcome_unknown' WHERE id=$1 AND write_generation=$2",
           [id, record.write_generation],
         );
-      else
+      } else {
         await this.db.query('UPDATE memory_writer SET holder=NULL WHERE org_id=$1 AND holder=$2', [
           this.c.ORG_ID,
           id,
         ]);
+      }
       throw error;
     }
   }
@@ -286,11 +311,12 @@ export class Memory implements Recall {
       'memory_hash_conflict',
     );
     await this.db.tx(async (tx) => {
-      for (const m of matches)
+      for (const m of matches) {
         await tx.query(
           'INSERT INTO memory_external_refs(record_id,upstream_id) VALUES($1,$2) ON CONFLICT DO NOTHING',
           [id, m.id],
         );
+      }
       await tx.query(
         "UPDATE memory_records SET upstream_id=$2,state='persisted_index_pending' WHERE id=$1",
         [id, matches[0].id],
@@ -303,13 +329,17 @@ export class Memory implements Recall {
     await this.persist(id);
   }
   async remove(id: string) {
-    if (!this.c.MEMORY_ENABLED) throw new AppError('memory_disabled', 503);
+    if (!this.c.MEMORY_ENABLED) {
+      throw new AppError('memory_disabled', 503);
+    }
     const record = await one<MemoryRecord>(
       this.db,
       'SELECT * FROM memory_records WHERE org_id=$1 AND id=$2',
       [this.c.ORG_ID, id],
     );
-    if (!record) return;
+    if (!record) {
+      return;
+    }
     await this.db.query('UPDATE memory_records SET eligible=false WHERE id=$1', [id]);
     if (['writing', 'write_unknown'].includes(record.state)) {
       await this.reconcile(id);

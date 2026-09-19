@@ -1,6 +1,8 @@
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
+
 import { Agent, fetch, type RequestInit, type Response } from 'undici';
+
 import { ensure } from './errors.js';
 
 export async function boundedText(response: Response, limit = 1024 * 1024): Promise<string> {
@@ -35,10 +37,11 @@ export function publicAddress(address: string): boolean {
       (a === 198 && (b === 18 || b === 19))
     );
   }
-  if (isIP(address) === 6)
+  if (isIP(address) === 6) {
     return (
       !/^(::|fc|fd|fe[89ab]|ff)/i.test(address) && !address.toLowerCase().startsWith('2001:db8:')
     );
+  }
   return false;
 }
 /** Media requests have no credentials, no redirects and a DNS-pinned public destination. */
@@ -67,8 +70,11 @@ export async function mediaFetch(
   const dispatcher = new Agent({
     connect: {
       lookup: ((_hostname: string, options: unknown, callback: (...args: unknown[]) => void) => {
-        if ((options as { all?: boolean }).all) callback(null, [selected]);
-        else callback(null, selected.address, selected.family);
+        if ((options as { all?: boolean }).all) {
+          callback(null, [selected]);
+        } else {
+          callback(null, selected.address, selected.family);
+        }
       }) as never,
     },
   });

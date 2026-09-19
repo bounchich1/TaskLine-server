@@ -1,18 +1,19 @@
 import { Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
-import type { Config } from './config.js';
-import { one, type Database } from './db.js';
-import { Domain } from './domain.js';
-import { DeliveryWorker } from './delivery.js';
-import { MaxClient } from './max/client.js';
-import { Files } from './files.js';
-import { Memory } from './ai/memory.js';
+
 import { GatewayClient, type Model } from './ai/gateway.js';
+import { Memory } from './ai/memory.js';
 import { Workflows } from './ai/workflows.js';
-import { AppError } from './errors.js';
+import type { Config } from './config.js';
 import { decrypt } from './crypto.js';
-import type { ClientInput, Job } from './types.js';
+import { one, type Database } from './db.js';
+import { DeliveryWorker } from './delivery.js';
+import { Domain } from './domain.js';
+import { AppError } from './errors.js';
 import { emit } from './events.js';
+import { Files } from './files.js';
+import { MaxClient } from './max/client.js';
+import type { ClientInput, Job } from './types.js';
 
 const queueFor = (kind: string) =>
   ['triage', 'learning'].includes(kind)
@@ -46,7 +47,9 @@ export class JobRunner {
         [this.c.ORG_ID, id],
       ),
     );
-    if (!job) return;
+    if (!job) {
+      return;
+    }
     let done = true;
     try {
       switch (job.kind) {
@@ -75,14 +78,18 @@ export class JobRunner {
             'SELECT id FROM messages WHERE org_id=$1 AND provider_ref=$2',
             [this.c.ORG_ID, input.messageId],
           );
-          if (!original) throw new AppError('original_not_received', 503);
+          if (!original) {
+            throw new AppError('original_not_received', 503);
+          }
           await this.db.tx(async (tx) => {
             const client = await one<import('./types.js').Client>(
               tx,
               'SELECT * FROM clients WHERE id=$1 AND org_id=$2 FOR UPDATE',
               [job.ref_id, this.c.ORG_ID],
             );
-            if (client) await this.domain.reviseMessage(tx, client, input);
+            if (client) {
+              await this.domain.reviseMessage(tx, client, input);
+            }
           });
           break;
         }
@@ -123,12 +130,15 @@ export class JobRunner {
           "UPDATE jobs SET state=$3,reason=$4,payload=jsonb_set(payload,'{retry_count}',$5::jsonb),due_at=now()+($6*interval '1 second') WHERE id=$1 AND generation=$2 AND state='running' RETURNING id",
           [job.id, job.generation, state, code, JSON.stringify(count), delay],
         );
-        if (!updated.rows.length) return;
-        if (job.kind === 'learning' && ['failed', 'unknown', 'canceled'].includes(state))
+        if (!updated.rows.length) {
+          return;
+        }
+        if (job.kind === 'learning' && ['failed', 'unknown', 'canceled'].includes(state)) {
           await tx.query('UPDATE closures SET learning_status=$2 WHERE id=$1 AND NOT invalidated', [
             job.ref_id,
             suppressed ? 'suppressed' : state === 'unknown' ? 'needs_review' : 'failed',
           ]);
+        }
         if (job.kind === 'triage' && state === 'failed') {
           await tx.query(
             "UPDATE tickets SET ai_status='failed',review_required=true WHERE id=$1 AND ai_status='pending'",
@@ -220,7 +230,9 @@ export async function startWorkers(db: Database, c: Config) {
             [c.ORG_ID],
           )
         ).rows;
-        for (const client of clients) await runner.domain.processClient(client.client_id);
+        for (const client of clients) {
+          await runner.domain.processClient(client.client_id);
+        }
         const outgoing = (
           await db.query<{ client_id: string }>(
             "SELECT DISTINCT client_id FROM deliveries WHERE org_id=$1 AND state IN('queued','retry_wait') AND due_at<=now() LIMIT 20",
@@ -234,8 +246,9 @@ export async function startWorkers(db: Database, c: Config) {
         }
         try {
           const cap = Number((await one(db, 'SELECT cap FROM ai_settings WHERE id=1'))!.cap);
-          if ((await queues.get('ai-execution')!.getGlobalConcurrency()) !== cap)
+          if ((await queues.get('ai-execution')!.getGlobalConcurrency()) !== cap) {
             await queues.get('ai-execution')!.setGlobalConcurrency(cap);
+          }
           const due = (
             await db.query<Job>(
               "SELECT * FROM jobs WHERE org_id=$1 AND state='pending' AND due_at<=now() ORDER BY created_at LIMIT 200",
@@ -246,10 +259,16 @@ export async function startWorkers(db: Database, c: Config) {
           const learning = due.filter((j) => j.kind === 'learning');
           const chosen: Job[] = [];
           while (chosen.length < 2 * cap && (triage.length || learning.length)) {
-            if (learning.length && Date.now() - new Date(learning[0].created_at).getTime() > 600000)
+            if (
+              learning.length &&
+              Date.now() - new Date(learning[0].created_at).getTime() > 600000
+            ) {
               chosen.push(learning.shift()!);
+            }
             chosen.push(...triage.splice(0, 4));
-            if (learning.length) chosen.push(learning.shift()!);
+            if (learning.length) {
+              chosen.push(learning.shift()!);
+            }
           }
           chosen.push(...due.filter((j) => !['triage', 'learning'].includes(j.kind)).slice(0, 40));
           for (const job of chosen) {

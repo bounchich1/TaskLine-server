@@ -1,10 +1,12 @@
-import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import { randomUUID } from 'node:crypto';
+
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
+
 import { fixture } from './helpers.js';
+import { Admin } from '../src/admin.js';
 import { one } from '../src/db.js';
 import { DeliveryWorker } from '../src/delivery.js';
 import { MaxClient, TransportFailure } from '../src/max/client.js';
-import { Admin } from '../src/admin.js';
 import type { Client, Employee } from '../src/types.js';
 let f: Awaited<ReturnType<typeof fixture>>;
 beforeEach(async () => {

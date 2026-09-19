@@ -1,10 +1,10 @@
 import type { Config } from './config.js';
 import { one, type Database } from './db.js';
-import { emit, audit } from './events.js';
 import { ensure } from './errors.js';
+import { emit, audit } from './events.js';
+import type { Files } from './files.js';
 import { TransportFailure, type MaxTransport } from './max/client.js';
 import type { Client, Employee, Row, Ticket } from './types.js';
-import type { Files } from './files.js';
 
 type Delivery = Row & {
   id: string;
@@ -43,21 +43,26 @@ export class DeliveryWorker {
         'SELECT * FROM clients WHERE org_id=$1 AND id=$2 FOR UPDATE',
         [this.c.ORG_ID, clientId],
       );
-      if (!client) return null;
+      if (!client) {
+        return null;
+      }
       const head = await one<Delivery>(
         tx,
         "SELECT * FROM deliveries WHERE org_id=$1 AND client_id=$2 AND state IN('queued','retry_wait','sending','unknown') ORDER BY chat_seq LIMIT 1 FOR UPDATE",
         [this.c.ORG_ID, clientId],
       );
-      if (!head || head.state === 'sending' || head.state === 'unknown') return null;
+      if (!head || head.state === 'sending' || head.state === 'unknown') {
+        return null;
+      }
       if (
         !(await one(
           tx,
           "SELECT id FROM deliveries WHERE id=$1 AND due_at<=now() AND ($2::timestamptz IS NULL OR $2::timestamptz<=now()-interval '550 milliseconds')",
           [head.id, client.last_send_at ?? null],
         ))
-      )
+      ) {
         return null;
+      }
       let valid = true;
       if (head.kind === 'staff') {
         const ticket = await one<Ticket>(tx, 'SELECT * FROM tickets WHERE org_id=$1 AND id=$2', [
@@ -77,7 +82,7 @@ export class DeliveryWorker {
           employee.version === head.staff_version &&
           (ticket.assignee_id === employee.id || employee.role !== 'support');
       }
-      if (head.cycle_id)
+      if (head.cycle_id) {
         valid =
           valid &&
           !!(await one(
@@ -85,15 +90,17 @@ export class DeliveryWorker {
             "SELECT t.id FROM tickets t JOIN closures c ON c.id=t.current_cycle_id WHERE t.id=$1 AND c.id=$2 AND NOT c.invalidated AND t.status='awaiting_rating' AND c.expires_at>now()",
             [head.ticket_id, head.cycle_id],
           ));
+      }
       if (!valid) {
         await tx.query(
           "UPDATE deliveries SET state='canceled',reason='authorization_changed' WHERE id=$1",
           [head.id],
         );
-        if (head.message_id)
+        if (head.message_id) {
           await tx.query("UPDATE messages SET delivery_state='canceled' WHERE id=$1", [
             head.message_id,
           ]);
+        }
         return null;
       }
       const delivery = (await one<Delivery>(
@@ -102,25 +109,28 @@ export class DeliveryWorker {
         [head.id],
       ))!;
       await tx.query('UPDATE clients SET last_send_at=now() WHERE id=$1', [client.id]);
-      if (head.message_id)
+      if (head.message_id) {
         await tx.query("UPDATE messages SET delivery_state='sending' WHERE id=$1", [
           head.message_id,
         ]);
+      }
       return { delivery, client };
     });
-    if (!claimed) return false;
+    if (!claimed) {
+      return false;
+    }
     const { delivery, client } = claimed;
     let state = 'delivered';
     let reason: string | null = null;
     let ref: string | null = null;
     let retryAfter = 2;
     try {
-      if (delivery.kind === 'callback_answer')
+      if (delivery.kind === 'callback_answer') {
         await this.max.answer(
           String(delivery.body.callback_id),
           String(delivery.body.notification),
         );
-      else {
+      } else {
         const { attachment_ids, ...body } = delivery.body;
         if (Array.isArray(attachment_ids) && attachment_ids.length) {
           ensure(this.files, 'file_worker_unavailable', 503);
@@ -147,7 +157,9 @@ export class DeliveryWorker {
           (delivery.kind === 'staff' && current.consent_state !== 'granted')
         ) {
           state = 'canceled';
-        } else ref = await this.max.send(client.chat_id, body);
+        } else {
+          ref = await this.max.send(client.chat_id, body);
+        }
       }
     } catch (error) {
       const failure =
@@ -169,17 +181,21 @@ export class DeliveryWorker {
         "UPDATE deliveries SET state=$3,provider_ref=$4,reason=$5,due_at=now()+($6*interval '1 second') WHERE id=$1 AND generation=$2 AND state='sending' RETURNING id",
         [delivery.id, delivery.generation, state, ref, reason, retryAfter],
       );
-      if (!updated.rows.length) return;
-      if (delivery.message_id)
+      if (!updated.rows.length) {
+        return;
+      }
+      if (delivery.message_id) {
         await tx.query(
           'UPDATE messages SET delivery_state=$2,provider_ref=coalesce($3,provider_ref) WHERE id=$1',
           [delivery.message_id, state, ref],
         );
-      if (delivery.ticket_id)
+      }
+      if (delivery.ticket_id) {
         await emit(tx, this.c.ORG_ID, 'delivery.changed', delivery.ticket_id, {
           message_id: delivery.message_id,
           state,
         });
+      }
     });
     return true;
   }
@@ -217,23 +233,25 @@ export class DeliveryWorker {
         delivery.state !== 'sending' && delivery.state !== 'delivered',
         'delivery_not_resolvable',
       );
-      if (delivery.state === 'unknown')
+      if (delivery.state === 'unknown') {
         ensure(
           actor.role !== 'support' && typeof evidence === 'string' && evidence.trim().length >= 10,
           'operator_evidence_required',
           409,
           'Неизвестный результат: требуется проверка руководителем и подтверждение риска дубликата.',
         );
-      if (action === 'retry')
+      }
+      if (action === 'retry') {
         ensure(
           ticket.status === 'in_progress' && ['failed', 'unknown'].includes(delivery.state),
           'retry_not_allowed',
         );
-      else
+      } else {
         ensure(
           ['queued', 'retry_wait', 'failed', 'unknown'].includes(delivery.state),
           'cancel_not_allowed',
         );
+      }
       const state = action === 'retry' ? 'queued' : 'canceled';
       await tx.query('UPDATE deliveries SET state=$2,due_at=now(),reason=NULL WHERE id=$1', [
         delivery.id,
@@ -260,14 +278,16 @@ export class DeliveryWorker {
         )
       ).rows;
       for (const row of rows) {
-        if (row.message_id)
+        if (row.message_id) {
           await tx.query("UPDATE messages SET delivery_state='unknown' WHERE id=$1", [
             row.message_id,
           ]);
-        if (row.ticket_id)
+        }
+        if (row.ticket_id) {
           await emit(tx, this.c.ORG_ID, 'delivery.changed', String(row.ticket_id), {
             state: 'unknown',
           });
+        }
       }
     });
   }

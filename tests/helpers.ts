@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
+
 import { PGlite } from '@electric-sql/pglite';
+
 import { readConfig, type Config } from '../src/config.js';
 import { migrate, one, type Database, type Sql } from '../src/db.js';
-import { seed } from '../src/seed.js';
 import { Domain } from '../src/domain.js';
+import { seed } from '../src/seed.js';
 import type { Client, Employee, Ticket } from '../src/types.js';
 import { traceSql, traceTransaction } from './support/sql-trace.js';
 

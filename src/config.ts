@@ -58,26 +58,33 @@ export type Config = z.infer<typeof schema>;
 export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const c = schema.parse(env);
   new Intl.DateTimeFormat('ru', { timeZone: c.ORG_TIMEZONE });
-  if (c.MAX_MODE === 'live' && !c.MAX_BOT_TOKEN)
+  if (c.MAX_MODE === 'live' && !c.MAX_BOT_TOKEN) {
     throw new Error('MAX_BOT_TOKEN required for live MAX');
-  if (c.AI_ENABLED && c.AI_MODE === 'live' && (!c.AI_API_KEY || !c.AI_MODEL))
+  }
+  if (c.AI_ENABLED && c.AI_MODE === 'live' && (!c.AI_API_KEY || !c.AI_MODEL)) {
     throw new Error('AI_API_KEY and AI_MODEL required');
+  }
   if (c.NODE_ENV === 'production') {
     if (
       c.DEV_AUTH_ENABLED ||
       c.MAX_MODE !== 'live' ||
       c.SCANNER_MODE !== 'clamav' ||
       c.STORAGE_MODE !== 's3'
-    )
+    ) {
       throw new Error('Unsafe production mode');
-    if (c.AI_ENABLED && c.AI_MODE !== 'live') throw new Error('Mock AI forbidden in production');
+    }
+    if (c.AI_ENABLED && c.AI_MODE !== 'live') {
+      throw new Error('Mock AI forbidden in production');
+    }
     for (const url of [c.PUBLIC_URL, c.APP_ORIGIN, c.POLICY_URL, c.MAX_API_URL, c.AI_API_URL]) {
       const parsed = new URL(url);
-      if (parsed.protocol !== 'https:' || parsed.hostname.endsWith('.invalid'))
+      if (parsed.protocol !== 'https:' || parsed.hostname.endsWith('.invalid')) {
         throw new Error('Production requires configured HTTPS URLs');
+      }
     }
-    if (c.POLICY_VERSION.startsWith('dev-'))
+    if (c.POLICY_VERSION.startsWith('dev-')) {
       throw new Error('Publish approved consent policy before production');
+    }
   }
   return c;
 }

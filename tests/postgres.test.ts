@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { Postgres, migrate, one } from '../src/db.js';
+
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+
 import { fixture, testConfig } from './helpers.js';
 import { Gateway } from '../src/ai/gateway.js';
+import { Postgres, migrate, one } from '../src/db.js';
 import type { Client, Job } from '../src/types.js';
 describe.runIf(process.env.RUN_POSTGRES_TESTS === '1')('real PostgreSQL concurrency', () => {
   const schema = `test_${randomUUID().replaceAll('-', '')}`;
@@ -22,7 +24,9 @@ describe.runIf(process.env.RUN_POSTGRES_TESTS === '1')('real PostgreSQL concurre
   afterAll(async () => {
     await db?.close();
     if (control) {
-      if (!/^test_[a-f0-9]{32}$/.test(schema)) throw new Error('Unsafe test schema');
+      if (!/^test_[a-f0-9]{32}$/.test(schema)) {
+        throw new Error('Unsafe test schema');
+      }
       await control.query(`DROP SCHEMA ${schema} CASCADE`);
       await control.close();
     }
@@ -102,7 +106,9 @@ describe.runIf(process.env.RUN_POSTGRES_TESTS === '1')('real PostgreSQL concurre
                 });
                 break;
               } catch (error) {
-                if ((error as { code?: string }).code !== 'ai_busy') throw error;
+                if ((error as { code?: string }).code !== 'ai_busy') {
+                  throw error;
+                }
                 await new Promise((resolve) => setTimeout(resolve, 2));
               }
             }

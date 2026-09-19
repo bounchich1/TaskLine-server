@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
+
+import { Memory } from './ai/memory.js';
 import { readConfig } from './config.js';
 import { Postgres, migrate, one } from './db.js';
-import { seed } from './seed.js';
+import { ensure } from './errors.js';
 import { audit } from './events.js';
 import { MaxClient } from './max/client.js';
-import { ensure } from './errors.js';
-import { Memory } from './ai/memory.js';
+import { seed } from './seed.js';
 const c = readConfig();
 const db = new Postgres(c.DATABASE_URL);
 try {
@@ -96,10 +97,11 @@ try {
       await audit(tx, c.ORG_ID, null, 'ai.cap.changed', '1', { cap });
     });
     console.log('Global AI cap updated.');
-  } else
+  } else {
     throw new Error(
       'Commands: migrate, bootstrap, subscribe, memory-reconcile <id>, permit-resolve <slot> <evidence>, ai-cap <10..15>',
     );
+  }
 } finally {
   await db.close();
 }

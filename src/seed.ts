@@ -23,15 +23,17 @@ export async function seed(db: Database, c: Config) {
       ['complexity', 'medium', 'Средняя', 1],
       ['complexity', 'high', 'Высокая', 2],
     ];
-    for (const [dimension, code, label, rank] of values)
+    for (const [dimension, code, label, rank] of values) {
       await tx.query(
         'INSERT INTO dictionaries(org_id,dimension,code,label,rank) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
         [c.ORG_ID, dimension, code, label, rank],
       );
-    for (const [code, body] of Object.entries(templates))
+    }
+    for (const [code, body] of Object.entries(templates)) {
       await tx.query(
         'INSERT INTO templates(org_id,code,body) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
         [c.ORG_ID, code, body],
       );
+    }
   });
 }

@@ -14,5 +14,7 @@ export function ensure(
   status = 409,
   message?: string,
 ): asserts condition {
-  if (!condition) throw new AppError(code, status, message);
+  if (!condition) {
+    throw new AppError(code, status, message);
+  }
 }

@@ -1,10 +1,11 @@
 import { beforeEach, afterEach, it, expect } from 'vitest';
+
 import { fixture } from './helpers.js';
-import { one } from '../src/db.js';
 import { Gateway } from '../src/ai/gateway.js';
-import { Workflows } from '../src/ai/workflows.js';
 import { Memory, type MemoryTransport } from '../src/ai/memory.js';
+import { Workflows } from '../src/ai/workflows.js';
 import { hash } from '../src/crypto.js';
+import { one } from '../src/db.js';
 import type { Job, Row, Resolution } from '../src/types.js';
 let f: Awaited<ReturnType<typeof fixture>>;
 beforeEach(async () => {
@@ -27,7 +28,9 @@ class FakeMemory implements MemoryTransport {
   async remember(content: string, project: string) {
     const memory = { id: `mem_${++this.calls}`, content, project };
     this.records.set(memory.id, memory);
-    if (this.unknown) throw new Error('timeout_after_commit');
+    if (this.unknown) {
+      throw new Error('timeout_after_commit');
+    }
     return memory;
   }
   async get(id: string) {

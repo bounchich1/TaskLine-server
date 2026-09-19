@@ -32,8 +32,9 @@ export const templates: Record<string, string> = {
 const allowed = new Set(['ticket_number', 'policy_url', 'alternative_contact']);
 export function validateTemplate(body: string) {
   ensure(body.trim().length > 0 && body.length <= 3000, 'invalid_template', 422);
-  for (const match of body.matchAll(/\{([^{}]+)\}/g))
+  for (const match of body.matchAll(/\{([^{}]+)\}/g)) {
     ensure(allowed.has(match[1]), 'invalid_placeholder', 422);
+  }
 }
 export async function render(
   db: Sql,

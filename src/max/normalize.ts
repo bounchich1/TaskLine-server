@@ -1,5 +1,5 @@
-import { decimalId, object, strictJson } from '../json.js';
 import { hash } from '../crypto.js';
+import { decimalId, object, strictJson } from '../json.js';
 import type { ClientInput, InputAttachment } from '../types.js';
 
 export function normalizeUpdate(raw: string): ClientInput {
@@ -8,7 +8,9 @@ export function normalizeUpdate(raw: string): ClientInput {
   const unknown: ClientInput = { kind: 'unknown', sourceKey: `unknown:${hash(raw)}` };
   if (kind === 'bot_started') {
     const user = object(update.user);
-    if (user.is_bot) return unknown;
+    if (user.is_bot) {
+      return unknown;
+    }
     return {
       kind: 'started',
       sourceKey: `started:${decimalId(user.user_id)}:${String(update.timestamp)}`,
@@ -21,7 +23,9 @@ export function normalizeUpdate(raw: string): ClientInput {
     const user = object(callback.user);
     const message = object(update.message);
     const recipient = object(message.recipient);
-    if (user.is_bot || recipient.chat_type !== 'dialog') return unknown;
+    if (user.is_bot || recipient.chat_type !== 'dialog') {
+      return unknown;
+    }
     return {
       kind: 'callback',
       sourceKey: `callback:${String(callback.callback_id)}`,
@@ -32,7 +36,9 @@ export function normalizeUpdate(raw: string): ClientInput {
     };
   }
   if (kind === 'message_removed') {
-    if (!update.user_id || !update.chat_id || !update.message_id) return unknown;
+    if (!update.user_id || !update.chat_id || !update.message_id) {
+      return unknown;
+    }
     return {
       kind: 'delete',
       sourceKey: `delete:${String(update.message_id)}:${String(update.timestamp)}`,
@@ -41,16 +47,22 @@ export function normalizeUpdate(raw: string): ClientInput {
       messageId: String(update.message_id),
     };
   }
-  if (!['message_created', 'message_edited'].includes(kind)) return unknown;
+  if (!['message_created', 'message_edited'].includes(kind)) {
+    return unknown;
+  }
   const message = object(update.message);
   const sender = object(message.sender);
   const recipient = object(message.recipient);
   const body = object(message.body);
-  if (sender.is_bot || recipient.chat_type !== 'dialog') return unknown;
+  if (sender.is_bot || recipient.chat_type !== 'dialog') {
+    return unknown;
+  }
   const attachments: InputAttachment[] = [];
   for (const item of Array.isArray(body.attachments) ? body.attachments.slice(0, 11) : []) {
     const attachment = object(item);
-    if (!['image', 'video', 'file'].includes(String(attachment.type))) continue;
+    if (!['image', 'video', 'file'].includes(String(attachment.type))) {
+      continue;
+    }
     const payload = object(attachment.payload ?? {});
     attachments.push({
       kind: attachment.type as InputAttachment['kind'],
@@ -60,7 +72,9 @@ export function normalizeUpdate(raw: string): ClientInput {
     });
   }
   const id = String(body.mid ?? '');
-  if (!id || id.length > 256) throw new Error('missing_message_id');
+  if (!id || id.length > 256) {
+    throw new Error('missing_message_id');
+  }
   return {
     kind: kind === 'message_created' ? 'message' : 'edit',
     sourceKey: `${kind}:${id}${kind === 'message_edited' ? `:${hash(raw)}` : ''}`,

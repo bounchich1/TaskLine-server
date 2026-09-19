@@ -1,5 +1,6 @@
-import pg from 'pg';
 import { readFile } from 'node:fs/promises';
+
+import pg from 'pg';
 export interface Sql {
   query<T extends Record<string, unknown> = Record<string, unknown>>(
     sql: string,
@@ -33,8 +34,9 @@ export class Postgres implements Database {
         return result;
       } catch (error) {
         await connection.query('ROLLBACK');
-        if (attempt >= 2 || !['40001', '40P01'].includes((error as { code?: string }).code ?? ''))
+        if (attempt >= 2 || !['40001', '40P01'].includes((error as { code?: string }).code ?? '')) {
           throw error;
+        }
       } finally {
         connection.release();
       }

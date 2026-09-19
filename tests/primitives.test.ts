@@ -1,13 +1,15 @@
-import { describe, it, expect } from 'vitest';
 import { createHmac } from 'node:crypto';
-import { parseRating } from '../src/rating.js';
+
+import { describe, it, expect } from 'vitest';
+
+import { testConfig } from './helpers.js';
+import { planChunks, confirmedResolution } from '../src/ai/workflows.js';
 import { verifyLaunch } from '../src/auth.js';
+import { readConfig } from '../src/config.js';
 import { strictJson } from '../src/json.js';
 import { normalizeUpdate } from '../src/max/normalize.js';
-import { readConfig } from '../src/config.js';
-import { testConfig } from './helpers.js';
 import { publicAddress } from '../src/network.js';
-import { planChunks, confirmedResolution } from '../src/ai/workflows.js';
+import { parseRating } from '../src/rating.js';
 import type { SnapshotEntry, Resolution } from '../src/types.js';
 describe('rating grammar', () => {
   for (const [text, n] of [
@@ -16,8 +18,9 @@ describe('rating grammar', () => {
     ['оценка 10, спасибо', 10],
     [' 7 ', 7],
     ['👍 9!', 9],
-  ] as const)
+  ] as const) {
     it(`accepts ${text}`, () => expect(parseRating(text)).toBe(n));
+  }
   for (const text of [
     '',
     '0',
@@ -42,8 +45,9 @@ describe('rating grammar', () => {
     'номер7',
     '7_',
     '10, 8',
-  ])
+  ]) {
     it(`rejects ${text}`, () => expect(parseRating(text)).toBeNull());
+  }
 });
 describe('strict JSON and MAX identifiers', () => {
   it('rejects duplicate object keys and trailing content', () => {
@@ -119,8 +123,9 @@ describe('security and coverage', () => {
       '::ffff:127.0.0.1',
       'fc00::1',
       '198.18.0.1',
-    ])
+    ]) {
       expect(publicAddress(ip)).toBe(false);
+    }
     expect(publicAddress('8.8.8.8')).toBe(true);
   });
   it('enforces global concurrency bounds and production modes', () => {

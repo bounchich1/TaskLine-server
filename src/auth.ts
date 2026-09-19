@@ -1,8 +1,9 @@
 import { createHmac } from 'node:crypto';
+
 import type { Config } from './config.js';
+import { equal, hash, token } from './crypto.js';
 import type { Database, Sql } from './db.js';
 import { one } from './db.js';
-import { equal, hash, token } from './crypto.js';
 import { ensure } from './errors.js';
 import { decimalId, object, strictJson } from './json.js';
 import type { Employee } from './types.js';
@@ -36,7 +37,9 @@ export function verifyLaunch(
     401,
   );
   let values = form(raw.startsWith('#') ? raw.slice(1) : raw);
-  if (values.has('WebAppData')) values = form(values.get('WebAppData')!);
+  if (values.has('WebAppData')) {
+    values = form(values.get('WebAppData')!);
+  }
   const signature = values.get('hash') ?? '';
   ensure(/^[a-fA-F0-9]{64}$/.test(signature), 'invalid_launch', 401);
   values.delete('hash');

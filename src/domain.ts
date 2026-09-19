@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
+
 import type { Config } from './config.js';
-import { one, type Database, type Sql } from './db.js';
 import { decrypt, encrypt, hash, token } from './crypto.js';
+import { one, type Database, type Sql } from './db.js';
 import { ensure } from './errors.js';
 import { audit, emit, enqueue } from './events.js';
+import { consentKeyboard } from './max/client.js';
 import { parseRating } from './rating.js';
 import { render } from './templates.js';
-import { consentKeyboard } from './max/client.js';
 import type { Client, ClientInput, Closure, Employee, Message, Row, Ticket } from './types.js';
 
 export class Domain {
@@ -25,8 +26,9 @@ export class Domain {
           this.org,
           input.sourceKey,
         ])
-      )
+      ) {
         return;
+      }
       if (!input.userId || !input.chatId || input.kind === 'unknown') {
         await tx.query(
           "INSERT INTO inbox(org_id,source_key,kind,state,reason) VALUES($1,$2,$3,'quarantined','unsupported_update') ON CONFLICT DO NOTHING",
@@ -56,8 +58,9 @@ export class Domain {
           this.org,
           input.sourceKey,
         ])
-      )
+      ) {
         return;
+      }
       const seq = await one(
         tx,
         'UPDATE clients SET next_ingress=next_ingress+1 WHERE id=$1 RETURNING next_ingress',
@@ -84,7 +87,9 @@ export class Domain {
         'SELECT * FROM clients WHERE org_id=$1 AND id=$2 FOR UPDATE',
         [this.org, clientId],
       );
-      if (!client) return false;
+      if (!client) {
+        return false;
+      }
       const receipt = await one<
         Row & { id: string; payload: string; source_key: string; received_at: string }
       >(
@@ -92,7 +97,9 @@ export class Domain {
         "SELECT * FROM inbox WHERE org_id=$1 AND client_id=$2 AND state='pending' ORDER BY ingress_seq LIMIT 1 FOR UPDATE",
         [this.org, client.id],
       );
-      if (!receipt) return false;
+      if (!receipt) {
+        return false;
+      }
       const input = decrypt<ClientInput>(receipt.payload, this.config.ENCRYPTION_KEY);
       await this.route(tx, client, input, receipt.received_at);
       await tx.query("UPDATE inbox SET state='done',payload=NULL,processed_at=now() WHERE id=$1", [
@@ -111,7 +118,9 @@ export class Domain {
     cycleId?: string,
     extra: Row = {},
   ) {
-    if (await one(tx, 'SELECT id FROM deliveries WHERE logical_key=$1', [key])) return;
+    if (await one(tx, 'SELECT id FROM deliveries WHERE logical_key=$1', [key])) {
+      return;
+    }
     const text = await render(tx, this.org, code, {
       ticket_number: ticket?.ticket_number.toString().padStart(6, '0') ?? '',
       policy_url: this.config.POLICY_URL,
@@ -172,7 +181,9 @@ export class Domain {
           }),
         ],
       );
-      if (!action || action.used_at) return;
+      if (!action || action.used_at) {
+        return;
+      }
       await tx.query('UPDATE callback_actions SET used_at=now() WHERE nonce=$1', [
         input.callbackPayload,
       ]);
@@ -184,8 +195,9 @@ export class Domain {
         if (
           client.consent_state === 'granted' &&
           client.consent_version === this.config.POLICY_VERSION
-        )
+        ) {
           return;
+        }
         client = (await one<Client>(
           tx,
           "UPDATE clients SET consent_state='granted',consent_version=$2,consent_at=now(),consent_revision=consent_revision+1 WHERE id=$1 RETURNING *",
@@ -217,10 +229,14 @@ export class Domain {
           );
         }
         await tx.query('DELETE FROM preconsent_buffers WHERE client_id=$1', [client.id]);
-        if (expired) await this.bot(tx, client, 'buffer_expired', `expired:${input.sourceKey}`);
+        if (expired) {
+          await this.bot(tx, client, 'buffer_expired', `expired:${input.sourceKey}`);
+        }
       } else if (action.action === 'decline') {
         // An old decline button cannot revoke a consent already granted by a newer action.
-        if (client.consent_state === 'granted') return;
+        if (client.consent_state === 'granted') {
+          return;
+        }
         await tx.query("UPDATE clients SET consent_state='declined' WHERE id=$1", [client.id]);
         await tx.query('DELETE FROM preconsent_buffers WHERE client_id=$1', [client.id]);
         await tx.query(
@@ -280,7 +296,7 @@ export class Domain {
           'SELECT count(*)::int AS n,coalesce(sum(byte_count),0)::int AS bytes FROM preconsent_buffers WHERE client_id=$1',
           [client.id],
         );
-        if (Number(size!.n) < 5 && Number(size!.bytes) + bytes <= 65536)
+        if (Number(size!.n) < 5 && Number(size!.bytes) + bytes <= 65536) {
           await tx.query(
             'INSERT INTO preconsent_buffers(org_id,client_id,source_key,payload,byte_count) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
             [
@@ -291,7 +307,9 @@ export class Domain {
               bytes,
             ],
           );
-        else await this.bot(tx, client, 'buffer_full', `bufferfull:${input.sourceKey}`);
+        } else {
+          await this.bot(tx, client, 'buffer_full', `bufferfull:${input.sourceKey}`);
+        }
       }
       await this.consentPrompt(tx, client, input.sourceKey);
       return;
@@ -377,7 +395,7 @@ export class Domain {
           [this.org],
         )
       ).rows;
-      if (this.config.AI_ENABLED)
+      if (this.config.AI_ENABLED) {
         await enqueue(tx, this.org, `triage:${ticket.id}`, 'triage', ticket.id, {
           message_id: message.id,
           revision: 1,
@@ -387,8 +405,9 @@ export class Domain {
           dictionary_version: hash(JSON.stringify(dictionaries)),
           field_revisions: { tag: 0, urgency: 0, complexity: 0 },
         });
+      }
       await emit(tx, this.org, 'ticket.created', ticket.id, { version: ticket.version });
-    } else
+    } else {
       await emit(
         tx,
         this.org,
@@ -397,6 +416,7 @@ export class Domain {
         { message_id: message.id },
         ticket.assignee_id,
       );
+    }
   }
 
   async addMessage(
@@ -457,9 +477,9 @@ export class Domain {
       await tx.query('UPDATE closures SET invalid_attempts=invalid_attempts+1 WHERE id=$1', [
         cycle.id,
       ]);
-      if (cycle.invalid_attempts + 1 >= 3)
+      if (cycle.invalid_attempts + 1 >= 3) {
         await this.finishRating(tx, client, ticket, cycle, 'attempts_exhausted', input.sourceKey);
-      else
+      } else {
         await this.bot(
           tx,
           client,
@@ -468,6 +488,7 @@ export class Domain {
           ticket,
           cycle.id,
         );
+      }
     }
   }
 
@@ -556,7 +577,7 @@ export class Domain {
         [ticketId, reason],
       )
     ).rows;
-    for (const record of records)
+    for (const record of records) {
       await enqueue(
         tx,
         this.org,
@@ -564,6 +585,7 @@ export class Domain {
         'memory_delete',
         String(record.id),
       );
+    }
     await tx.query(
       "UPDATE jobs SET state='canceled',reason=$2 WHERE (ref_id=$1 OR ref_id IN(SELECT id FROM closures WHERE ticket_id=$1)) AND kind IN('triage','learning') AND state IN('pending','running')",
       [ticketId, reason],
@@ -571,7 +593,9 @@ export class Domain {
   }
 
   async reviseMessage(tx: Sql, client: Client, input: ClientInput) {
-    if (client.consent_state !== 'granted') return;
+    if (client.consent_state !== 'granted') {
+      return;
+    }
     const message = await one<Message>(
       tx,
       "SELECT m.* FROM messages m JOIN tickets t ON t.id=m.ticket_id WHERE m.org_id=$1 AND t.client_id=$2 AND m.provider_ref=$3 AND m.author_type='client' FOR UPDATE OF m",
@@ -642,7 +666,9 @@ export class Domain {
         [this.org, employee.id],
       );
       ensure(actor && actor.version === employee.version, 'access_denied', 403);
-      if (previous.response) return previous.response as Ticket;
+      if (previous.response) {
+        return previous.response as Ticket;
+      }
       const ref = await one(tx, 'SELECT client_id FROM tickets WHERE org_id=$1 AND id=$2', [
         this.org,
         ticketId,
@@ -685,7 +711,7 @@ export class Domain {
         );
       } else if (name === 'classification') {
         ensure(['open', 'in_progress'].includes(ticket.status), 'ticket_closed');
-        for (const field of ['tag', 'urgency', 'complexity'] as const)
+        for (const field of ['tag', 'urgency', 'complexity'] as const) {
           if (body[field] !== undefined) {
             const value = await one(
               tx,
@@ -705,6 +731,7 @@ export class Domain {
               ],
             );
           }
+        }
       } else if (name === 'transfer') {
         own();
         ensure(ticket.status === 'in_progress', 'ticket_closed');
@@ -746,8 +773,9 @@ export class Domain {
           ensure(a, 'attachment_not_ready', 422);
         }
         const message = await this.addMessage(tx, ticket, 'staff', actor.id, text, null, 'queued');
-        for (const id of ids)
+        for (const id of ids) {
           await tx.query('UPDATE attachments SET message_id=$2 WHERE id=$1', [id, message.id]);
+        }
         await tx.query(
           "INSERT INTO deliveries(org_id,client_id,ticket_id,message_id,logical_key,kind,body,staff_id,staff_version) VALUES($1,$2,$3,$4,$5,'staff',$6,$7,$8)",
           [
@@ -822,10 +850,14 @@ export class Domain {
           409,
           `У клиента уже есть обращение №${String(conflict?.ticket_number ?? '').padStart(6, '0')}.`,
         );
-        if (ticket.current_cycle_id) await this.cancelRatingPrompts(tx, ticket.current_cycle_id);
+        if (ticket.current_cycle_id) {
+          await this.cancelRatingPrompts(tx, ticket.current_cycle_id);
+        }
         await this.invalidateLearning(tx, ticket.id, 'reopened');
         const targetId = typeof body.employee_id === 'string' ? body.employee_id : actor.id;
-        if (actor.role === 'support') ensure(targetId === actor.id, 'forbidden', 403);
+        if (actor.role === 'support') {
+          ensure(targetId === actor.id, 'forbidden', 403);
+        }
         ensure(
           await one(tx, 'SELECT id FROM employees WHERE org_id=$1 AND id=$2 AND NOT blocked', [
             this.org,
@@ -854,7 +886,9 @@ export class Domain {
           `reopened:${ticket.id}:${ticket.lifecycle + 1}`,
           ticket,
         );
-      } else ensure(false, 'unknown_command', 404);
+      } else {
+        ensure(false, 'unknown_command', 404);
+      }
       const result = (await one<Ticket>(
         tx,
         'UPDATE tickets SET version=version+1,updated_at=now() WHERE id=$1 RETURNING *',
@@ -900,7 +934,7 @@ export class Domain {
         [this.org],
       )
     ).rows;
-    for (const item of due)
+    for (const item of due) {
       await this.db.tx(async (tx) => {
         const client = (await one<Client>(
           tx,
@@ -912,7 +946,9 @@ export class Domain {
           "SELECT * FROM tickets WHERE client_id=$1 AND status='awaiting_rating' FOR UPDATE",
           [client.id],
         );
-        if (!ticket) return;
+        if (!ticket) {
+          return;
+        }
         const cycle = (await one<Closure>(tx, 'SELECT * FROM closures WHERE id=$1 FOR UPDATE', [
           ticket.current_cycle_id,
         ]))!;
@@ -926,8 +962,9 @@ export class Domain {
               "SELECT id FROM inbox WHERE client_id=$1 AND state='pending' AND received_at<=$2 LIMIT 1",
               [client.id, cycle.expires_at],
             )
-          )
+          ) {
             return;
+          }
           const prompt = await one(
             tx,
             "SELECT state FROM deliveries WHERE cycle_id=$1 AND kind='ticket_closed'",
@@ -946,25 +983,30 @@ export class Domain {
           await this.bot(tx, client, 'rating_reminder', `reminder:${cycle.id}`, ticket, cycle.id);
         }
       });
+    }
     const expiredBuffers = (
       await this.db.query<{ client_id: string }>(
         'SELECT DISTINCT client_id FROM preconsent_buffers WHERE expires_at<=now() LIMIT 100',
       )
     ).rows;
-    for (const item of expiredBuffers)
+    for (const item of expiredBuffers) {
       await this.db.tx(async (tx) => {
         const client = await one<Client>(
           tx,
           'SELECT * FROM clients WHERE org_id=$1 AND id=$2 FOR UPDATE',
           [this.org, item.client_id],
         );
-        if (!client) return;
+        if (!client) {
+          return;
+        }
         const removed = await tx.query(
           'DELETE FROM preconsent_buffers WHERE client_id=$1 AND expires_at<=now() RETURNING id',
           [client.id],
         );
-        if (removed.rows.length)
+        if (removed.rows.length) {
           await this.bot(tx, client, 'buffer_expired', `buffer-expired:${randomUUID()}`);
+        }
       });
+    }
   }
 }

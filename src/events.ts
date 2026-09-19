@@ -31,16 +31,17 @@ export async function emit(
     'INSERT INTO ui_events(org_id,cursor,type,ticket_id,payload) VALUES($1,$2,$3,$4,$5)',
     [org, row!.cursor, type, ticket, JSON.stringify(payload)],
   );
-  if (employeeId)
+  if (employeeId) {
     await tx.query(
       'INSERT INTO notifications(org_id,employee_id,cursor,type,ticket_id) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
       [org, employeeId, row!.cursor, type, ticket],
     );
-  else if (type === 'ticket.created')
+  } else if (type === 'ticket.created') {
     await tx.query(
       'INSERT INTO notifications(org_id,employee_id,cursor,type,ticket_id) SELECT org_id,id,$2,$3,$4 FROM employees WHERE org_id=$1 AND NOT blocked ON CONFLICT DO NOTHING',
       [org, row!.cursor, type, ticket],
     );
+  }
 }
 export async function enqueue(
   tx: Sql,

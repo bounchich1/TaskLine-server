@@ -1,21 +1,23 @@
+import { createHash } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { resolve, join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { createHash } from 'node:crypto';
 import { Socket } from 'node:net';
+import { tmpdir } from 'node:os';
+import { resolve, join } from 'node:path';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { fileTypeFromFile } from 'file-type';
+
 import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
+import { fileTypeFromFile } from 'file-type';
+
 import type { Config } from './config.js';
-import { one, type Database } from './db.js';
 import { decrypt } from './crypto.js';
+import { one, type Database } from './db.js';
 import { ensure } from './errors.js';
 import { emit, enqueue } from './events.js';
 import { mediaFetch } from './network.js';
@@ -46,20 +48,21 @@ export class Files {
     readonly db: Database,
     readonly c: Config,
   ) {
-    if (c.STORAGE_MODE === 's3')
+    if (c.STORAGE_MODE === 's3') {
       this.s3 = new S3Client({
         region: c.S3_REGION,
         endpoint: c.S3_ENDPOINT,
         forcePathStyle: !!c.S3_ENDPOINT,
         credentials: { accessKeyId: c.S3_ACCESS_KEY_ID, secretAccessKey: c.S3_SECRET_ACCESS_KEY },
       });
+    }
   }
   private path(key: string) {
     ensure(/^[a-f0-9-]{36}\/[a-f0-9-]{36}$/.test(key), 'invalid_object_key', 500);
     return resolve(this.c.STORAGE_PATH, key);
   }
   private async put(key: string, path: string, mime: string) {
-    if (this.s3)
+    if (this.s3) {
       await this.s3.send(
         new PutObjectCommand({
           Bucket: this.c.S3_BUCKET,
@@ -70,7 +73,7 @@ export class Files {
           ServerSideEncryption: 'AES256',
         }),
       );
-    else {
+    } else {
       const target = this.path(key);
       await mkdir(resolve(target, '..'), { recursive: true });
       await pipeline(
@@ -90,9 +93,11 @@ export class Files {
     return createReadStream(this.path(key));
   }
   async remove(key: string) {
-    if (this.s3)
+    if (this.s3) {
       await this.s3.send(new DeleteObjectCommand({ Bucket: this.c.S3_BUCKET, Key: key }));
-    else await rm(this.path(key), { force: true });
+    } else {
+      await rm(this.path(key), { force: true });
+    }
   }
   async prepare(employee: Employee, ticketId: string, filename: string, kind: string) {
     return this.db.tx(async (tx) => {
@@ -156,8 +161,11 @@ export class Files {
           transform(chunk: Buffer, _encoding, callback) {
             bytes += chunk.length;
             digest.update(chunk);
-            if (bytes > limitFor(file.kind)) callback(new Error('file_too_large'));
-            else callback(null, chunk);
+            if (bytes > limitFor(file.kind)) {
+              callback(new Error('file_too_large'));
+            } else {
+              callback(null, chunk);
+            }
           },
         }),
         createWriteStream(path, { mode: 0o600 }),
@@ -170,8 +178,9 @@ export class Files {
           "UPDATE attachments SET object_key=$2,bytes=$3,sha256=$4,status='quarantined' WHERE id=$1 AND status IN('receiving','pending') RETURNING id",
           [file.id, key, bytes, digest.digest('hex')],
         );
-        if (changed.rows.length)
+        if (changed.rows.length) {
           await enqueue(tx, this.c.ORG_ID, `scan:${file.id}`, 'scan', file.id);
+        }
       });
     } finally {
       await rm(temp, { recursive: true, force: true });
@@ -183,7 +192,9 @@ export class Files {
       'SELECT * FROM attachments WHERE org_id=$1 AND id=$2',
       [this.c.ORG_ID, id],
     );
-    if (!file || file.status !== 'pending') return;
+    if (!file || file.status !== 'pending') {
+      return;
+    }
     const consent = await one(
       this.db,
       "SELECT t.id FROM tickets t JOIN clients c ON c.id=t.client_id WHERE t.id=$1 AND c.consent_state='granted' AND c.consent_revision=t.consent_revision",
@@ -221,7 +232,9 @@ export class Files {
       'SELECT * FROM attachments WHERE org_id=$1 AND id=$2',
       [this.c.ORG_ID, id],
     );
-    if (!file || file.status !== 'quarantined' || !file.object_key) return;
+    if (!file || file.status !== 'quarantined' || !file.object_key) {
+      return;
+    }
     const temp = await mkdtemp(join(tmpdir(), 'max-scan-'));
     const path = join(temp, 'body');
     try {
@@ -322,12 +335,18 @@ async function clamScan(path: string, host: string, port: number): Promise<boole
     socket.on('error', reject);
     socket.on('data', (chunk) => {
       response += chunk.toString();
-      if (response.length > 4096) socket.destroy(new Error('scanner_invalid_response'));
+      if (response.length > 4096) {
+        socket.destroy(new Error('scanner_invalid_response'));
+      }
     });
     socket.on('end', () => {
-      if (/stream: OK/.test(response)) resolve(true);
-      else if (/FOUND/.test(response)) resolve(false);
-      else reject(new Error('scanner_unavailable'));
+      if (/stream: OK/.test(response)) {
+        resolve(true);
+      } else if (/FOUND/.test(response)) {
+        resolve(false);
+      } else {
+        reject(new Error('scanner_unavailable'));
+      }
     });
   });
   try {
@@ -341,7 +360,9 @@ async function clamScan(path: string, host: string, port: number): Promise<boole
       const size = Buffer.alloc(4);
       size.writeUInt32BE(bytes.length);
       socket.write(size);
-      if (!socket.write(bytes)) await new Promise<void>((resolve) => socket.once('drain', resolve));
+      if (!socket.write(bytes)) {
+        await new Promise<void>((resolve) => socket.once('drain', resolve));
+      }
     }
     socket.write(Buffer.alloc(4));
     return await result;

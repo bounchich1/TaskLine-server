@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { one, type Database } from './db.js';
 import { ensure } from './errors.js';
 import type { Row, Ticket } from './types.js';
@@ -42,26 +43,39 @@ export class Queries {
       values.push(value);
       clauses.push(sql.replaceAll('?', `$${values.length}`));
     };
-    for (const field of ['tag', 'urgency', 'complexity', 'status'] as const)
-      if (f[field]) add(`t.${field}=?`, f[field]);
-    if (f.assignee) add('t.assignee_id=?', f.assignee);
-    if (f.from) add('t.created_at>=?::timestamptz', f.from);
-    if (f.to) add('t.created_at<?::timestamptz', f.to);
+    for (const field of ['tag', 'urgency', 'complexity', 'status'] as const) {
+      if (f[field]) {
+        add(`t.${field}=?`, f[field]);
+      }
+    }
+    if (f.assignee) {
+      add('t.assignee_id=?', f.assignee);
+    }
+    if (f.from) {
+      add('t.created_at>=?::timestamptz', f.from);
+    }
+    if (f.to) {
+      add('t.created_at<?::timestamptz', f.to);
+    }
     if (f.q.trim()) {
       const q = f.q.trim().replace(/^№\s*/, '');
-      if (/^\d{1,6}$/.test(q)) add('t.ticket_number=?', Number(q));
-      else
+      if (/^\d{1,6}$/.test(q)) {
+        add('t.ticket_number=?', Number(q));
+      } else {
         add(
           `(to_tsvector('russian',t.description) @@ plainto_tsquery('russian',?) OR EXISTS(SELECT 1 FROM messages m WHERE m.ticket_id=t.id AND NOT m.deleted AND to_tsvector('russian',m.text) @@ plainto_tsquery('russian',?)))`,
           q,
         );
+      }
     }
     const counts = await one(
       this.db,
       `SELECT count(*) FILTER(WHERE t.status IN('open','in_progress'))::int AS open,count(*) FILTER(WHERE t.status IN('awaiting_rating','closed'))::int AS closed,now() AS snapshot_at ${joins} WHERE ${clauses.join(' AND ')}`,
       values,
     );
-    if (countsOnly) return counts;
+    if (countsOnly) {
+      return counts;
+    }
     clauses.push(
       f.tab === 'open'
         ? "t.status IN('open','in_progress')"

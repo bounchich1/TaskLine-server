@@ -1,7 +1,13 @@
 import { readFileSync } from 'node:fs';
+
 import { z } from 'zod';
-import { one, type Database } from '../db.js';
+
 import type { Config } from '../config.js';
+import { decrypt, encrypt, hash } from '../crypto.js';
+import { one, type Database } from '../db.js';
+import { ensure, AppError } from '../errors.js';
+import { audit, emit, enqueue } from '../events.js';
+import { object, strictJson } from '../json.js';
 import type {
   Closure,
   Job,
@@ -12,11 +18,6 @@ import type {
   Ticket,
   TriageResult,
 } from '../types.js';
-import { decrypt, encrypt, hash } from '../crypto.js';
-import { ensure, AppError } from '../errors.js';
-import { audit, emit, enqueue } from '../events.js';
-import { object, strictJson } from '../json.js';
-import { eligibleJob, type Model, type ModelMessage } from './gateway.js';
 import {
   parseResolution,
   parseTriage,
@@ -24,6 +25,7 @@ import {
   resolutionSchema,
   triageSchema,
 } from './contracts.js';
+import { eligibleJob, type Model, type ModelMessage } from './gateway.js';
 import type { Recall, CaseEvidence } from './memory.js';
 
 const triageSkill = readFileSync(
@@ -77,7 +79,9 @@ export class Workflows {
       'SELECT * FROM messages WHERE org_id=$1 AND id=$2',
       [this.c.ORG_ID, job.payload.message_id],
     );
-    if (!message || !(await eligibleJob(this.db, this.c.ORG_ID, job))) return;
+    if (!message || !(await eligibleJob(this.db, this.c.ORG_ID, job))) {
+      return;
+    }
     const attachments = (
       await this.db.query(
         'SELECT id,status,extraction,extraction_status FROM attachments WHERE message_id=$1 ORDER BY id',
@@ -152,7 +156,9 @@ export class Workflows {
               422,
             );
             data = { cases: await this.memory.expand(parsed.ids) };
-          } else throw new AppError('forbidden_ai_tool', 422);
+          } else {
+            throw new AppError('forbidden_ai_tool', 422);
+          }
           messages.push(
             {
               role: 'assistant',
@@ -204,8 +210,9 @@ export class Workflows {
         break;
       }
     } catch (error) {
-      if (error instanceof AppError && ['ai_busy', 'gateway_unavailable'].includes(error.code))
+      if (error instanceof AppError && ['ai_busy', 'gateway_unavailable'].includes(error.code)) {
         throw error;
+      }
       failure = error instanceof AppError ? error.code : 'ai_failed';
       result = fallback(version, message.id);
     }
@@ -219,15 +226,21 @@ export class Workflows {
     }
     await this.db.tx(async (tx) => {
       const ref = await one(tx, 'SELECT client_id FROM tickets WHERE id=$1', [job.ref_id]);
-      if (!ref) return;
+      if (!ref) {
+        return;
+      }
       await tx.query('SELECT id FROM clients WHERE id=$1 FOR UPDATE', [ref.client_id]);
       const ticket = await one<Ticket>(
         tx,
         'SELECT * FROM tickets WHERE id=$1 AND org_id=$2 FOR UPDATE',
         [job.ref_id, this.c.ORG_ID],
       );
-      if (!ticket) return;
-      if (!(await eligibleJob(tx, this.c.ORG_ID, job))) return;
+      if (!ticket) {
+        return;
+      }
+      if (!(await eligibleJob(tx, this.c.ORG_ID, job))) {
+        return;
+      }
       const current = await one<Message>(tx, 'SELECT * FROM messages WHERE id=$1', [message.id]);
       if (current?.revision !== job.payload.revision) {
         await tx.query(
@@ -246,11 +259,12 @@ export class Workflows {
           result.tags[field] = field === 'tag' ? 'undefined' : 'medium';
           success = false;
         }
-        if (ticket[`${field}_revision`] === Number((job.payload.field_revisions as Row)[field]))
+        if (ticket[`${field}_revision`] === Number((job.payload.field_revisions as Row)[field])) {
           await tx.query(
             `UPDATE tickets SET ${field}=$2,classification_labels=jsonb_set(classification_labels,ARRAY[$3],$4::jsonb) WHERE id=$1`,
             [ticket.id, result.tags[field], field, JSON.stringify(active ?? {})],
           );
+        }
       }
       await tx.query(
         'UPDATE tickets SET ai_status=$2,suggestion=$3,review_required=$4,version=version+1 WHERE id=$1',
@@ -289,7 +303,7 @@ export class Workflows {
         initial.id,
       ]))!;
       ensure(await eligibleJob(tx, this.c.ORG_ID, job), 'job_ineligible');
-      if (cycle.snapshot)
+      if (cycle.snapshot) {
         return {
           cycle,
           ...decrypt<{ entries: SnapshotEntry[]; missing: string[] }>(
@@ -297,6 +311,7 @@ export class Workflows {
             this.c.ENCRYPTION_KEY,
           ),
         };
+      }
       const messages = (
         await tx.query<Message>(
           'SELECT * FROM messages WHERE org_id=$1 AND ticket_id=$2 AND seq<=$3 ORDER BY seq',
@@ -312,8 +327,9 @@ export class Workflows {
       const pending = files.some((f) =>
         ['pending', 'quarantined', 'receiving'].includes(String(f.status)),
       );
-      if (pending && Date.now() - new Date(cycle.closed_at).getTime() < 60000)
+      if (pending && Date.now() - new Date(cycle.closed_at).getTime() < 60000) {
         throw new AppError('snapshot_waiting_files', 429);
+      }
       const revisions = (
         await tx.query(
           'SELECT r.* FROM message_revisions r JOIN messages m ON m.id=r.message_id WHERE m.ticket_id=$1 AND m.seq<=$2 ORDER BY m.seq,r.revision',
@@ -371,7 +387,9 @@ export class Workflows {
 
   /** One model step per queue job invocation, yielding between chunks for fair admission. */
   async learning(job: Job): Promise<boolean> {
-    if (!this.c.AI_ENABLED) throw new AppError('ai_disabled', 503);
+    if (!this.c.AI_ENABLED) {
+      throw new AppError('ai_disabled', 503);
+    }
     const { cycle, entries, missing } = await this.snapshot(job);
     const allIds = entries.map((e) => e.id);
     ensure(allIds.length > 0, 'empty_snapshot');
@@ -512,7 +530,9 @@ export class Workflows {
     let resolution = parseResolution(call.arguments, allIds);
     const sanitized = redact(JSON.stringify(resolution));
     let containsSecrets = sanitized !== JSON.stringify(resolution);
-    if (containsSecrets) resolution = parseResolution(sanitized, allIds);
+    if (containsSecrets) {
+      resolution = parseResolution(sanitized, allIds);
+    }
     const sourceKey = hash(`${this.c.ORG_ID}|${cycle.id}|${hash(JSON.stringify(entries))}|1`);
     const contentHash = hash(JSON.stringify(resolution));
     const confirmed =
@@ -645,13 +665,14 @@ export function planChunks(entries: SnapshotEntry[], budget: number): Part[][] {
   for (const entry of entries) {
     const data = JSON.stringify(entry);
     const count = Math.max(1, Math.ceil(data.length / size));
-    for (let i = 0; i < count; i++)
+    for (let i = 0; i < count; i++) {
       parts.push({
         id: entry.id,
         part: i,
         parts: count,
         data: data.slice(i * size, (i + 1) * size),
       });
+    }
   }
   const chunks: Part[][] = [];
   let current: Part[] = [];
@@ -666,11 +687,15 @@ export function planChunks(entries: SnapshotEntry[], budget: number): Part[][] {
     current.push(part);
     used += length;
   }
-  if (current.length) chunks.push(current);
+  if (current.length) {
+    chunks.push(current);
+  }
   return chunks;
 }
 export function confirmedResolution(resolution: Resolution, entries: SnapshotEntry[]): boolean {
-  if (resolution.outcome !== 'resolved') return false;
+  if (resolution.outcome !== 'resolved') {
+    return false;
+  }
   const staff = entries.filter(
     (e) =>
       e.role === 'staff' &&

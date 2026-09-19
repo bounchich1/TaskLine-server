@@ -1,14 +1,16 @@
 import { randomUUID } from 'node:crypto';
+
 import Fastify from 'fastify';
 import { fetch } from 'undici';
 import { z } from 'zod';
-import { one, type Database, type Sql } from '../db.js';
+
 import type { Config } from '../config.js';
-import type { Job, Row } from '../types.js';
 import { decrypt, encrypt, equal, hash } from '../crypto.js';
+import { one, type Database, type Sql } from '../db.js';
 import { AppError, ensure } from '../errors.js';
-import { boundedText } from '../network.js';
 import { object, strictJson } from '../json.js';
+import { boundedText } from '../network.js';
+import type { Job, Row } from '../types.js';
 
 export type ModelMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -44,7 +46,7 @@ export async function eligibleJob(tx: Sql, org: string, job: Job): Promise<boole
       [job.ref_id, org, job.payload.lifecycle, job.payload.consent_revision],
     ));
   }
-  if (job.kind === 'learning')
+  if (job.kind === 'learning') {
     return !!(await one(
       tx,
       `SELECT cl.id FROM closures cl JOIN tickets t ON t.id=cl.ticket_id JOIN clients c ON c.id=t.client_id
@@ -52,6 +54,7 @@ export async function eligibleJob(tx: Sql, org: string, job: Job): Promise<boole
     AND c.consent_state='granted' AND c.consent_revision=$3 AND t.consent_revision=c.consent_revision`,
       [job.ref_id, org, job.payload.consent_revision],
     ));
+  }
   return false;
 }
 
@@ -81,8 +84,9 @@ export class Gateway implements Model {
       ]);
       if (old) {
         ensure(old.input_hash === digest, 'ai_input_changed');
-        if (old.state === 'completed' && old.response)
+        if (old.state === 'completed' && old.response) {
           return { cached: decrypt<ModelReply>(String(old.response), this.c.ENCRYPTION_KEY) };
+        }
         throw new AppError(
           old.state === 'failed' ? 'ai_rejected' : 'ai_uncertain',
           409,
@@ -115,7 +119,9 @@ export class Gateway implements Model {
       );
       return { slot: Number(permit.slot), generation };
     });
-    if ('cached' in admission) return admission.cached!;
+    if ('cached' in admission) {
+      return admission.cached!;
+    }
     // Crash after admission intentionally retains the slot. A clock-based lease never releases remote work.
     let completed = false;
     try {
@@ -184,7 +190,9 @@ export class Gateway implements Model {
         ? { type: 'function', function: { name: request.forceTool } }
         : 'auto';
     }
-    if (request.json) body.response_format = { type: 'json_object' };
+    if (request.json) {
+      body.response_format = { type: 'json_object' };
+    }
     const response = await fetch(this.c.AI_API_URL, {
       method: 'POST',
       headers: { Authorization: `Bearer ${this.c.AI_API_KEY}`, 'Content-Type': 'application/json' },
@@ -247,13 +255,14 @@ export class GatewayClient implements Model {
       redirect: 'error',
     });
     const data = object(strictJson(await boundedText(response, 128 * 1024), false, 128 * 1024));
-    if (!response.ok)
+    if (!response.ok) {
       throw new AppError(
         String(data.code ?? 'gateway_unavailable'),
         response.status,
         'Модель временно недоступна.',
         true,
       );
+    }
     return data as ModelReply;
   }
 }
@@ -265,8 +274,9 @@ export async function buildGateway(db: Database, c: Config) {
     permits: (await db.query('SELECT slot,state FROM ai_permits ORDER BY slot')).rows,
   }));
   app.post('/execute', async (request, reply) => {
-    if (!equal(request.headers.authorization ?? '', `Bearer ${c.GATEWAY_SECRET}`))
+    if (!equal(request.headers.authorization ?? '', `Bearer ${c.GATEWAY_SECRET}`)) {
       return reply.code(401).send({ code: 'unauthorized' });
+    }
     try {
       const body = z
         .object({
