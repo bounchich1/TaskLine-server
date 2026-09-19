@@ -1,124 +1,169 @@
-/** Bounded JSON parser: rejects duplicate keys and preserves unsafe integer tokens. */
+const MAX_DEPTH = 40;
+const LITERAL = /^(true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)/;
+
+/**
+ * Bounded JSON parser for untrusted input: size and depth limits, duplicate keys rejected,
+ * objects without a prototype. With `losslessIds`, integers beyond 2^53 are returned as their
+ * digits (MAX user and chat ids) instead of being rounded.
+ */
 export function strictJson(text: string, losslessIds = false, maxBytes = 32768): unknown {
   if (Buffer.byteLength(text) > maxBytes) {
     throw new Error('json_too_large');
   }
-  let at = 0;
-  const ws = () => {
-    while (/\s/.test(text[at] ?? '') && at < text.length) {
-      at++;
+  return new StrictJsonParser(text, losslessIds).document();
+}
+
+class StrictJsonParser {
+  private at = 0;
+
+  constructor(
+    private readonly text: string,
+    private readonly losslessIds: boolean,
+  ) {}
+
+  document(): unknown {
+    const result = this.value(0);
+    this.skipWhitespace();
+    if (this.at !== this.text.length) {
+      throw new Error('trailing_json');
     }
-  };
-  const str = (): string => {
-    const start = at++;
-    while (at < text.length) {
-      if (text[at] === '\\') {
-        at += 2;
+    return result;
+  }
+
+  private value(depth: number): unknown {
+    if (depth > MAX_DEPTH) {
+      throw new Error('json_depth');
+    }
+    this.skipWhitespace();
+    const next = this.text.charAt(this.at);
+    if (next === '"') {
+      return this.string();
+    }
+    if (next === '{') {
+      return this.object(depth);
+    }
+    if (next === '[') {
+      return this.array(depth);
+    }
+    return this.literal();
+  }
+
+  private object(depth: number): Record<string, unknown> {
+    this.at++;
+    this.skipWhitespace();
+    const result = Object.create(null) as Record<string, unknown>;
+    if (this.text.charAt(this.at) === '}') {
+      this.at++;
+      return result;
+    }
+    const seen = new Set<string>();
+    for (;;) {
+      const key = this.memberName(seen);
+      result[key] = this.value(depth + 1);
+      this.skipWhitespace();
+      const end = this.text.charAt(this.at++);
+      if (end === '}') {
+        return result;
+      }
+      if (end !== ',') {
+        throw new Error('invalid_json_object');
+      }
+    }
+  }
+
+  /** A member name and the colon after it. */
+  private memberName(seen: Set<string>): string {
+    this.skipWhitespace();
+    if (this.text.charAt(this.at) !== '"') {
+      throw new Error('invalid_json_key');
+    }
+    const key = this.string();
+    if (seen.has(key)) {
+      throw new Error('duplicate_json_key');
+    }
+    seen.add(key);
+    this.skipWhitespace();
+    if (this.text.charAt(this.at++) !== ':') {
+      throw new Error('invalid_json_colon');
+    }
+    return key;
+  }
+
+  private array(depth: number): unknown[] {
+    this.at++;
+    this.skipWhitespace();
+    const result: unknown[] = [];
+    if (this.text.charAt(this.at) === ']') {
+      this.at++;
+      return result;
+    }
+    for (;;) {
+      result.push(this.value(depth + 1));
+      this.skipWhitespace();
+      const end = this.text.charAt(this.at++);
+      if (end === ']') {
+        return result;
+      }
+      if (end !== ',') {
+        throw new Error('invalid_json_array');
+      }
+    }
+  }
+
+  /** Finds the closing quote (skipping escapes); JSON.parse decodes the escapes. */
+  private string(): string {
+    const start = this.at++;
+    while (this.at < this.text.length) {
+      if (this.text.charAt(this.at) === '\\') {
+        this.at += 2;
         continue;
       }
-      if (text[at++] === '"') {
-        return JSON.parse(text.slice(start, at)) as string;
+      if (this.text.charAt(this.at++) === '"') {
+        return JSON.parse(this.text.slice(start, this.at)) as string;
       }
     }
     throw new Error('invalid_json_string');
-  };
-  const value = (depth: number): unknown => {
-    if (depth > 40) {
-      throw new Error('json_depth');
-    }
-    ws();
-    const ch = text[at];
-    if (ch === '"') {
-      return str();
-    }
-    if (ch === '{') {
-      at++;
-      ws();
-      const result: Record<string, unknown> = Object.create(null);
-      const keys = new Set<string>();
-      if (text[at] === '}') {
-        at++;
-        return result;
-      }
-      for (;;) {
-        ws();
-        if (text[at] !== '"') {
-          throw new Error('invalid_json_key');
-        }
-        const key = str();
-        if (keys.has(key)) {
-          throw new Error('duplicate_json_key');
-        }
-        keys.add(key);
-        ws();
-        if (text[at++] !== ':') {
-          throw new Error('invalid_json_colon');
-        }
-        result[key] = value(depth + 1);
-        ws();
-        const end = text[at++];
-        if (end === '}') {
-          return result;
-        }
-        if (end !== ',') {
-          throw new Error('invalid_json_object');
-        }
-      }
-    }
-    if (ch === '[') {
-      at++;
-      ws();
-      const result: unknown[] = [];
-      if (text[at] === ']') {
-        at++;
-        return result;
-      }
-      for (;;) {
-        result.push(value(depth + 1));
-        ws();
-        const end = text[at++];
-        if (end === ']') {
-          return result;
-        }
-        if (end !== ',') {
-          throw new Error('invalid_json_array');
-        }
-      }
-    }
-    const literal = /^(true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)/.exec(
-      text.slice(at),
-    );
-    if (!literal) {
+  }
+
+  private literal(): unknown {
+    const match = LITERAL.exec(this.text.slice(this.at));
+    if (!match) {
       throw new Error('invalid_json_value');
     }
-    at += literal[0].length;
-    const parsed: unknown = JSON.parse(literal[0]);
+    const [token] = match;
+    this.at += token.length;
+    const parsed: unknown = JSON.parse(token);
     if (typeof parsed === 'number' && !Number.isFinite(parsed)) {
       throw new Error('nonfinite_json_number');
     }
-    if (
-      losslessIds &&
-      typeof parsed === 'number' &&
-      /^-?\d+$/.test(literal[0]) &&
-      !Number.isSafeInteger(parsed)
-    ) {
-      return literal[0];
-    }
-    return parsed;
-  };
-  const result = value(0);
-  ws();
-  if (at !== text.length) {
-    throw new Error('trailing_json');
+    const unsafeInteger =
+      typeof parsed === 'number' && /^-?\d+$/.test(token) && !Number.isSafeInteger(parsed);
+    return this.losslessIds && unsafeInteger ? token : parsed;
   }
-  return result;
+
+  private skipWhitespace(): void {
+    while (this.at < this.text.length && /\s/.test(this.text.charAt(this.at))) {
+      this.at++;
+    }
+  }
 }
+
+/**
+ * A scalar field of an external JSON payload as text, rendered exactly as String() renders
+ * it. MAX sends ids and codes as strings or numbers.
+ */
+export function jsonText(value: unknown): string {
+  return String(value);
+}
+
 export function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('expected_object');
   }
   return value as Record<string, unknown>;
 }
+
+/** A MAX numeric id as a decimal string; rejects numbers already rounded by JSON.parse. */
 export function decimalId(value: unknown): string {
   if (typeof value === 'number' && !Number.isSafeInteger(value)) {
     throw new Error('unsafe_id');

@@ -5,6 +5,7 @@ import { Agent, fetch, type RequestInit, type Response } from 'undici';
 
 import { ensure } from './errors.js';
 
+/** Reads a response body as UTF-8, failing once it exceeds `limit` bytes. */
 export async function boundedText(response: Response, limit = 1024 * 1024): Promise<string> {
   const declared = Number(response.headers.get('content-length'));
   if (declared > limit) {
@@ -13,34 +14,51 @@ export async function boundedText(response: Response, limit = 1024 * 1024): Prom
   }
   const chunks: Uint8Array[] = [];
   let size = 0;
-  for await (const chunk of response.body ?? []) {
-    size += chunk.byteLength;
-    if (size > limit) {
-      throw new Error('response_too_large');
+  if (response.body) {
+    for await (const chunk of response.body as AsyncIterable<Uint8Array>) {
+      size += chunk.byteLength;
+      if (size > limit) {
+        throw new Error('response_too_large');
+      }
+      chunks.push(chunk);
     }
-    chunks.push(chunk);
   }
   return Buffer.concat(chunks).toString('utf8');
 }
+
+/**
+ * Non-public IPv4 blocks as [first octet, second octet from, to]: this network, private,
+ * loopback, link-local, carrier-grade NAT and benchmarking ranges.
+ */
+const NON_PUBLIC_IPV4: [number, number, number][] = [
+  [0, 0, 255],
+  [10, 0, 255],
+  [127, 0, 255],
+  [169, 254, 254],
+  [172, 16, 31],
+  [192, 168, 168],
+  [100, 64, 127],
+  [198, 18, 19],
+];
+const MULTICAST_IPV4_FROM = 224;
+/** Unspecified/loopback, unique-local, link-local, multicast. */
+const NON_PUBLIC_IPV6 = /^(::|fc|fd|fe[89ab]|ff)/i;
+const DOCUMENTATION_IPV6 = '2001:db8:';
+
+/** Whether an IP literal is publicly routable (guards media fetches against SSRF). */
 export function publicAddress(address: string): boolean {
-  if (isIP(address) === 4) {
-    const [a, b] = address.split('.').map(Number);
-    return !(
-      a === 0 ||
-      a === 10 ||
-      a === 127 ||
-      a >= 224 ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      (a === 100 && b >= 64 && b <= 127) ||
-      (a === 198 && (b === 18 || b === 19))
+  const version = isIP(address);
+  if (version === 4) {
+    const [first, second] = address.split('.').map(Number);
+    return (
+      first < MULTICAST_IPV4_FROM &&
+      !NON_PUBLIC_IPV4.some(
+        ([octet, from, to]) => first === octet && second >= from && second <= to,
+      )
     );
   }
-  if (isIP(address) === 6) {
-    return (
-      !/^(::|fc|fd|fe[89ab]|ff)/i.test(address) && !address.toLowerCase().startsWith('2001:db8:')
-    );
+  if (version === 6) {
+    return !NON_PUBLIC_IPV6.test(address) && !address.toLowerCase().startsWith(DOCUMENTATION_IPV6);
   }
   return false;
 }
@@ -62,7 +80,7 @@ export async function mediaFetch(
   );
   const addresses = await lookup(url.hostname, { all: true });
   ensure(
-    addresses.length && addresses.every((a) => publicAddress(a.address)),
+    addresses.length && addresses.every((entry) => publicAddress(entry.address)),
     'media_address_denied',
     422,
   );

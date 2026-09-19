@@ -4,6 +4,8 @@ import pg from 'pg';
 
 import { serverFile } from './paths.js';
 export interface Sql {
+  // The row type is the caller's claim about the SQL, as in pg's own query<T>.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
   query<T extends Record<string, unknown> = Record<string, unknown>>(
     sql: string,
     params?: unknown[],
@@ -60,7 +62,8 @@ export async function migrate(db: Database) {
   await db.tx(async (tx) => {
     await tx.query('SELECT pg_advisory_xact_lock(7136001)');
     await tx.query(
-      'CREATE TABLE IF NOT EXISTS schema_migrations (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',
+      `CREATE TABLE IF NOT EXISTS schema_migrations
+       (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`,
     );
     if (!(await one(tx, 'SELECT version FROM schema_migrations WHERE version=1'))) {
       await tx.query(migration);

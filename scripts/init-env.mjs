@@ -11,6 +11,9 @@ try {
   await writeFile(path, text, { flag: 'wx', mode: 0o600 });
   console.log('Created ignored .env. Provider credentials are blank.');
 } catch (error) {
-  if (error.code === 'EEXIST') console.log('.env already exists; preserved.');
-  else throw error;
+  if (error.code === 'EEXIST') {
+    console.log('.env already exists; preserved.');
+  } else {
+    throw error;
+  }
 }

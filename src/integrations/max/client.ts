@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { openAsBlob } from 'node:fs';
 
-import { fetch, FormData } from 'undici';
+import { fetch, FormData, type Response } from 'undici';
 
 import { mediaHosts, type Config } from '../../shared/config.js';
-import { object, strictJson } from '../../shared/json.js';
+import { jsonText, object, strictJson } from '../../shared/json.js';
 import { boundedText, mediaFetch } from '../../shared/network.js';
 import type { Row } from '../../shared/types/entities.js';
 
@@ -22,51 +22,34 @@ export interface MaxTransport {
   answer(callbackId: string, text: string): Promise<void>;
   upload(kind: string, path: string, name: string, mime: string): Promise<Row>;
 }
+const MAX_RESPONSE_BYTES = 1024 * 1024;
+const REQUEST_TIMEOUT_MS = 20000;
+const noRateLimit = (): Promise<void> => Promise.resolve();
+
+/**
+ * The MAX Bot API. Every failure is a TransportFailure whose outcome tells the delivery worker
+ * what it may do: `retry` (safe to resend), `failed` (rejected), `unknown` (may have been sent).
+ */
 export class MaxClient implements MaxTransport {
   constructor(
     private c: Config,
-    private rate: () => Promise<void> = async () => {},
+    private rate: () => Promise<void> = noRateLimit,
   ) {}
+
   async request(path: string, body: Row, query: Record<string, string> = {}): Promise<Row> {
     await this.rate();
     const url = new URL(path, this.c.MAX_API_URL);
     for (const [key, value] of Object.entries(query)) {
       url.searchParams.set(key, value);
     }
-    let response;
+    const response = await this.post(url, body);
+    await rejectUnsuccessful(response);
     try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: { Authorization: this.c.MAX_BOT_TOKEN, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        redirect: 'error',
-        signal: AbortSignal.timeout(20000),
-      });
-    } catch {
-      throw new TransportFailure('unknown', 'max_transport_uncertain');
-    }
-    if (response.status === 429) {
-      await response.body?.cancel();
-      throw new TransportFailure(
-        'retry',
-        'max_rate_limited',
-        Math.min(3600, Math.max(2, Number(response.headers.get('retry-after')) || 2)),
-      );
-    }
-    if (response.status >= 500) {
-      await response.body?.cancel();
-      throw new TransportFailure('unknown', 'max_server_uncertain');
-    }
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new TransportFailure('failed', `max_rejected_${response.status}`);
-    }
-    try {
-      const result = object(strictJson(await boundedText(response), true, 1024 * 1024));
+      const result = object(strictJson(await boundedText(response), true, MAX_RESPONSE_BYTES));
       if (result.success === false) {
         throw new TransportFailure(
           result.code === 'attachment.not.ready' ? 'retry' : 'failed',
-          String(result.code ?? 'max_rejected'),
+          jsonText(result.code ?? 'max_rejected'),
         );
       }
       return result;
@@ -77,6 +60,22 @@ export class MaxClient implements MaxTransport {
       throw new TransportFailure('unknown', 'max_invalid_response');
     }
   }
+
+  /** A network error leaves the outcome unknown: the request may have reached MAX. */
+  private async post(url: URL, body: Row): Promise<Response> {
+    try {
+      return await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: this.c.MAX_BOT_TOKEN, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        redirect: 'error',
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch {
+      throw new TransportFailure('unknown', 'max_transport_uncertain');
+    }
+  }
+
   async send(chatId: string, body: Row) {
     if (this.c.MAX_MODE === 'mock') {
       return `mock-${randomUUID()}`;
@@ -117,7 +116,9 @@ export class MaxClient implements MaxTransport {
       if (!media.response.ok) {
         throw new TransportFailure('retry', 'upload_failed');
       }
-      const result = object(strictJson(await boundedText(media.response), true, 1024 * 1024));
+      const result = object(
+        strictJson(await boundedText(media.response), true, MAX_RESPONSE_BYTES),
+      );
       if (kind === 'video') {
         if (typeof allocation.token !== 'string') {
           throw new TransportFailure('failed', 'video_token_missing');
@@ -140,4 +141,24 @@ export class MaxClient implements MaxTransport {
       await media.close();
     }
   }
+}
+
+/** 429: retry after the advertised delay (2 s to 1 h); 5xx: unknown; other 4xx: rejected. */
+async function rejectUnsuccessful(response: Response): Promise<void> {
+  if (response.ok) {
+    return;
+  }
+  await response.body?.cancel();
+  if (response.status === 429) {
+    const retryAfter = Number(response.headers.get('retry-after')) || 2;
+    throw new TransportFailure(
+      'retry',
+      'max_rate_limited',
+      Math.min(3600, Math.max(2, retryAfter)),
+    );
+  }
+  if (response.status >= 500) {
+    throw new TransportFailure('unknown', 'max_server_uncertain');
+  }
+  throw new TransportFailure('failed', `max_rejected_${response.status}`);
 }

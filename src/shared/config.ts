@@ -4,7 +4,7 @@ import { z } from 'zod';
 const bool = z
   .enum(['true', 'false'])
   .default('false')
-  .transform((v) => v === 'true');
+  .transform((value) => value === 'true');
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   HOST: z.string().default('127.0.0.1'),
@@ -55,38 +55,52 @@ const schema = z.object({
   DEV_AUTH_ENABLED: bool,
 });
 export type Config = z.infer<typeof schema>;
+/** Reads and validates the environment; refuses unsafe combinations, above all in production. */
 export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const c = schema.parse(env);
-  new Intl.DateTimeFormat('ru', { timeZone: c.ORG_TIMEZONE });
-  if (c.MAX_MODE === 'live' && !c.MAX_BOT_TOKEN) {
+  const config = schema.parse(env);
+  // Throws on an unknown time zone.
+  new Intl.DateTimeFormat('ru', { timeZone: config.ORG_TIMEZONE });
+  if (config.MAX_MODE === 'live' && !config.MAX_BOT_TOKEN) {
     throw new Error('MAX_BOT_TOKEN required for live MAX');
   }
-  if (c.AI_ENABLED && c.AI_MODE === 'live' && (!c.AI_API_KEY || !c.AI_MODEL)) {
+  if (config.AI_ENABLED && config.AI_MODE === 'live' && (!config.AI_API_KEY || !config.AI_MODEL)) {
     throw new Error('AI_API_KEY and AI_MODEL required');
   }
-  if (c.NODE_ENV === 'production') {
-    if (
-      c.DEV_AUTH_ENABLED ||
-      c.MAX_MODE !== 'live' ||
-      c.SCANNER_MODE !== 'clamav' ||
-      c.STORAGE_MODE !== 's3'
-    ) {
-      throw new Error('Unsafe production mode');
-    }
-    if (c.AI_ENABLED && c.AI_MODE !== 'live') {
-      throw new Error('Mock AI forbidden in production');
-    }
-    for (const url of [c.PUBLIC_URL, c.APP_ORIGIN, c.POLICY_URL, c.MAX_API_URL, c.AI_API_URL]) {
-      const parsed = new URL(url);
-      if (parsed.protocol !== 'https:' || parsed.hostname.endsWith('.invalid')) {
-        throw new Error('Production requires configured HTTPS URLs');
-      }
-    }
-    if (c.POLICY_VERSION.startsWith('dev-')) {
-      throw new Error('Publish approved consent policy before production');
+  if (config.NODE_ENV === 'production') {
+    assertProductionSafe(config);
+  }
+  return config;
+}
+
+/** Production runs only with real integrations, HTTPS everywhere and a published policy. */
+function assertProductionSafe(config: Config): void {
+  if (
+    config.DEV_AUTH_ENABLED ||
+    config.MAX_MODE !== 'live' ||
+    config.SCANNER_MODE !== 'clamav' ||
+    config.STORAGE_MODE !== 's3'
+  ) {
+    throw new Error('Unsafe production mode');
+  }
+  if (config.AI_ENABLED && config.AI_MODE !== 'live') {
+    throw new Error('Mock AI forbidden in production');
+  }
+  const urls = [
+    config.PUBLIC_URL,
+    config.APP_ORIGIN,
+    config.POLICY_URL,
+    config.MAX_API_URL,
+    config.AI_API_URL,
+  ];
+  for (const url of urls) {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' || parsed.hostname.endsWith('.invalid')) {
+      throw new Error('Production requires configured HTTPS URLs');
     }
   }
-  return c;
+  if (config.POLICY_VERSION.startsWith('dev-')) {
+    throw new Error('Publish approved consent policy before production');
+  }
 }
 
 /** Hosts MAX serves client media from (the only hosts media is fetched from or uploaded to). */
