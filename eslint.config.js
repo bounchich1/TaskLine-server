@@ -91,7 +91,10 @@ export default tseslint.config(
       ],
       curly: ['error', 'all'],
       'no-nested-ternary': 'error',
-      'id-length': ['error', { min: 2, exceptions: ['_', 'i', 'j', 'x', 'y'], properties: 'never' }],
+      'id-length': [
+        'error',
+        { min: 2, exceptions: ['_', 'i', 'j', 'x', 'y'], properties: 'never' },
+      ],
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/consistent-type-exports': 'error',
       'import-x/no-cycle': 'error',
@@ -123,7 +126,12 @@ export default tseslint.config(
       'boundaries/elements': [
         { type: 'app', pattern: 'src/app', partialMatch: false },
         { type: 'module', pattern: 'src/modules/*', capture: ['name'], partialMatch: false },
-        { type: 'integration', pattern: 'src/integrations/*', capture: ['name'], partialMatch: false },
+        {
+          type: 'integration',
+          pattern: 'src/integrations/*',
+          capture: ['name'],
+          partialMatch: false,
+        },
         { type: 'shared', pattern: 'src/shared', partialMatch: false },
         // Temporary: files not yet moved into the layout above. Nothing new may depend on them.
         { type: 'legacy', pattern: 'src', partialMatch: false },
@@ -141,7 +149,10 @@ export default tseslint.config(
           policies: [
             { allow: { to: { module: { origin: ['external', 'core'] } } } },
             { allow: { dependency: { relationship: { to: 'internal' } } } },
-            { from: { element: { type: 'shared' } }, allow: { to: { element: { type: 'shared' } } } },
+            {
+              from: { element: { type: 'shared' } },
+              allow: { to: { element: { type: 'shared' } } },
+            },
             {
               from: { element: { type: 'integration' } },
               allow: { to: { element: { type: 'shared' } } },

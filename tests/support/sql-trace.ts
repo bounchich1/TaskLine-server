@@ -26,7 +26,9 @@ function describeParam(value: unknown): string {
 function normalize(sql: string): string {
   const compact = sql.replace(/\s+/g, '');
   // Multi-statement scripts (the migration) are large; a digest is enough to detect changes.
-  return compact.length > 2000 ? `script:${createHash('sha1').update(compact).digest('hex')}` : compact;
+  return compact.length > 2000
+    ? `script:${createHash('sha1').update(compact).digest('hex')}`
+    : compact;
 }
 
 export function traceSql(sql: string, params: readonly unknown[] = []): void {
