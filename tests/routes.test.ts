@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
-import { fixture } from './helpers.js';
 import { buildApi } from '../src/api.js';
+
+import { fixture } from './helpers.js';
 
 // Refactoring safety net: the HTTP surface (paths and methods) must not change while routes move
 // into feature modules. The route tree is flattened and sorted so registration order is irrelevant.

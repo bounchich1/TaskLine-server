@@ -2,15 +2,16 @@ import { createHmac } from 'node:crypto';
 
 import { describe, it, expect } from 'vitest';
 
-import { testConfig } from './helpers.js';
 import { planChunks, confirmedResolution } from '../src/ai/workflows.js';
 import { verifyLaunch } from '../src/auth.js';
 import { normalizeUpdate } from '../src/integrations/max/index.js';
-import { parseRating } from '../src/rating.js';
+import { parseRating } from '../src/modules/ratings/index.js';
 import { readConfig } from '../src/shared/config.js';
 import { strictJson } from '../src/shared/json.js';
 import { publicAddress } from '../src/shared/network.js';
 import type { Resolution, SnapshotEntry } from '../src/shared/types/ai.js';
+
+import { testConfig } from './helpers.js';
 describe('rating grammar', () => {
   for (const [text, n] of [
     ['1', 1],

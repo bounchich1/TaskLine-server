@@ -1,6 +1,7 @@
-import { DEFAULT_TEMPLATES } from './default-templates.js';
 import { one, type Sql } from '../../shared/db.js';
 import { ensure } from '../../shared/errors.js';
+
+import { DEFAULT_TEMPLATES } from './default-templates.js';
 
 const PLACEHOLDERS = new Set(['ticket_number', 'policy_url', 'alternative_contact']);
 

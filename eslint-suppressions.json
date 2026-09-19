@@ -225,7 +225,7 @@
       "count": 1
     },
     "@typescript-eslint/no-non-null-assertion": {
-      "count": 21
+      "count": 17
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2
@@ -252,7 +252,7 @@
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 5
+      "count": 4
     }
   },
   "src/files.ts": {
@@ -346,14 +346,6 @@
     },
     "no-nested-ternary": {
       "count": 2
-    }
-  },
-  "src/rating.ts": {
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 1
     }
   },
   "src/seed.ts": {

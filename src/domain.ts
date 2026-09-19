@@ -11,7 +11,7 @@ import {
   queueHistoryPage,
   queueStaffReply,
 } from './modules/outbox/index.js';
-import { parseRating } from './rating.js';
+import { acceptRatingInput, finishRating, RatingTimers } from './modules/ratings/index.js';
 import type { Config } from './shared/config.js';
 import { createCtx } from './shared/context.js';
 import { decrypt, encrypt, hash, token } from './shared/crypto.js';
@@ -421,42 +421,7 @@ export class Domain {
   }
 
   async rate(tx: Sql, client: Client, ticket: Ticket, input: ClientInput, receivedAt: string) {
-    const cycle = (await one<Closure>(tx, 'SELECT * FROM closures WHERE id=$1 FOR UPDATE', [
-      ticket.current_cycle_id,
-    ]))!;
-    if (new Date(receivedAt).getTime() > new Date(cycle.expires_at).getTime()) {
-      await this.finishRating(tx, client, ticket, cycle, 'expired', input.sourceKey);
-      return;
-    }
-    const value = parseRating(input.text ?? '');
-    if (value !== null && !input.attachments?.length) {
-      await tx.query(
-        "UPDATE closures SET rating=$2,rated_at=now(),finished_reason='rated' WHERE id=$1 AND rating IS NULL",
-        [cycle.id, value],
-      );
-      await tx.query("UPDATE tickets SET status='closed',version=version+1 WHERE id=$1", [
-        ticket.id,
-      ]);
-      await this.cancelRatingPrompts(tx, cycle.id);
-      await this.bot(tx, client, 'rating_accepted', `rated:${cycle.id}`, ticket);
-      await emit(tx, this.org, 'rating.received', ticket.id, { value }, String(cycle.closed_by));
-    } else {
-      await tx.query('UPDATE closures SET invalid_attempts=invalid_attempts+1 WHERE id=$1', [
-        cycle.id,
-      ]);
-      if (cycle.invalid_attempts + 1 >= 3) {
-        await this.finishRating(tx, client, ticket, cycle, 'attempts_exhausted', input.sourceKey);
-      } else {
-        await this.bot(
-          tx,
-          client,
-          'rating_invalid',
-          `invalid:${input.sourceKey}`,
-          ticket,
-          cycle.id,
-        );
-      }
-    }
+    await acceptRatingInput(tx, this.ctx, { client, ticket, input, receivedAt });
   }
 
   async cancelRatingPrompts(tx: Sql, cycleId: string) {
@@ -470,17 +435,7 @@ export class Domain {
     reason: string,
     key: string,
   ) {
-    await tx.query('UPDATE closures SET finished_reason=$2 WHERE id=$1', [cycle.id, reason]);
-    await tx.query("UPDATE tickets SET status='closed',version=version+1 WHERE id=$1", [ticket.id]);
-    await this.cancelRatingPrompts(tx, cycle.id);
-    await this.bot(
-      tx,
-      client,
-      reason === 'attempts_exhausted' ? 'rating_attempts_exhausted' : 'rating_expired',
-      `final:${key}`,
-      ticket,
-    );
-    await emit(tx, this.org, 'rating.expired', ticket.id, { reason });
+    await finishRating(tx, this.ctx, { client, ticket, cycle, reason, key });
   }
 
   async withdraw(tx: Sql, client: Client, key: string) {
@@ -811,63 +766,7 @@ export class Domain {
   }
 
   async timers() {
-    const due = (
-      await this.db.query<Row & { client_id: string }>(
-        `SELECT DISTINCT t.client_id FROM tickets t JOIN closures c ON c.id=t.current_cycle_id
-      WHERE t.org_id=$1 AND t.status='awaiting_rating' AND (c.expires_at<=now() OR (c.reminder_at<=now() AND NOT c.reminder_created)) LIMIT 100`,
-        [this.org],
-      )
-    ).rows;
-    for (const item of due) {
-      await this.db.tx(async (tx) => {
-        const client = (await one<Client>(
-          tx,
-          'SELECT * FROM clients WHERE org_id=$1 AND id=$2 FOR UPDATE',
-          [this.org, item.client_id],
-        ))!;
-        const ticket = await one<Ticket>(
-          tx,
-          "SELECT * FROM tickets WHERE client_id=$1 AND status='awaiting_rating' FOR UPDATE",
-          [client.id],
-        );
-        if (!ticket) {
-          return;
-        }
-        const cycle = (await one<Closure>(tx, 'SELECT * FROM closures WHERE id=$1 FOR UPDATE', [
-          ticket.current_cycle_id,
-        ]))!;
-        const times = (await one(tx, 'SELECT now() >= $1::timestamptz AS expired', [
-          cycle.expires_at,
-        ]))!;
-        if (times.expired) {
-          if (
-            await one(
-              tx,
-              "SELECT id FROM inbox WHERE client_id=$1 AND state='pending' AND received_at<=$2 LIMIT 1",
-              [client.id, cycle.expires_at],
-            )
-          ) {
-            return;
-          }
-          const prompt = await one(
-            tx,
-            "SELECT state FROM deliveries WHERE cycle_id=$1 AND kind='ticket_closed'",
-            [cycle.id],
-          );
-          await this.finishRating(
-            tx,
-            client,
-            ticket,
-            cycle,
-            prompt?.state === 'delivered' ? 'expired' : 'notification_not_delivered',
-            cycle.id,
-          );
-        } else if (!cycle.reminder_created) {
-          await tx.query('UPDATE closures SET reminder_created=true WHERE id=$1', [cycle.id]);
-          await this.bot(tx, client, 'rating_reminder', `reminder:${cycle.id}`, ticket, cycle.id);
-        }
-      });
-    }
+    await new RatingTimers(this.db, this.config).run();
     const expiredBuffers = (
       await this.db.query<{ client_id: string }>(
         'SELECT DISTINCT client_id FROM preconsent_buffers WHERE expires_at<=now() LIMIT 100',

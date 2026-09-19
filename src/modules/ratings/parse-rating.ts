@@ -15,7 +15,7 @@ export function parseRating(raw: string): number | null {
     return null;
   }
   const match = matches[0];
-  const start = match.index!;
+  const start = match.index;
   const end = start + match[0].length;
   if (/[\p{L}\p{N}_]/u.test(text[start - 1] ?? '') || /[\p{L}\p{N}_]/u.test(text[end] ?? '')) {
     return null;

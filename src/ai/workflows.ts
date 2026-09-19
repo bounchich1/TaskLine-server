@@ -2,15 +2,6 @@ import { readFileSync } from 'node:fs';
 
 import { z } from 'zod';
 
-import {
-  parseResolution,
-  parseTriage,
-  redact,
-  resolutionSchema,
-  triageSchema,
-} from './contracts.js';
-import { eligibleJob, type Model, type ModelMessage } from './gateway.js';
-import type { Recall, CaseEvidence } from './memory.js';
 import type { Config } from '../shared/config.js';
 import { decrypt, encrypt, hash } from '../shared/crypto.js';
 import { one, type Database } from '../shared/db.js';
@@ -20,6 +11,16 @@ import { object, strictJson } from '../shared/json.js';
 import { serverFile } from '../shared/paths.js';
 import type { Resolution, SnapshotEntry, TriageResult } from '../shared/types/ai.js';
 import type { Closure, Job, Message, Row, Ticket } from '../shared/types/entities.js';
+
+import {
+  parseResolution,
+  parseTriage,
+  redact,
+  resolutionSchema,
+  triageSchema,
+} from './contracts.js';
+import { eligibleJob, type Model, type ModelMessage } from './gateway.js';
+import type { Recall, CaseEvidence } from './memory.js';
 
 const triageSkill = readFileSync(serverFile('agent-skills/support-triage/SKILL.md'), 'utf8');
 const learningSkill = readFileSync(

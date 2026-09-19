@@ -4,10 +4,11 @@ import { PGlite } from '@electric-sql/pglite';
 
 import { Domain } from '../src/domain.js';
 import { seed } from '../src/seed.js';
-import { traceSql, traceTransaction } from './support/sql-trace.js';
 import { readConfig, type Config } from '../src/shared/config.js';
 import { migrate, one, type Database, type Sql } from '../src/shared/db.js';
 import type { Client, Employee, Ticket } from '../src/shared/types/entities.js';
+
+import { traceSql, traceTransaction } from './support/sql-trace.js';
 
 export function testConfig(): Config {
   return readConfig({

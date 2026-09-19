@@ -2,9 +2,10 @@ import { randomUUID } from 'node:crypto';
 
 import { beforeEach, afterEach, it, expect } from 'vitest';
 
-import { fixture } from './helpers.js';
 import { buildApi } from '../src/api.js';
 import { one } from '../src/shared/db.js';
+
+import { fixture } from './helpers.js';
 let f: Awaited<ReturnType<typeof fixture>>;
 let app: Awaited<ReturnType<typeof buildApi>>;
 let headers: Record<string, string>;
