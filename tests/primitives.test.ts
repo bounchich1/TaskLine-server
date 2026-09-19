@@ -13,14 +13,16 @@ import type { Resolution, SnapshotEntry } from '../src/shared/types/ai.js';
 
 import { testConfig } from './helpers.js';
 describe('rating grammar', () => {
-  for (const [text, n] of [
+  for (const [text, expected] of [
     ['1', 1],
     ['10', 10],
     ['оценка 10, спасибо', 10],
     [' 7 ', 7],
     ['👍 9!', 9],
   ] as const) {
-    it(`accepts ${text}`, () => expect(parseRating(text)).toBe(n));
+    it(`accepts ${text}`, () => {
+      expect(parseRating(text)).toBe(expected);
+    });
   }
   for (const text of [
     '',
@@ -47,7 +49,9 @@ describe('rating grammar', () => {
     '7_',
     '10, 8',
   ]) {
-    it(`rejects ${text}`, () => expect(parseRating(text)).toBeNull());
+    it(`rejects ${text}`, () => {
+      expect(parseRating(text)).toBeNull();
+    });
   }
 });
 describe('strict JSON and MAX identifiers', () => {
@@ -56,10 +60,10 @@ describe('strict JSON and MAX identifiers', () => {
     expect(() => strictJson('{}text')).toThrow();
     expect(() => strictJson('{"n":1e999}')).toThrow();
   });
-  it('preserves int64 IDs', () =>
-    expect((strictJson('{"id":9223372036854775807}', true) as { id: string }).id).toBe(
-      '9223372036854775807',
-    ));
+  it('preserves int64 IDs', () => {
+    const parsed = strictJson('{"id":9223372036854775807}', true) as { id: string };
+    expect(parsed.id).toBe('9223372036854775807');
+  });
   it('does not create tickets for groups or bot echoes', () => {
     const raw = JSON.stringify({
       update_type: 'message_created',
@@ -72,15 +76,18 @@ describe('strict JSON and MAX identifiers', () => {
     expect(normalizeUpdate(raw).kind).toBe('unknown');
   });
   it('normalizes lossless direct messages', () => {
+    // Hand-written: JSON.stringify cannot produce integers beyond 2^53.
     const raw =
-      '{"update_type":"message_created","message":{"sender":{"user_id":9223372036854775807},"recipient":{"chat_id":9223372036854775806,"chat_type":"dialog"},"body":{"mid":"a","text":"test"}}}';
+      '{"update_type":"message_created","message":{"sender":{"user_id":9223372036854775807},' +
+      '"recipient":{"chat_id":9223372036854775806,"chat_type":"dialog"},' +
+      '"body":{"mid":"a","text":"test"}}}';
     expect(normalizeUpdate(raw).userId).toBe('9223372036854775807');
   });
 });
 function sign(fields: Record<string, string>, token = 'bot-token') {
   const canonical = Object.entries(fields)
-    .sort(([a], [b]) => (a < b ? -1 : 1))
-    .map(([k, v]) => `${k}=${v}`)
+    .sort(([left], [right]) => (left < right ? -1 : 1))
+    .map(([key, value]) => `${key}=${value}`)
     .join('\n');
   const key = createHmac('sha256', 'WebAppData').update(token).digest();
   return new URLSearchParams({
@@ -130,13 +137,13 @@ describe('security and coverage', () => {
     expect(publicAddress('8.8.8.8')).toBe(true);
   });
   it('enforces global concurrency bounds and production modes', () => {
-    const c = testConfig();
+    const config = testConfig();
     expect(() => readConfig({ ...process.env, AI_MAX_CONCURRENCY: '16' })).toThrow();
-    expect(c.AI_MAX_CONCURRENCY).toBe(12);
+    expect(config.AI_MAX_CONCURRENCY).toBe(12);
     expect(() => readConfig({ ...process.env, NODE_ENV: 'production' })).toThrow();
   });
   it('covers every part of long messages without truncation', () => {
-    const entries: Array<SnapshotEntry> = Array.from({ length: 7 }, (_, i) => ({
+    const entries: SnapshotEntry[] = Array.from({ length: 7 }, (_, i) => ({
       id: `m${i}`,
       seq: i,
       role: 'client',
@@ -150,9 +157,9 @@ describe('security and coverage', () => {
     const parts = chunks.flat();
     for (const entry of entries) {
       const data = parts
-        .filter((p) => p.id === entry.id)
-        .sort((a, b) => a.part - b.part)
-        .map((p) => p.data)
+        .filter((part) => part.id === entry.id)
+        .sort((left, right) => left.part - right.part)
+        .map((part) => part.data)
         .join('');
       expect(JSON.parse(data)).toEqual(entry);
     }

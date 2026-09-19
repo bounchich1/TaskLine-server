@@ -8,7 +8,7 @@ import { Inbox } from '../src/modules/inbox/index.js';
 import { RatingTimers } from '../src/modules/ratings/index.js';
 import { TicketCommands } from '../src/modules/tickets/index.js';
 import { readConfig, type Config } from '../src/shared/config.js';
-import { migrate, one, type Database, type Sql } from '../src/shared/db.js';
+import { migrate, one, requireOne, type Database, type Sql } from '../src/shared/db.js';
 import type { ClientInput } from '../src/shared/types/client-input.js';
 import type { Client, Employee, Row, Ticket } from '../src/shared/types/entities.js';
 
@@ -35,11 +35,15 @@ export function testConfig(): Config {
     ALTERNATIVE_CONTACT: 'Поддержка',
   });
 }
+/** In-memory PostgreSQL (PGlite) with the schema applied; every statement is traced. */
 export async function memoryDb(): Promise<Database> {
   const pg = new PGlite();
   const adapt = (connection: Pick<PGlite, 'query' | 'exec'>): Sql => ({
+    // Same contract as Sql.query: the row type is the caller's claim.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
     async query<T extends Record<string, unknown>>(sql: string, params: unknown[] = []) {
       traceSql(sql, params);
+      // Multi-statement scripts (the migration) need exec().
       if (!params.length && sql.includes(';')) {
         const results = await connection.exec(sql);
         const result = results.at(-1);
@@ -50,7 +54,7 @@ export async function memoryDb(): Promise<Database> {
     },
   });
   const db: Database = {
-    query: adapt(pg).query,
+    ...adapt(pg),
     async tx<T>(fn: (sql: Sql) => Promise<T>) {
       traceTransaction('begin');
       try {
@@ -91,21 +95,33 @@ function domainAdapter(db: Database, config: Config) {
   };
 }
 
-export async function fixture(db?: Database, c = testConfig()) {
-  db = db ?? (await memoryDb());
-  await seed(db, c);
-  const domain = domainAdapter(db, c);
-  const staff = (await one<Employee>(
+/**
+ * A seeded organization with a support employee (MAX user 1) and an admin (MAX user 2), plus
+ * shortcuts that drive a client through the bot the way MAX would.
+ */
+export async function fixture(existing?: Database, config = testConfig()) {
+  const db = existing ?? (await memoryDb());
+  await seed(db, config);
+  const domain = domainAdapter(db, config);
+  const staff = await requireOne<Employee>(
     db,
-    "INSERT INTO employees(org_id,max_user_id,name,role) VALUES($1,'1','Анна','support') RETURNING *",
-    [c.ORG_ID],
-  ))!;
-  const admin = (await one<Employee>(
+    `INSERT INTO employees(org_id,max_user_id,name,role) VALUES($1,'1','Анна','support')
+     RETURNING *`,
+    [config.ORG_ID],
+  );
+  const admin = await requireOne<Employee>(
     db,
-    "INSERT INTO employees(org_id,max_user_id,name,role) VALUES($1,'2','Руководитель','admin') RETURNING *",
-    [c.ORG_ID],
-  ))!;
+    `INSERT INTO employees(org_id,max_user_id,name,role) VALUES($1,'2','Руководитель','admin')
+     RETURNING *`,
+    [config.ORG_ID],
+  );
   let seq = 0;
+  /** Routes the client's pending input until nothing is left. */
+  const drain = async (clientId: string) => {
+    while (await domain.processClient(clientId)) {
+      /* one input per call */
+    }
+  };
   const input = async (text: string, userId = '100') => {
     const key = `m-${randomUUID()}`;
     await domain.ingest({
@@ -116,20 +132,22 @@ export async function fixture(db?: Database, c = testConfig()) {
       sourceKey: key,
       text,
     });
-    const client = (await one<Client>(
-      db!,
+    const client = await requireOne<Client>(
+      db,
       'SELECT * FROM clients WHERE org_id=$1 AND max_user_id=$2',
-      [c.ORG_ID, userId],
-    ))!;
-    while (await domain.processClient(client.id)) {}
+      [config.ORG_ID, userId],
+    );
+    await drain(client.id);
     return client;
   };
+  /** Presses the latest "accept" consent button. */
   const accept = async (client: Client) => {
-    const action = (await one(
-      db!,
-      "SELECT nonce FROM callback_actions WHERE client_id=$1 AND action='accept' ORDER BY expires_at DESC LIMIT 1",
+    const action = await requireOne(
+      db,
+      `SELECT nonce FROM callback_actions WHERE client_id=$1 AND action='accept'
+       ORDER BY expires_at DESC LIMIT 1`,
       [client.id],
-    ))!;
+    );
     await domain.ingest({
       kind: 'callback',
       userId: client.max_user_id,
@@ -138,19 +156,31 @@ export async function fixture(db?: Database, c = testConfig()) {
       callbackPayload: String(action.nonce),
       callbackId: `cb-${seq}`,
     });
-    while (await domain.processClient(client.id)) {}
+    await drain(client.id);
   };
-  const ticket = async (userId = '100') =>
-    (await one<Ticket>(
-      db!,
-      'SELECT t.* FROM tickets t JOIN clients c ON c.id=t.client_id WHERE t.org_id=$1 AND c.max_user_id=$2 ORDER BY t.created_at DESC LIMIT 1',
-      [c.ORG_ID, userId],
-    ))!;
+  /** The client's latest ticket, if any. */
+  const findTicket = async (userId = '100') =>
+    one<Ticket>(
+      db,
+      `SELECT t.* FROM tickets t JOIN clients c ON c.id=t.client_id
+       WHERE t.org_id=$1 AND c.max_user_id=$2 ORDER BY t.created_at DESC LIMIT 1`,
+      [config.ORG_ID, userId],
+    );
+  /** The client's latest ticket, which must exist. */
+  const ticket = async (userId = '100') => {
+    const found = await findTicket(userId);
+    if (!found) {
+      throw new Error(`Client ${userId} has no ticket`);
+    }
+    return found;
+  };
+  /** A client writes, accepts the consent request, and a ticket opens. */
   const create = async (text = 'Не работает подключение', userId = '100') => {
     const client = await input(text, userId);
     await accept(client);
     return ticket(userId);
   };
+  /** Runs a ticket command against the client's latest ticket at its current version. */
   const command = async (
     name: string,
     body: Record<string, unknown> = {},
@@ -160,5 +190,17 @@ export async function fixture(db?: Database, c = testConfig()) {
     const current = await ticket(userId);
     return domain.command(actor, current.id, name, body, current.version, randomUUID());
   };
-  return { db, c, domain, staff, admin, input, accept, ticket, create, command };
+  return {
+    db,
+    c: config,
+    domain,
+    staff,
+    admin,
+    input,
+    accept,
+    findTicket,
+    ticket,
+    create,
+    command,
+  };
 }

@@ -1,35 +1,29 @@
-import { randomUUID } from 'node:crypto';
-
 import { beforeEach, afterEach, it, expect } from 'vitest';
 
 import { buildApi } from '../src/app/http/build-api.js';
 import { one } from '../src/shared/db.js';
 
 import { fixture } from './helpers.js';
-let f: Awaited<ReturnType<typeof fixture>>;
+import { staffLogin } from './support/http-client.js';
+
+type TicketPage = {
+  items: { number: string }[];
+  counts: Record<string, number>;
+  next_cursor: string | null;
+};
+
+let context: Awaited<ReturnType<typeof fixture>>;
 let app: Awaited<ReturnType<typeof buildApi>>;
 let headers: Record<string, string>;
 beforeEach(async () => {
-  f = await fixture();
-  app = await buildApi(f.db, f.c);
-  const login = await app.inject({
-    method: 'POST',
-    url: '/v1/auth/dev',
-    headers: { origin: f.c.APP_ORIGIN },
-    payload: { user_id: '1' },
-  });
-  expect(login.statusCode).toBe(200);
-  const auth = login.json();
-  headers = {
-    origin: f.c.APP_ORIGIN,
-    authorization: `Bearer ${auth.token}`,
-    'x-csrf-token': auth.csrf,
-    'idempotency-key': randomUUID(),
-  };
+  context = await fixture();
+  app = await buildApi(context.db, context.c);
+  // One idempotency key per test: the tests below rely on repeating it.
+  headers = (await staffLogin(app, context.c.APP_ORIGIN, '1')).headers();
 });
 afterEach(async () => {
   await app.close();
-  await f.db.close();
+  await context.db.close();
 });
 it('rejects unknown staff, forged launch data and cross-origin mutations', async () => {
   expect((await app.inject({ url: '/v1/tickets' })).statusCode).toBe(401);
@@ -38,7 +32,7 @@ it('rejects unknown staff, forged launch data and cross-origin mutations', async
       await app.inject({
         method: 'POST',
         url: '/v1/auth/dev',
-        headers: { origin: f.c.APP_ORIGIN },
+        headers: { origin: context.c.APP_ORIGIN },
         payload: { user_id: '999' },
       })
     ).statusCode,
@@ -48,7 +42,7 @@ it('rejects unknown staff, forged launch data and cross-origin mutations', async
       await app.inject({
         method: 'POST',
         url: '/v1/auth/max',
-        headers: { origin: f.c.APP_ORIGIN },
+        headers: { origin: context.c.APP_ORIGIN },
         payload: { init_data: 'auth_date=100&hash=invalid' },
       })
     ).statusCode,
@@ -75,7 +69,7 @@ it('rejects unknown staff, forged launch data and cross-origin mutations', async
   ).toBe(403);
 });
 it('enforces command shape, If-Match, idempotency and absent forbidden routes', async () => {
-  const ticket = await f.create();
+  const ticket = await context.create();
   const claim = await app.inject({
     method: 'POST',
     url: `/v1/tickets/${ticket.id}/assign`,
@@ -96,7 +90,7 @@ it('enforces command shape, If-Match, idempotency and absent forbidden routes', 
       await app.inject({
         method: 'POST',
         url: `/v1/tickets/${ticket.id}/messages`,
-        headers: { ...headers, 'if-match': String(claim.json().version) },
+        headers: { ...headers, 'if-match': String(claim.json<{ version: number }>().version) },
         payload: { text: 'test', rating: 10 },
       })
     ).statusCode,
@@ -116,7 +110,9 @@ it('enforces command shape, If-Match, idempotency and absent forbidden routes', 
   ).toBe(404);
 });
 it('blocked staff lose existing sessions and download authorization', async () => {
-  await f.db.query('UPDATE employees SET blocked=true,version=version+1 WHERE id=$1', [f.staff.id]);
+  await context.db.query('UPDATE employees SET blocked=true,version=version+1 WHERE id=$1', [
+    context.staff.id,
+  ]);
   expect((await app.inject({ url: '/v1/me', headers })).statusCode).toBe(401);
   expect(
     (
@@ -142,28 +138,29 @@ it('webhook ACK follows durable commit and secret verification', async () => {
   const request = {
     method: 'POST' as const,
     url: '/webhooks/max',
-    headers: { 'x-max-bot-api-secret': f.c.MAX_WEBHOOK_SECRET },
+    headers: { 'x-max-bot-api-secret': context.c.MAX_WEBHOOK_SECRET },
     payload,
   };
   expect((await app.inject(request)).statusCode).toBe(200);
   expect((await app.inject(request)).statusCode).toBe(200);
-  expect((await one(f.db, 'SELECT count(*)::int AS n FROM inbox'))!.n).toBe(1);
-  expect((await one(f.db, 'SELECT count(*)::int AS n FROM tickets'))!.n).toBe(0);
+  expect((await one(context.db, 'SELECT count(*)::int AS n FROM inbox'))!.n).toBe(1);
+  expect((await one(context.db, 'SELECT count(*)::int AS n FROM tickets'))!.n).toBe(0);
 });
 it('paginates deterministic queue, searches and denies admin access to support', async () => {
-  await f.create('Ошибка подключения', '100');
-  await f.create('Не печатается документ', '101');
-  await f.create('Ошибка входа', '102');
+  await context.create('Ошибка подключения', '100');
+  await context.create('Не печатается документ', '101');
+  await context.create('Ошибка входа', '102');
   const first = await app.inject({ url: '/v1/tickets?limit=2', headers });
   expect(first.statusCode).toBe(200);
-  expect(first.json().items).toHaveLength(2);
-  expect(first.json().counts.open).toBe(3);
+  const page = first.json<TicketPage>();
+  expect(page.items).toHaveLength(2);
+  expect(page.counts.open).toBe(3);
   const second = await app.inject({
-    url: `/v1/tickets?limit=2&cursor=${first.json().next_cursor}`,
+    url: `/v1/tickets?limit=2&cursor=${String(page.next_cursor)}`,
     headers,
   });
-  expect(second.json().items).toHaveLength(1);
+  expect(second.json<TicketPage>().items).toHaveLength(1);
   const search = await app.inject({ url: '/v1/tickets?q=000001', headers });
-  expect(search.json().items[0].number).toBe('000001');
+  expect(search.json<TicketPage>().items[0]?.number).toBe('000001');
   expect((await app.inject({ url: '/v1/admin/employees', headers })).statusCode).toBe(403);
 });
