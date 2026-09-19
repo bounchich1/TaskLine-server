@@ -1,0 +1,36 @@
+import type { Sql } from './db.js';
+import { one } from './db.js';
+import { ensure } from './errors.js';
+export const templates: Record<string,string> = {
+  consent_request: 'Для обращения в поддержку необходимо согласие на обработку данных. Политика: {policy_url}\nВыберите «Согласен» или «Отказаться».',
+  consent_accepted: 'Согласие принято. Опишите вашу проблему или отправьте файл.',
+  consent_declined: 'Без согласия мы не можем обработать обращение. {alternative_contact}',
+  consent_withdrawn: 'Согласие отозвано. Текущее обращение закрыто. Обработка данных и использование в базе знаний прекращены.',
+  ticket_created: 'Обращение №{ticket_number} создано. Сотрудник поддержки скоро ответит.',
+  ticket_closed: 'Обращение №{ticket_number} закрыто. Оцените работу поддержки целым числом от 1 до 10.',
+  ticket_reopened: 'Обращение №{ticket_number} снова в работе. Вы можете продолжить переписку.',
+  rating_invalid: 'Не удалось распознать оценку. Отправьте одно целое число от 1 до 10.',
+  rating_accepted: 'Спасибо за оценку! Обращение №{ticket_number} завершено.',
+  rating_reminder: 'Напоминаем: оцените поддержку по обращению №{ticket_number} числом от 1 до 10.',
+  rating_attempts_exhausted: 'Обращение №{ticket_number} завершено без оценки. Для нового вопроса отправьте сообщение.',
+  rating_expired: 'Срок оценки обращения №{ticket_number} истёк. Для нового вопроса отправьте сообщение.',
+  buffer_expired: 'Ранее отправленные сообщения больше не хранятся. Пожалуйста, отправьте их снова после согласия.',
+  buffer_full: 'Лимит временного хранения достигнут. Примите согласие и отправьте последнее сообщение повторно.',
+  attachment_rejected: 'Не удалось обработать вложение. Отправьте изображение, видео или документ.',
+  input_too_long: 'Сообщение слишком длинное. Разделите текст на несколько сообщений.',
+  unsupported_input: 'Опишите проблему текстом или отправьте изображение, видео либо документ.',
+  technical_error: 'Не удалось обработать действие. Пожалуйста, повторите позже.',
+  expired_button: 'Эта кнопка больше не действует. Используйте актуальное сообщение бота.',
+};
+const allowed = new Set(['ticket_number','policy_url','alternative_contact']);
+export function validateTemplate(body: string) {
+  ensure(body.trim().length > 0 && body.length <= 3000, 'invalid_template', 422);
+  for (const match of body.matchAll(/\{([^{}]+)\}/g)) ensure(allowed.has(match[1]), 'invalid_placeholder', 422);
+}
+export async function render(db: Sql, org: string, code: string, values: Record<string,string>): Promise<string> {
+  const row = await one(db, 'SELECT body FROM templates WHERE org_id=$1 AND code=$2', [org,code]);
+  const text = String(row?.body ?? templates[code] ?? '');
+  const result = text.replace(/\{([^{}]+)\}/g, (_, key: string) => values[key] ?? '');
+  ensure(result.length <= 4000, 'template_too_long', 422);
+  return result;
+}

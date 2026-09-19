@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:max-support:memorize-resolution:1",
+  "title": "Input to memorize_ticket_resolution; identity injected by host",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "problem_summary",
+    "solution_summary",
+    "outcome",
+    "steps",
+    "observed_result",
+    "evidence_message_ids",
+    "applicability",
+    "cautions",
+    "uncertainties"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "problem_summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "solution_summary": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 6000
+        }
+      ]
+    },
+    "outcome": {
+      "enum": [
+        "resolved",
+        "unresolved",
+        "insufficient_evidence"
+      ]
+    },
+    "steps": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "evidence_message_ids"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "evidence_message_ids": {
+            "type": "array",
+            "maxItems": 20,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "observed_result": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 3000
+        }
+      ]
+    },
+    "evidence_message_ids": {
+      "type": "array",
+      "maxItems": 200,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "minItems": 1
+    },
+    "applicability": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "cautions": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "uncertainties": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "resolved"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "solution_summary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 6000
+          },
+          "observed_result": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 3000
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "solution_summary": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "dictionary_version": "dict-2026-09-18-1",
+  "tags": {
+    "tag": "connectivity",
+    "urgency": "medium",
+    "complexity": "low"
+  },
+  "suggested_solution": "Проверить доступность сервиса и настройки подключения по подтвержденной инструкции. Перед применением сверить условия похожего случая.",
+  "evidence_message_ids": [
+    "msg_example_1"
+  ],
+  "evidence_memory_ids": [
+    "case_example_1"
+  ],
+  "missing_information": [
+    "Не указан текст ошибки"
+  ],
+  "confidence": 0.72,
+  "needs_review": true
+}

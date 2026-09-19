@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "problem_summary": "Клиент сообщил о периодическом сбое подключения.",
+  "solution_summary": null,
+  "outcome": "insufficient_evidence",
+  "steps": [],
+  "observed_result": null,
+  "evidence_message_ids": [
+    "msg_client_1",
+    "msg_staff_2"
+  ],
+  "applicability": [],
+  "cautions": [
+    "Не использовать как подтвержденное решение"
+  ],
+  "uncertainties": [
+    "Клиент не подтвердил результат; содержимое видео не распознано"
+  ]
+}
