@@ -174,5 +174,10 @@ docker compose run --rm api node dist/cli.js <command>   # ai-cap, permit-resolv
   errors, point freshclam at a mirror. Scanning keeps working on the signatures in the image.
 - The API allows 180 requests per minute per client IP, MAX webhook deliveries included. Watch
   for `429` on `/webhooks/max` as traffic grows.
+- The agentmemory engine keeps its state in memory and writes it to disk every 500 ms
+  (`save_interval_ms` in `infra/agentmemory/engine.yaml`); it does not flush on shutdown, so a
+  write acknowledged less than 500 ms before the engine stops (crash, kill or restart) is lost.
+  After changing `engine.yaml`, recreate the engine:
+  `docker compose up -d --force-recreate memory-engine memory`.
 - Turn AI on (`AI_ENABLED=true`, `AI_API_KEY`, `AI_MODEL`) only with a provider that is reachable
   from the host and approved for personal data.
