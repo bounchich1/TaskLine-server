@@ -51,8 +51,9 @@ Configuration: `NODE_ENV=production`, `AI_ENABLED=false`, `MEMORY_ENABLED=false`
 
 ## Gate 3 — closure learning and recall
 
-1. agentmemory runs with a persistent volume (not yet in `deploy/compose.yaml`); plan P00
-   step 5 probes pass: remember, exact read, search, restart, delete, Cyrillic recall.
+1. agentmemory runs with persistent volumes (`memory`, `memory-engine` in
+   `deploy/compose.yaml`); `deploy/memory-check.sh` passes: remember, exact read, search,
+   restart, delete, Cyrillic recall, wrong secret rejected.
 2. `MEMORY_ENABLED=true`: a closed ticket produces a learning record; a similar new ticket
    recalls it; a reopened ticket's memory is no longer recalled.
 

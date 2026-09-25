@@ -9,6 +9,7 @@ One Linux host runs everything with Docker Compose (`deploy/compose.yaml`):
 | api                         | HTTP API and MAX webhook                                                                  |
 | worker                      | Delivery, files, timers, AI jobs                                                          |
 | gateway                     | AI gateway (idle while `AI_ENABLED=false`)                                                |
+| memory, memory-engine       | agentmemory recall store for AI learning (used only with `MEMORY_ENABLED=true`)           |
 | postgres, redis, clamav, s3 | Database, job transport, virus scanner, private file storage (SeaweedFS)                  |
 
 The API and the mini-app share one origin, so `PUBLIC_URL` and `APP_ORIGIN` are both
@@ -17,7 +18,8 @@ The API and the mini-app share one origin, so `PUBLIC_URL` and `APP_ORIGIN` are 
 ## Requirements
 
 - A Linux VPS hosted in Russia (personal data of Russian citizens stays in Russia, 152-ФЗ):
-  2 vCPU, 4 GB RAM (ClamAV alone needs about 1.5 GB), 40 GB disk.
+  2 vCPU, 4 GB RAM (ClamAV alone needs about 1.5 GB), 40 GB disk. The `memory` image is built on
+  the host from `infra/agentmemory`, so keep the repository checkout next to `deploy/`.
 - Docker Engine with Compose v2.20 or newer, `openssl`, `flock`.
 - A DNS `A` record for `DOMAIN` pointing at the host; ports 80 and 443 open.
 - The MAX bot token, and the privacy policy published at an HTTPS URL.
@@ -62,6 +64,22 @@ docker compose run --rm api node dist/cli.js media-hosts
 
 Put the printed hosts (comma-separated) into `MAX_MEDIA_HOSTS`, run `docker compose up -d`,
 and retry the failed file job in Управление → Состояние системы (or ask the client to send the file again).
+
+### AI and memory
+
+AI stays off until `AI_ENABLED=true`, `AI_API_KEY` and `AI_MODEL` are set in `.env` (then
+`docker compose up -d`). The provider must accept OpenAI-style chat completions over HTTPS.
+
+agentmemory (`memory` + `memory-engine`) starts with the stack and is reachable only inside the
+compose network at `http://memory-engine:3111`, authenticated with `AGENTMEMORY_SECRET`. Before
+turning recall on, prove it on this host:
+
+```sh
+./memory-check.sh       # remember, exact read, search, restart, forget, Cyrillic text, wrong secret
+```
+
+When it prints `agentmemory check passed`, set `MEMORY_ENABLED=true` and run `docker compose up -d`.
+Memory has no effect while `AI_ENABLED=false`.
 
 ## Releasing
 
@@ -129,6 +147,10 @@ Restore into the running stack:
 docker compose exec -T postgres pg_restore -U support -d support --clean --if-exists < /var/backups/support-YYYY-MM-DD.dump
 ```
 
+agentmemory keeps its state in the `memory-engine-data` and `memory-index-data` volumes. Stop
+`memory` and `memory-engine` before copying them (a live copy is not consistent), then start them
+again; PostgreSQL keeps the learning records, so a lost memory volume can be refilled from there.
+
 Files live in the `object-data` volume (SeaweedFS, versioning on); back it up with the volume
 or copy the bucket with any S3 client (`rclone sync`, `aws s3 sync`). Continuous WAL archiving (point-in-time recovery) is still needed before full
 production, see plan chapter 09.
@@ -152,7 +174,5 @@ docker compose run --rm api node dist/cli.js <command>   # ai-cap, permit-resolv
   errors, point freshclam at a mirror. Scanning keeps working on the signatures in the image.
 - The API allows 180 requests per minute per client IP, MAX webhook deliveries included. Watch
   for `429` on `/webhooks/max` as traffic grows.
-- The agentmemory service is not part of this stack; keep `MEMORY_ENABLED=false` until it is
-  deployed and verified.
 - Turn AI on (`AI_ENABLED=true`, `AI_API_KEY`, `AI_MODEL`) only with a provider that is reachable
   from the host and approved for personal data.

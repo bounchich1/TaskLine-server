@@ -17,6 +17,7 @@ x-app: &app
     DATABASE_URL: postgres://support:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/support
     REDIS_URL: redis://redis:6379
     GATEWAY_URL: http://gateway:3001
+    AGENTMEMORY_URL: http://memory-engine:3111
     STORAGE_MODE: s3
     SCANNER_MODE: clamav
     CLAMAV_HOST: clamav
@@ -115,6 +116,38 @@ services:
       AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY in .env}
     volumes: [object-data:/data]
 
+  memory-init:
+    image: busybox:1.36.1
+    user: '0:0'
+    volumes: [memory-engine-data:/engine, memory-index-data:/index]
+    command: ['sh', '-c', 'chown 65532:65532 /engine /index && chmod 750 /engine /index']
+
+  memory-engine:
+    image: iiidev/iii:0.11.2
+    restart: unless-stopped
+    user: '65532:65532'
+    depends_on:
+      memory-init:
+        condition: service_completed_successfully
+    volumes:
+      - memory-engine-data:/data
+      - ../infra/agentmemory/engine.yaml:/app/config.yaml:ro
+
+  memory:
+    image: max-support-agentmemory:0.9.29
+    build: ../infra/agentmemory
+    restart: unless-stopped
+    depends_on: [memory-engine]
+    environment:
+      AGENTMEMORY_SECRET: ${AGENTMEMORY_SECRET:?set AGENTMEMORY_SECRET in .env}
+      AGENT_ID: support-knowledge
+      AGENTMEMORY_AGENT_SCOPE: isolated
+      AGENTMEMORY_AUTO_COMPRESS: 'false'
+      CONSOLIDATION_ENABLED: 'false'
+      GRAPH_EXTRACTION_ENABLED: 'false'
+      LOG_LEVEL: error
+    volumes: [memory-index-data:/data]
+
 volumes:
   caddy-data:
   caddy-config:
@@ -122,3 +155,5 @@ volumes:
   redis-data:
   clamav-data:
   object-data:
+  memory-engine-data:
+  memory-index-data:
