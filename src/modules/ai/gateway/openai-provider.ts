@@ -24,7 +24,7 @@ export async function callOpenAi(
   const response = await fetch(config.AI_API_URL, {
     method: 'POST',
     headers: { Authorization: `Bearer ${config.AI_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(completionBody(config.AI_MODEL, request)),
+    body: JSON.stringify(completionBody(config, request)),
     redirect: 'error',
     signal: AbortSignal.timeout(timeoutMs),
   });
@@ -45,13 +45,17 @@ export async function callOpenAi(
   };
 }
 
-function completionBody(model: string, request: ModelRequest): Row {
+function completionBody(config: Config, request: ModelRequest): Row {
   const body: Row = {
-    model,
+    model: config.AI_MODEL,
     messages: request.messages,
+    // Reasoning tokens count toward this cap; the budget (<=4096) leaves room for the answer.
     max_completion_tokens: MAX_COMPLETION_TOKENS,
     store: false,
   };
+  if (config.AI_THINKING_BUDGET > 0) {
+    body.chat_template_kwargs = { thinking_token_budget: config.AI_THINKING_BUDGET };
+  }
   if (request.tools?.length) {
     body.tools = request.tools;
     body.parallel_tool_calls = false;

@@ -33,6 +33,8 @@ const schema = z.object({
   AI_API_URL: z.url().default('https://api.openai.com/v1/chat/completions'),
   AI_API_KEY: z.string().default(''),
   AI_MODEL: z.string().default(''),
+  /** Reasoning tokens per call for thinking models (vLLM chat_template_kwargs); 0 omits it. */
+  AI_THINKING_BUDGET: z.coerce.number().int().min(0).max(4096).default(0),
   AI_MAX_CONCURRENCY: z.coerce.number().int().min(10).max(15).default(12),
   AI_TRIAGE_TIMEOUT_SECONDS: z.coerce.number().int().min(1).max(90).default(45),
   AI_LEARNING_TIMEOUT_SECONDS: z.coerce.number().int().min(1).max(120).default(90),
