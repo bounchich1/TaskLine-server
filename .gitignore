@@ -9,3 +9,5 @@ coverage/
 test-results/
 .npm-cache/
 .sql-trace/
+deploy.log
+.deploy.lock

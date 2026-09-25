@@ -59,6 +59,7 @@ export async function mediaFetch(
   raw: string,
   allowedHosts: string[],
   init: RequestInit = {},
+  ca?: string[],
 ): Promise<{ response: Response; close: () => Promise<void> }> {
   const url = new URL(raw);
   ensure(
@@ -86,6 +87,7 @@ export async function mediaFetch(
           callback(null, selected.address, selected.family);
         }
       }) as never,
+      ca,
     },
   });
   try {

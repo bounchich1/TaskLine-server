@@ -14,7 +14,7 @@ import type { Client, Employee, Row, Ticket } from '../src/shared/types/entities
 
 import { traceSql, traceTransaction } from './support/sql-trace.js';
 
-export function testConfig(): Config {
+export function testConfig(overrides: NodeJS.ProcessEnv = {}): Config {
   return readConfig({
     ...process.env,
     NODE_ENV: 'test',
@@ -33,9 +33,10 @@ export function testConfig(): Config {
     POLICY_VERSION: 'test-1',
     POLICY_URL: 'https://example.invalid/privacy',
     ALTERNATIVE_CONTACT: 'Поддержка',
+    ...overrides,
   });
 }
-async function memoryDb(): Promise<Database> {
+export function emptyMemoryDb(): Database {
   const pg = new PGlite();
   const adapt = (connection: Pick<PGlite, 'query' | 'exec'>): Sql => ({
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
@@ -62,6 +63,11 @@ async function memoryDb(): Promise<Database> {
     },
     close: () => pg.close(),
   };
+  return db;
+}
+
+async function memoryDb(): Promise<Database> {
+  const db = emptyMemoryDb();
   await migrate(db);
   return db;
 }

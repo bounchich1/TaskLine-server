@@ -28,7 +28,7 @@ const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 export async function buildApi(db: Database, config: Config): Promise<FastifyInstance> {
   const app = Fastify({
     bodyLimit: MAX_BODY_BYTES,
-    trustProxy: false,
+    trustProxy: (_address: string, hop: number) => hop < config.TRUST_PROXY_HOPS,
     logger: loggerOptions(config),
   });
   await registerInfrastructure(app);
@@ -58,7 +58,7 @@ async function registerRoutes(app: FastifyInstance, db: Database, config: Config
   const queries = new TicketQueries(db, org);
   const commands = new TicketCommands(db, config);
 
-  await app.register(healthRoutes, { db });
+  await app.register(healthRoutes, { db, config });
   await app.register(webhookRoutes, { inbox, config });
   await app.register(authRoutes, { db, config });
   await app.register(ticketRoutes, { queries, commands });

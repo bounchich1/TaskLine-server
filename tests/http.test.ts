@@ -29,8 +29,14 @@ afterEach(async () => {
 const login = async (userId: string) => staffLogin(app, context.c.APP_ORIGIN, userId);
 
 it('serves health checks, the OpenAPI document and CORS preflight', async () => {
-  expect((await app.inject({ url: '/health/live' })).json()).toEqual({ status: 'ok' });
-  expect((await app.inject({ url: '/health/ready' })).json()).toEqual({ status: 'ready' });
+  expect((await app.inject({ url: '/health/live' })).json()).toEqual({
+    status: 'ok',
+    version: 'dev',
+  });
+  expect((await app.inject({ url: '/health/ready' })).json()).toEqual({
+    status: 'ready',
+    version: 'dev',
+  });
   expect((await app.inject({ url: '/openapi.json' })).json()).toMatchObject({ openapi: '3.1.0' });
   const preflight = await app.inject({
     method: 'OPTIONS',
@@ -103,6 +109,26 @@ it('lists employees, dictionaries, counts and notifications, and marks one read'
     notification.id,
   ]);
   expect(stored?.read_at).not.toBeNull();
+});
+
+it('reports not ready while the schema lags behind the migrations', async () => {
+  await context.db.query('DELETE FROM schema_migrations');
+  expect((await app.inject({ url: '/health/ready' })).statusCode).toBe(503);
+  expect((await app.inject({ url: '/health/live' })).statusCode).toBe(200);
+});
+
+it('takes the client address from one trusted proxy hop', async () => {
+  const proxied = await buildApi(context.db, { ...context.c, TRUST_PROXY_HOPS: 1 });
+  const devLogin = (headers: Record<string, string>) =>
+    proxied.inject({
+      method: 'POST',
+      url: '/v1/auth/dev',
+      headers: { origin: context.c.APP_ORIGIN, ...headers },
+      payload: { user_id: '1' },
+    });
+  expect((await devLogin({ 'x-forwarded-for': '203.0.113.7' })).statusCode).toBe(404);
+  expect((await devLogin({})).statusCode).toBe(200);
+  await proxied.close();
 });
 
 it('signs a local stand in on every reload', async () => {

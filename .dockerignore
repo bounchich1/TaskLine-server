@@ -1,8 +1,15 @@
 node_modules
 dist
 .git
+.github
+.idea
 .env
 .env.*
 .data
+.sql-trace
 coverage
+test-results
 tests
+deploy
+runbooks
+infra

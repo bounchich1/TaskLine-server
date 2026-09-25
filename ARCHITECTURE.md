@@ -62,6 +62,11 @@ writes happen in the same transaction as the change that causes them.
   `audit` / `emit` / `enqueue` from `shared/events.ts` with the caller's transaction.
 - **Code another module needs**: export it from the owning module's `index.ts`. If that
   creates a new edge, add it to `MODULE_DEPENDENCIES` (and this table) first.
+- **A schema change**: a new `migrations/NNN_name.sql` with the next number. `migrate` applies
+  every pending file in order inside one transaction; a released migration is never edited.
+  Keep changes additive so the previous image still runs against the new schema (rollback).
+- **Production topology**: `Dockerfile` builds one image for all three roles; `deploy/` holds
+  the compose file, Caddy config and scripts; `runbooks/` says how to use them.
 
 ## Conventions
 

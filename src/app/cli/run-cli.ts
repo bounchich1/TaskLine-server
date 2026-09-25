@@ -4,22 +4,26 @@ import { Postgres } from '../../shared/db.js';
 import type { CliCommand } from './cli-command.js';
 import { aiCapCommand } from './commands/ai-cap.js';
 import { bootstrapCommand } from './commands/bootstrap.js';
+import { mediaHostsCommand } from './commands/media-hosts.js';
 import { memoryReconcileCommand } from './commands/memory-reconcile.js';
 import { migrateCommand } from './commands/migrate.js';
 import { permitResolveCommand } from './commands/permit-resolve.js';
+import { storageInitCommand } from './commands/storage-init.js';
 import { subscribeCommand } from './commands/subscribe.js';
 
 const COMMANDS = new Map<string, CliCommand>([
   ['migrate', migrateCommand],
   ['bootstrap', bootstrapCommand],
   ['subscribe', subscribeCommand],
+  ['storage-init', storageInitCommand],
+  ['media-hosts', mediaHostsCommand],
   ['memory-reconcile', memoryReconcileCommand],
   ['permit-resolve', permitResolveCommand],
   ['ai-cap', aiCapCommand],
 ]);
 
 const USAGE =
-  'Commands: migrate, bootstrap, subscribe, memory-reconcile <id>, ' +
+  'Commands: migrate, bootstrap, subscribe, storage-init, media-hosts, memory-reconcile <id>, ' +
   'permit-resolve <slot> <evidence>, ai-cap <10..15>';
 
 export async function runCli(argv: string[]): Promise<void> {

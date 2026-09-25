@@ -3,7 +3,9 @@ import { seed } from '../../bootstrap/seed.js';
 import type { CliCommand } from '../cli-command.js';
 
 export const migrateCommand: CliCommand = async ({ db, config }) => {
-  await migrate(db);
+  const applied = await migrate(db);
   await seed(db, config);
-  return 'Schema and reserved defaults ready.';
+  return applied.length
+    ? `Applied migrations ${applied.join(', ')}; reserved defaults ready.`
+    : 'Schema up to date; reserved defaults ready.';
 };

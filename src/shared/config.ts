@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import { existsSync } from 'node:fs';
+
 import { z } from 'zod';
 
 const bool = z
@@ -7,8 +9,10 @@ const bool = z
   .transform((value) => value === 'true');
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  APP_VERSION: z.string().min(1).default('dev'),
   HOST: z.string().default('127.0.0.1'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
   PUBLIC_URL: z.url().default('http://localhost:3000'),
   APP_ORIGIN: z.url().default('http://localhost:5173'),
   ORG_ID: z.uuid().default('00000000-0000-4000-8000-000000000001'),
@@ -25,6 +29,7 @@ const schema = z.object({
   MAX_BOT_TOKEN: z.string().default(''),
   MAX_WEBHOOK_SECRET: z.string().min(32),
   MAX_MEDIA_HOSTS: z.string().default(''),
+  MAX_CA_FILE: z.string().default(''),
   POLICY_VERSION: z.string().min(1),
   POLICY_URL: z.url(),
   ALTERNATIVE_CONTACT: z.string().min(1),
@@ -59,6 +64,9 @@ export type Config = z.infer<typeof schema>;
 export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const config = schema.parse(env);
   new Intl.DateTimeFormat('ru', { timeZone: config.ORG_TIMEZONE });
+  if (config.MAX_CA_FILE && !existsSync(config.MAX_CA_FILE)) {
+    throw new Error('MAX_CA_FILE does not exist');
+  }
   if (config.MAX_MODE === 'live' && !config.MAX_BOT_TOKEN) {
     throw new Error('MAX_BOT_TOKEN required for live MAX');
   }

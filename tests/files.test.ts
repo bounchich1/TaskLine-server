@@ -9,7 +9,7 @@ import { buildApi } from '../src/app/http/build-api.js';
 import { JobRunner } from '../src/app/workers/job-runner.js';
 import { MaxClient } from '../src/integrations/max/index.js';
 import { DeliveryWorker } from '../src/modules/delivery/index.js';
-import { Files } from '../src/modules/files/index.js';
+import { Files, ObjectStorage } from '../src/modules/files/index.js';
 import { one } from '../src/shared/db.js';
 
 import { fixture, testConfig } from './helpers.js';
@@ -123,4 +123,10 @@ it('rejects content that does not match the declared kind, and infected files', 
   const infected = await upload(ticket.id, { name: 'virus.txt', kind: 'file', content: marker });
   await runScanJob(infected);
   expect(await status(infected)).toBe('infected');
+});
+
+it('prepares a bucket only for S3 storage', async () => {
+  await expect(new ObjectStorage(context.c).prepareBucket()).rejects.toMatchObject({
+    code: 'storage_not_s3',
+  });
 });

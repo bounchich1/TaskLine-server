@@ -6,6 +6,7 @@ import { decrypt } from '../../shared/crypto.js';
 import { one } from '../../shared/db.js';
 import { ensure } from '../../shared/errors.js';
 import { mediaFetch } from '../../shared/network.js';
+import { maxTrustedRoots } from '../../shared/tls.js';
 import type { InputAttachment } from '../../shared/types/client-input.js';
 
 import type { Attachment, FileDeps } from './attachment.js';
@@ -30,7 +31,12 @@ export async function downloadInbound(deps: FileDeps, id: string): Promise<void>
     await db.query("UPDATE attachments SET status='unavailable' WHERE id=$1", [id]);
     return;
   }
-  const media = await mediaFetch(source.url, mediaHosts(ctx.config));
+  const media = await mediaFetch(
+    source.url,
+    mediaHosts(ctx.config),
+    {},
+    maxTrustedRoots(ctx.config),
+  );
   try {
     ensure(media.response.ok && media.response.body, 'media_unavailable', 503);
     const size = Number(media.response.headers.get('content-length'));

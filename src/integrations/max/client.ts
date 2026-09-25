@@ -6,6 +6,7 @@ import { fetch, FormData, type Response } from 'undici';
 import { mediaHosts, type Config } from '../../shared/config.js';
 import { jsonText, object, strictJson } from '../../shared/json.js';
 import { boundedText, mediaFetch } from '../../shared/network.js';
+import { maxDispatcher, maxTrustedRoots } from '../../shared/tls.js';
 import type { Row } from '../../shared/types/entities.js';
 
 export class TransportFailure extends Error {
@@ -65,6 +66,7 @@ export class MaxClient implements MaxTransport {
         body: JSON.stringify(body),
         redirect: 'error',
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        dispatcher: maxDispatcher(this.c),
       });
     } catch {
       throw new TransportFailure('unknown', 'max_transport_uncertain');
@@ -103,10 +105,12 @@ export class MaxClient implements MaxTransport {
     }
     const form = new FormData();
     form.set('data', await openAsBlob(path, { type: mime }), name);
-    const media = await mediaFetch(allocation.url, mediaHosts(this.c), {
-      method: 'POST',
-      body: form,
-    });
+    const media = await mediaFetch(
+      allocation.url,
+      mediaHosts(this.c),
+      { method: 'POST', body: form },
+      maxTrustedRoots(this.c),
+    );
     try {
       if (!media.response.ok) {
         throw new TransportFailure('retry', 'upload_failed');

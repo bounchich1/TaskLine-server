@@ -4,7 +4,14 @@ import { resolve } from 'node:path';
 import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  CreateBucketCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  PutBucketVersioningCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 
 import type { Config } from '../../shared/config.js';
 import { ensure } from '../../shared/errors.js';
@@ -24,6 +31,27 @@ export class ObjectStorage {
         },
       });
     }
+  }
+
+  async prepareBucket(): Promise<void> {
+    ensure(this.s3, 'storage_not_s3', 422, 'STORAGE_MODE=s3 required');
+    const bucket = this.config.S3_BUCKET;
+    try {
+      await this.s3.send(new HeadBucketCommand({ Bucket: bucket }));
+    } catch (error) {
+      if (
+        (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode !== 404
+      ) {
+        throw error;
+      }
+      await this.s3.send(new CreateBucketCommand({ Bucket: bucket }));
+    }
+    await this.s3.send(
+      new PutBucketVersioningCommand({
+        Bucket: bucket,
+        VersioningConfiguration: { Status: 'Enabled' },
+      }),
+    );
   }
 
   async put(key: string, path: string, mime: string): Promise<void> {
