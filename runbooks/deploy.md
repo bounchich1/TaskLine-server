@@ -170,6 +170,12 @@ docker compose run --rm api node dist/cli.js <command>   # ai-cap, permit-resolv
   `D2:6D:2D:02:31:B7:C3:9F:92:CC:73:85:12:BA:54:10:35:19:E4:40:5D:68:B5:BD:70:3E:97:88:CA:8E:CF:31`,
   valid until 2032, from gosuslugi.ru/crt) and trusts it only for MAX API calls and MAX file
   transfers (`MAX_CA_FILE`). AI provider and S3 connections keep the default trust store.
+- The compose network runs with MTU 1400. Some VPS uplinks carry less than 1500 bytes per packet
+  (1462 on the first production host) and drop larger ones without a reliable "fragmentation
+  needed" reply; containers on a 1500 network then stall on TLS handshakes to MAX at random
+  (`max_transport_uncertain`, `UND_ERR_CONNECT_TIMEOUT`) while the host itself looks fine. Check
+  with `ip route get <MAX API IP>` on the host: a cached `mtu` below 1500 means the uplink is
+  smaller. After changing the network MTU, recreate it: `docker compose down && docker compose up -d`.
 - ClamAV updates its signatures with freshclam; if `docker compose logs clamav` shows download
   errors, point freshclam at a mirror. Scanning keeps working on the signatures in the image.
 - The API allows 180 requests per minute per client IP, MAX webhook deliveries included. Watch

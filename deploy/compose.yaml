@@ -148,6 +148,11 @@ services:
       LOG_LEVEL: error
     volumes: [memory-index-data:/data]
 
+networks:
+  default:
+    driver_opts:
+      com.docker.network.driver.mtu: '1400'
+
 volumes:
   caddy-data:
   caddy-config:
