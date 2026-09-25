@@ -48,6 +48,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "0.3.14",
     "@eslint/js": "10.0.1",
+    "@stylistic/eslint-plugin": "5.10.0",
     "@types/node": "22.18.0",
     "@types/pg": "8.15.5",
     "@vitest/eslint-plugin": "1.6.27",

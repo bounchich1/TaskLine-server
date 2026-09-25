@@ -1,5 +1,6 @@
 // @ts-check
 import js from '@eslint/js';
+import stylistic from '@stylistic/eslint-plugin';
 import vitest from '@vitest/eslint-plugin';
 import prettier from 'eslint-config-prettier';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
@@ -43,6 +44,17 @@ const moduleDependencyPolicies = Object.entries(MODULE_DEPENDENCIES)
     allow: { to: publicApi('module', deps) },
   }));
 
+const SPACED_STATEMENTS = [
+  'multiline-const',
+  'multiline-let',
+  'multiline-expression',
+  'multiline-export',
+  'multiline-type',
+  'block-like',
+  'class',
+  'interface',
+];
+
 export default tseslint.config(
   {
     ignores: ['dist/**', 'coverage/**', 'node_modules/**', '.data/**', 'infra/**', '.sql-trace/**'],
@@ -59,7 +71,7 @@ export default tseslint.config(
   prettier,
 
   {
-    plugins: { 'import-x': importX, unicorn },
+    plugins: { '@stylistic': stylistic, 'import-x': importX, unicorn },
     settings: {
       'import-x/resolver-next': [createTypeScriptImportResolver()],
     },
@@ -84,6 +96,19 @@ export default tseslint.config(
       ],
       curly: ['error', 'all'],
       'no-nested-ternary': 'error',
+      '@stylistic/padding-line-between-statements': [
+        'error',
+        { blankLine: 'always', prev: '*', next: 'return' },
+        { blankLine: 'always', prev: ['const', 'let'], next: '*' },
+        {
+          blankLine: 'any',
+          prev: ['singleline-const', 'singleline-let'],
+          next: ['singleline-const', 'singleline-let'],
+        },
+        { blankLine: 'always', prev: '*', next: SPACED_STATEMENTS },
+        { blankLine: 'always', prev: SPACED_STATEMENTS, next: '*' },
+      ],
+      '@stylistic/lines-between-class-members': ['error', 'always', { exceptAfterSingleLine: true }],
       'id-length': [
         'error',
         { min: 2, exceptions: ['_', 'i', 'j', 'x', 'y'], properties: 'never' },
