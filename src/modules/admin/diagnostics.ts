@@ -1,6 +1,5 @@
 import type { Sql } from '../../shared/db.js';
 
-/** Operations view: recent jobs, undelivered messages, memory records and AI permit slots. */
 export async function adminDiagnostics(db: Sql, org: string) {
   const [jobs, deliveries, memory, permits] = await Promise.all([
     db.query(

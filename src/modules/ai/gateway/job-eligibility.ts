@@ -1,11 +1,6 @@
 import { one, type Sql } from '../../../shared/db.js';
 import type { Job } from '../../../shared/types/entities.js';
 
-/**
- * Whether an AI job may still use the client's data: consent unchanged since the job was
- * queued and the ticket (or closure cycle) still the one the job was created for. Triage also
- * expires two minutes after the ticket was created.
- */
 export async function eligibleJob(tx: Sql, org: string, job: Job): Promise<boolean> {
   if (job.kind === 'triage') {
     return !!(await one(

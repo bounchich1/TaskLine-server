@@ -1,7 +1,6 @@
 import { ensure } from '../../../../shared/errors.js';
 import type { TicketCommandHandler } from '../command-context.js';
 
-/** Take an open ticket into work. */
 export const assign: TicketCommandHandler = async (tx, _ctx, { actor, ticket }) => {
   ensure(ticket.status === 'open', 'already_assigned');
   await tx.query(

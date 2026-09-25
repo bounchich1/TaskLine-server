@@ -11,7 +11,6 @@ const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 const PAGE_SIZE = 250;
 const MAX_ENUMERATED = 100000;
 
-/** The external long-term memory service; injected in tests. */
 export interface MemoryTransport {
   remember(content: string, project: string, concepts: string[]): Promise<Row>;
   get(id: string): Promise<Row | null>;
@@ -20,7 +19,6 @@ export interface MemoryTransport {
   forget(id: string): Promise<void>;
 }
 
-/** HTTP client for the agentmemory service. */
 export class AgentMemoryClient implements MemoryTransport {
   constructor(private readonly config: Config) {}
 
@@ -42,7 +40,6 @@ export class AgentMemoryClient implements MemoryTransport {
     return result ? object(result.memory) : null;
   }
 
-  /** Upstream ids of matching memories (only ids of this service's `mem_` records). */
   async search(query: string): Promise<string[]> {
     const result = await this.request('/agentmemory/smart-search', {
       query: query.slice(0, 2000),
@@ -56,7 +53,6 @@ export class AgentMemoryClient implements MemoryTransport {
       .filter((id): id is string => typeof id === 'string' && id.startsWith('mem_'));
   }
 
-  /** Every memory of this agent, paged; fails if the total changes while paging. */
   async list(): Promise<Row[]> {
     const all: Row[] = [];
     let total: number | undefined;
@@ -85,7 +81,6 @@ export class AgentMemoryClient implements MemoryTransport {
     ensure(result?.success === true, 'memory_delete_failed', 503);
   }
 
-  /** GET when there is no body. A GET answered 404 means "no such memory" (null). */
   private async request(path: string, body?: Row): Promise<Row | null> {
     const response = await fetch(new URL(path, this.config.AGENTMEMORY_URL), {
       method: body ? 'POST' : 'GET',

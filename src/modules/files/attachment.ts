@@ -19,7 +19,6 @@ export type Attachment = Row & {
   sha256: string | null;
 };
 
-/** Dependencies shared by the file pipeline steps. */
 export interface FileDeps {
   db: Database;
   ctx: Ctx;

@@ -7,9 +7,6 @@ import type { Job, Row } from '../src/shared/types/entities.js';
 
 import { fixture, testConfig } from './helpers.js';
 
-// AI paths the scenario tests in ai.test.ts do not reach: triage tool calls and the schema
-// repair, chunked learning with a reduction round, and the gateway's HTTP boundary.
-
 let context: Awaited<ReturnType<typeof fixture>>;
 
 beforeEach(async () => {
@@ -29,7 +26,6 @@ async function claim(kind: string): Promise<Job> {
   return job!;
 }
 
-/** A provider that answers each model call with the next scripted reply. */
 function scripted(replies: ModelReply[]) {
   return () => {
     const reply = replies.shift();

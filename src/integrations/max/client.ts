@@ -26,10 +26,6 @@ const MAX_RESPONSE_BYTES = 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 20000;
 const noRateLimit = (): Promise<void> => Promise.resolve();
 
-/**
- * The MAX Bot API. Every failure is a TransportFailure whose outcome tells the delivery worker
- * what it may do: `retry` (safe to resend), `failed` (rejected), `unknown` (may have been sent).
- */
 export class MaxClient implements MaxTransport {
   constructor(
     private c: Config,
@@ -61,7 +57,6 @@ export class MaxClient implements MaxTransport {
     }
   }
 
-  /** A network error leaves the outcome unknown: the request may have reached MAX. */
   private async post(url: URL, body: Row): Promise<Response> {
     try {
       return await fetch(url, {
@@ -143,7 +138,6 @@ export class MaxClient implements MaxTransport {
   }
 }
 
-/** 429: retry after the advertised delay (2 s to 1 h); 5xx: unknown; other 4xx: rejected. */
 async function rejectUnsuccessful(response: Response): Promise<void> {
   if (response.ok) {
     return;

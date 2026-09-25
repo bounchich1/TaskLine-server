@@ -2,7 +2,6 @@ import type { Database } from '../../../shared/db.js';
 
 import type { Permit } from './admission.js';
 
-/** Stores the encrypted reply and frees the permit. */
 export async function settleSuccess(
   db: Database,
   {
@@ -31,11 +30,6 @@ export async function settleSuccess(
   });
 }
 
-/**
- * A call that is known not to have run remotely (or was rejected) fails and frees its permit.
- * Otherwise the provider may still be working on it: the call becomes `uncertain` and keeps
- * its permit until an operator resolves it, so the concurrency cap is never exceeded.
- */
 export async function settleFailure(
   db: Database,
   { callId, permit, known }: { callId: string; permit: Permit; known: boolean },

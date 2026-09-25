@@ -6,11 +6,6 @@ import type { ClientInput } from '../../shared/types/client-input.js';
 import type { Client, Message } from '../../shared/types/entities.js';
 import { invalidateLearning } from '../learning/index.js';
 
-/**
- * Applies a client's edit or deletion of an earlier message. Keeps the previous text as an
- * encrypted revision, marks the AI suggestion stale and withdraws the ticket from learning.
- * If the original has not been received yet, the revision is deferred as a job.
- */
 export async function reviseClientMessage(
   tx: Sql,
   ctx: Ctx,

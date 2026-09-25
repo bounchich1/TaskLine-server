@@ -1,6 +1,5 @@
 import type { TriageResult } from '../../../shared/types/ai.js';
 
-/** The suggestion stored when triage fails: neutral codes, flagged for staff review. */
 export function fallbackTriage(dictionaryVersion: string, messageId: string): TriageResult {
   return {
     schema_version: '1.0',

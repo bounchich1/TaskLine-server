@@ -5,10 +5,6 @@ import { queueBotMessage } from '../outbox/index.js';
 
 import { clearPreconsentBuffers } from './preconsent-buffers.js';
 
-/**
- * Records consent under the current policy. Returns the updated client, or undefined when the
- * client had already consented to this policy version (nothing to do).
- */
 export async function grantConsent(
   tx: Sql,
   ctx: Ctx,
@@ -44,7 +40,6 @@ export async function declineConsent(
   client: Client,
   sourceKey: string,
 ): Promise<void> {
-  // An old decline button cannot revoke a consent already granted by a newer action.
   if (client.consent_state === 'granted') {
     return;
   }

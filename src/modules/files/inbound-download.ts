@@ -12,7 +12,6 @@ import type { Attachment, FileDeps } from './attachment.js';
 import { sizeLimitFor } from './content-policy.js';
 import { storeStream } from './store-stream.js';
 
-/** Background job: fetches a client's attachment from MAX media hosts into storage. */
 export async function downloadInbound(deps: FileDeps, id: string): Promise<void> {
   const { db, ctx } = deps;
   const file = await one<Attachment>(db, 'SELECT * FROM attachments WHERE org_id=$1 AND id=$2', [

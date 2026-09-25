@@ -3,10 +3,6 @@ import { ensure } from '../../../shared/errors.js';
 import { audit } from '../../../shared/events.js';
 import type { CliCommand } from '../cli-command.js';
 
-/**
- * `permit-resolve <slot> <evidence>`: releases an uncertain AI permit once an operator has
- * confirmed with the provider that the call ended. The evidence is kept in the audit log.
- */
 export const permitResolveCommand: CliCommand = async ({ db, config, args }) => {
   const slot = Number(args.at(0));
   const evidence = args.at(1);

@@ -1,12 +1,7 @@
 import type { SnapshotEntry } from '../../../shared/types/ai.js';
 
-/** A slice of one serialized snapshot entry. */
 export type Part = { id: string; part: number; parts: number; data: string };
 
-/**
- * Splits the snapshot into chunks whose JSON fits `budget` characters. Long entries are cut
- * into parts first, so every message is covered even when a single one exceeds the budget.
- */
 export function planChunks(entries: SnapshotEntry[], budget: number): Part[][] {
   const partSize = Math.max(500, Math.floor(budget / 2) - 200);
   const chunks: Part[][] = [];

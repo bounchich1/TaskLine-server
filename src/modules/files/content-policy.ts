@@ -15,7 +15,6 @@ const ALLOWED_DOCUMENT_TYPES = [
   'application/vnd.ms-excel',
 ];
 
-/** Maximum size per attachment kind: video 100 MiB, image 20 MiB, other files 25 MiB. */
 export function sizeLimitFor(kind: string): number {
   if (kind === 'video') {
     return 100 * MEBIBYTE;
@@ -23,16 +22,11 @@ export function sizeLimitFor(kind: string): number {
   return (kind === 'image' ? 20 : 25) * MEBIBYTE;
 }
 
-/** A filename safe for Content-Disposition and storage: no separators or control characters. */
 export function safeFilename(name: string): string {
   // eslint-disable-next-line no-control-regex -- stripping control characters is the point.
   return name.replace(/[\\/\r\n\x00-\x1f"<>:|?*]/g, '_').slice(0, 160) || 'attachment';
 }
 
-/**
- * Detects the content type from the file's bytes, never trusting the client's name or MIME
- * header. Plain text (no signature) is accepted only for `.txt` files without NUL bytes.
- */
 export async function detectContentType(path: string, filename: string): Promise<string> {
   const detected = await fileTypeFromFile(path);
   if (!detected && filename.toLowerCase().endsWith('.txt')) {
@@ -43,7 +37,6 @@ export async function detectContentType(path: string, filename: string): Promise
   return detected?.mime ?? '';
 }
 
-/** Images (not SVG), videos and common documents; the declared kind must match the content. */
 export function isAllowedContent(contentType: string, kind: string): boolean {
   const isImage = contentType.startsWith('image/') && contentType !== 'image/svg+xml';
   const isVideo = contentType.startsWith('video/');

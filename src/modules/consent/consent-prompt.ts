@@ -10,10 +10,6 @@ const CONSENT_BUTTONS = [
   ['decline', 'Отказаться'],
 ] as const;
 
-/**
- * Asks the client for consent under the current policy. Each button carries a single-use nonce
- * bound to the policy version, so a button from an outdated prompt cannot grant consent.
- */
 export async function sendConsentPrompt(
   tx: Sql,
   ctx: Ctx,

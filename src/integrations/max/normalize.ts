@@ -9,11 +9,6 @@ const ATTACHMENT_KINDS = ['image', 'video', 'file'];
 
 type Update = Record<string, unknown>;
 
-/**
- * Turns a raw MAX webhook update into a ClientInput. Only direct dialogs with people are
- * accepted; bots, group chats and unsupported update types become `unknown` (still recorded,
- * keyed by the update's hash). Every source key is stable across MAX redeliveries.
- */
 export function normalizeUpdate(raw: string): ClientInput {
   const update = object(strictJson(raw, true, MAX_UPDATE_BYTES));
   const kind = jsonText(update.update_type);
@@ -46,7 +41,6 @@ function botStarted(update: Update): ClientInput | undefined {
   };
 }
 
-/** An inline button press. */
 function callback(update: Update): ClientInput | undefined {
   const pressed = object(update.callback);
   const user = object(pressed.user);
@@ -77,7 +71,6 @@ function removal(update: Update): ClientInput | undefined {
   };
 }
 
-/** A new or edited message; each edit gets its own source key (the update's hash). */
 function message(
   update: Update,
   { kind, raw }: { kind: 'message_created' | 'message_edited'; raw: string },
@@ -107,7 +100,6 @@ function message(
   };
 }
 
-/** Images, videos and files; other attachment types (stickers, contacts…) are skipped. */
 function parseAttachments(raw: unknown): InputAttachment[] {
   const items: unknown[] = Array.isArray(raw) ? raw.slice(0, MAX_ATTACHMENTS) : [];
   const attachments: InputAttachment[] = [];
@@ -119,7 +111,6 @@ function parseAttachments(raw: unknown): InputAttachment[] {
     }
     const payload = object(attachment.payload ?? {});
     attachments.push({
-      // The raw value, not `type`: a non-string that renders as a kind passes through as is.
       kind: attachment.type as InputAttachment['kind'],
       filename: jsonText(attachment.filename ?? type),
       url: typeof payload.url === 'string' ? payload.url : undefined,

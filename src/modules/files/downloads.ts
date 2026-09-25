@@ -8,7 +8,6 @@ import { safeFilename } from './content-policy.js';
 
 const GRANT_LIFETIME_MS = 60000;
 
-/** A clean attachment of a sent message, for download. */
 export async function findSentAttachment({ db, ctx }: FileDeps, id: string): Promise<Attachment> {
   const row = await one<Attachment>(
     db,
@@ -20,10 +19,6 @@ export async function findSentAttachment({ db, ctx }: FileDeps, id: string): Pro
   return row;
 }
 
-/**
- * A one-minute download link that needs no Authorization header, for downloads the browser
- * performs itself. It stops working with the session and with any change to the employee.
- */
 export async function grantDownload(
   deps: FileDeps,
   { attachmentId, session }: { attachmentId: string; session: Session },
@@ -43,7 +38,6 @@ export async function grantDownload(
   };
 }
 
-/** The attachment behind a live grant, if its session and employee are still valid. */
 export async function redeemDownloadGrant(deps: FileDeps, grant: string): Promise<Attachment> {
   const { db, ctx } = deps;
   const record = await one<{ attachment_id: string }>(
@@ -59,7 +53,6 @@ export async function redeemDownloadGrant(deps: FileDeps, grant: string): Promis
   return findSentAttachment(deps, record.attachment_id);
 }
 
-/** Always a download (never rendered inline), with an RFC 5987 UTF-8 filename. */
 export function attachmentDisposition(filename: string): string {
   return `attachment; filename*=UTF-8''${encodeURIComponent(safeFilename(filename))}`;
 }

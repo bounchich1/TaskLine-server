@@ -5,10 +5,6 @@ import type { TicketCommandHandler } from '../command-context.js';
 
 const FIELDS = ['tag', 'urgency', 'complexity'] as const;
 
-/**
- * Staff override of tag/urgency/complexity. Each field carries the revision the caller saw, so a
- * concurrent change (by staff or by AI triage) is a conflict rather than a silent overwrite.
- */
 export const classify: TicketCommandHandler = async (tx, ctx, { ticket, body }) => {
   ensure(['open', 'in_progress'].includes(ticket.status), 'ticket_closed');
   for (const field of FIELDS) {

@@ -4,7 +4,6 @@ import pg from 'pg';
 
 import { serverFile } from './paths.js';
 export interface Sql {
-  // The row type is the caller's claim about the SQL, as in pg's own query<T>.
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
   query<T extends Record<string, unknown> = Record<string, unknown>>(
     sql: string,
@@ -72,10 +71,6 @@ export async function migrate(db: Database) {
   });
 }
 
-/**
- * Like one(), for queries that must yield a row: a row locked or returned by an earlier step of
- * the same transaction, or an INSERT/UPDATE ... RETURNING.
- */
 export async function requireOne<T extends Record<string, unknown> = Record<string, unknown>>(
   db: Sql,
   sql: string,

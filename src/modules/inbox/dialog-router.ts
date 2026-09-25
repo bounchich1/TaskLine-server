@@ -18,7 +18,6 @@ export interface RoutedInput {
   receivedAt: string;
 }
 
-/** Decides what a client's input means in the bot dialog and hands it to the owning module. */
 export async function routeClientInput(
   tx: Sql,
   ctx: Ctx,
@@ -32,7 +31,6 @@ export async function routeClientInput(
     await reviseClientMessage(tx, ctx, client, input);
     return;
   }
-  // Commands work regardless of consent: a client can always withdraw or see their history.
   const command = input.text?.trim().toLowerCase() ?? '';
   if (WITHDRAW_COMMANDS.includes(command)) {
     await withdrawConsent(tx, ctx, client, input.sourceKey);

@@ -15,10 +15,6 @@ interface Receipt {
   received_at: string;
 }
 
-/**
- * Inbound pipeline for client updates: record durably on receipt (webhook), then route each
- * client's inputs one at a time, in arrival order (worker loop).
- */
 export class Inbox {
   private readonly ctx: Ctx;
 
@@ -33,7 +29,6 @@ export class Inbox {
     await this.db.tx((tx) => recordInput(tx, this.ctx, input));
   }
 
-  /** Routes the client's oldest pending input. Returns false when there was nothing to route. */
   async processClient(clientId: string): Promise<boolean> {
     return this.db.tx(async (tx) => {
       const client = await one<Client>(

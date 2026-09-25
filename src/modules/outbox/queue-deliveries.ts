@@ -2,7 +2,6 @@ import type { Ctx } from '../../shared/context.js';
 import type { Sql } from '../../shared/db.js';
 import type { Client, Employee, Message, Ticket } from '../../shared/types/entities.js';
 
-/** Acknowledges a pressed inline button (MAX shows `notification` as a toast). */
 export async function queueCallbackAnswer(
   tx: Sql,
   ctx: Ctx,
@@ -21,7 +20,6 @@ export async function queueCallbackAnswer(
   );
 }
 
-/** Sends the client the list of their tickets (reply to the history command). */
 export async function queueHistoryPage(
   tx: Sql,
   ctx: Ctx,
@@ -44,10 +42,6 @@ export interface StaffReply {
   attachmentIds: string[];
 }
 
-/**
- * Queues a staff reply. The sender's id and version are recorded so the delivery worker can
- * re-check their authorization right before sending.
- */
 export async function queueStaffReply(tx: Sql, ctx: Ctx, reply: StaffReply): Promise<void> {
   const { client, ticket, message, actor } = reply;
   await tx.query(

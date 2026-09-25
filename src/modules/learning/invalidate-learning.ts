@@ -2,10 +2,6 @@ import type { Ctx } from '../../shared/context.js';
 import type { Sql } from '../../shared/db.js';
 import { enqueue } from '../../shared/events.js';
 
-/**
- * A ticket's resolution may no longer be learned from (reopened, edited, consent withdrawn):
- * invalidate its closures, withdraw its memory records and cancel in-flight AI work for it.
- */
 export async function invalidateLearning(
   tx: Sql,
   ctx: Ctx,

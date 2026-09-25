@@ -9,10 +9,6 @@ import { capabilities } from './capabilities.js';
 
 const MAX_LOGINS_PER_LAUNCH = 5;
 
-/**
- * Resolves a bearer token to a live session. Sessions die on logout, when the employee is
- * blocked or changed (version), at expiry, and after 30 minutes idle. Touches `last_seen_at`.
- */
 export async function authenticate(
   db: Sql,
   org: string,
@@ -37,10 +33,6 @@ export async function authenticate(
   return { employee: row, hash: sessionHash, csrfHash: row.csrf_hash };
 }
 
-/**
- * Starts a session for an active employee identified by a verified MAX launch. Only hashes of
- * the session and CSRF tokens are stored; the raw tokens are returned once.
- */
 export async function issueSession(
   db: Database,
   config: Config,
@@ -87,12 +79,10 @@ export async function issueSession(
   });
 }
 
-/** Logout: the session stops working immediately. */
 export async function revokeSession(db: Sql, sessionHash: string): Promise<void> {
   await db.query('UPDATE staff_sessions SET revoked=true WHERE hash=$1', [sessionHash]);
 }
 
-/** Replaces the session and CSRF tokens of a live session; the old token stops working. */
 export async function rotateSession(
   db: Database,
   sessionHash: string,
@@ -110,7 +100,6 @@ export async function rotateSession(
   return { token: secret, csrf };
 }
 
-/** The signed-in employee, what they may do, and their organization (GET /v1/me). */
 export async function describeSession(db: Sql, org: string, employee: Employee) {
   return {
     employee,

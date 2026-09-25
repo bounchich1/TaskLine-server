@@ -7,7 +7,6 @@ import type { DeliveryWorker } from './delivery-worker.js';
 
 const resolveBody = z.object({ evidence: z.string().max(2000).optional() }).strict();
 
-/** Manual resolution of a failed or uncertain staff reply: `…/cancel` and `…/retry`. */
 export const deliveryRoutes: FastifyPluginAsync<{ deliveries: DeliveryWorker }> = async (
   app,
   { deliveries },

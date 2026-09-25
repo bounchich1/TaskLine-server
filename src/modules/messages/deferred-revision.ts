@@ -7,10 +7,6 @@ import type { Client, Job } from '../../shared/types/entities.js';
 
 import { reviseClientMessage } from './revise-message.js';
 
-/**
- * The `message_revision` job: an edit that arrived before its original message. Retried
- * (`original_not_received`) until the original is stored, then applied like a live edit.
- */
 export async function applyDeferredRevision(db: Database, ctx: Ctx, job: Job): Promise<void> {
   const input = decrypt<ClientInput>(job.payload.input as string, ctx.config.ENCRYPTION_KEY);
   const original = await one(db, 'SELECT id FROM messages WHERE org_id=$1 AND provider_ref=$2', [

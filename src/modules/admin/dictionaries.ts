@@ -15,17 +15,12 @@ export const dictionaryBody = z
 
 export type DictionaryBody = z.infer<typeof dictionaryBody>;
 
-/** Fallback values assigned when classification is unknown; they can never be archived. */
 function isProtectedDefault({ dimension, code }: DictionaryBody): boolean {
   return (
     (dimension === 'tag' && code === 'undefined') || (dimension !== 'tag' && code === 'medium')
   );
 }
 
-/**
- * Creates or updates a dictionary entry. Tickets already using the entry keep the label they
- * were classified with: it is frozen onto them before the live entry changes.
- */
 export async function publishDictionaryEntry(
   tx: Sql,
   org: string,

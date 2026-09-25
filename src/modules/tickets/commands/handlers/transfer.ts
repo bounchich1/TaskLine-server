@@ -4,7 +4,6 @@ import { findActiveEmployee } from '../../../../shared/staff.js';
 import { addMessage } from '../../../messages/index.js';
 import { requireOwner, type TicketCommandHandler } from '../command-context.js';
 
-/** Hand a ticket in work over to another employee, with a mandatory comment. */
 export const transfer: TicketCommandHandler = async (tx, ctx, command) => {
   const { actor, ticket, body } = command;
   requireOwner(command);

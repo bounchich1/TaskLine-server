@@ -4,9 +4,6 @@ import { ensure } from '../../shared/errors.js';
 import type { FileDeps } from './attachment.js';
 import { publicAttachment } from './public-attachment.js';
 
-// An upload is a draft until a reply claims it (message_id set). Only its owner sees it.
-
-/** Scan progress of the employee's draft upload, polled by the mini-app. */
 export async function draftUploadStatus(
   { db, ctx }: FileDeps,
   { employeeId, id }: { employeeId: string; id: string },
@@ -21,7 +18,6 @@ export async function draftUploadStatus(
   return publicAttachment(row);
 }
 
-/** Discards a draft; one still receiving bytes is left for the upload to finish or fail. */
 export async function cancelDraftUpload(
   { db, ctx }: FileDeps,
   { employeeId, id }: { employeeId: string; id: string },

@@ -4,15 +4,9 @@ import type { Job } from '../../shared/types/entities.js';
 import { queueFor, type Queues } from './queues.js';
 
 const TRIAGE_BATCH = 4;
-/** Learning older than this jumps the queue, so triage bursts cannot starve it. */
 const LEARNING_MAX_WAIT_MS = 600000;
 const OTHER_JOBS_PER_SWEEP = 40;
 
-/**
- * Publishes due jobs to their queues. The AI queue's global concurrency follows the permit
- * cap; AI jobs are published at most two per permit per sweep, triage in batches of four
- * interleaved with one learning job.
- */
 export async function publishDueJobs(db: Database, org: string, queues: Queues): Promise<void> {
   const cap = Number((await requireOne(db, 'SELECT cap FROM ai_settings WHERE id=1')).cap);
   const aiQueue = queues['ai-execution'];
@@ -34,7 +28,6 @@ export async function publishDueJobs(db: Database, org: string, queues: Queues):
   }
 }
 
-/** `clock` is read on every round, like the wall clock it stands in for. */
 export function selectDueJobs(due: Job[], cap: number, clock: () => number = Date.now): Job[] {
   const triage = due.filter((job) => job.kind === 'triage');
   const learning = due.filter((job) => job.kind === 'learning');

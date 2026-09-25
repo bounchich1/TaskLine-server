@@ -3,10 +3,6 @@ import { one, requireOne, type Sql } from '../../../shared/db.js';
 import { ensure } from '../../../shared/errors.js';
 import type { Client, Ticket } from '../../../shared/types/entities.js';
 
-/**
- * Locks the ticket's client, then the ticket (the global lock order), and checks the caller saw
- * the current version and that the client's consent still covers this ticket.
- */
 export async function lockCommandTarget(
   tx: Sql,
   ctx: Ctx,

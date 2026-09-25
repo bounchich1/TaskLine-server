@@ -25,13 +25,6 @@ import { useStrictJsonParser } from './strict-json-parser.js';
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 
-/**
- * The HTTP API: MAX webhook, staff mini-app API (/v1), downloads and health checks.
- *
- * Registration order matters. Parser, error handler and hooks go on the root instance before
- * any route plugin, so every plugin inherits them (and unknown /v1 routes still answer 401).
- * Route plugins use full paths, no prefixes.
- */
 export async function buildApi(db: Database, config: Config): Promise<FastifyInstance> {
   const app = Fastify({
     bodyLimit: MAX_BODY_BYTES,

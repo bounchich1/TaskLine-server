@@ -17,8 +17,6 @@ import { reply } from './handlers/reply.js';
 import { transfer } from './handlers/transfer.js';
 import { lockCommandTarget } from './lock-target.js';
 
-/** Command name → handler and the UI event announcing its result. */
-// A Map, not an object literal: a name like 'toString' must be an unknown command.
 const COMMANDS = new Map<string, { handle: TicketCommandHandler; event: string }>([
   ['assign', { handle: assign, event: 'ticket.assigned' }],
   ['classification', { handle: classify, event: 'ticket.classified' }],
@@ -33,12 +31,10 @@ export interface TicketCommandRequest {
   ticketId: string;
   name: string;
   body: Row;
-  /** The ticket version the caller acted on (If-Match). */
   expectedVersion: number;
   idempotencyKey: string;
 }
 
-/** Staff commands on a ticket: idempotent, version-checked, one transaction each. */
 export class TicketCommands {
   private readonly ctx: Ctx;
 
@@ -56,7 +52,6 @@ export class TicketCommands {
     const commandKey = { principal: request.actor.id, route: `${ticketId}:${name}`, key };
     return this.db.tx(async (tx) => {
       const claim = await claimCommandKey(tx, commandKey, requestHash);
-      // Re-check the actor inside the transaction: blocked or changed staff must not act.
       const actor = await findActiveEmployee(tx, this.ctx.org, request.actor.id);
       ensure(actor?.version === request.actor.version, 'access_denied', 403);
       if (claim.response) {

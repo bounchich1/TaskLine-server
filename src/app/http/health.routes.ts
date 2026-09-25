@@ -4,7 +4,6 @@ import type { Database } from '../../shared/db.js';
 
 import { openapi } from './openapi.js';
 
-/** Liveness, readiness (database reachable and migrated) and the OpenAPI document. */
 export const healthRoutes: FastifyPluginAsync<{ db: Database }> = async (app, { db }) => {
   app.get('/health/live', async () => ({ status: 'ok' }));
   app.get('/health/ready', async () => {

@@ -1,4 +1,3 @@
-/** Built-in bot message texts; an organization can override any of them (templates table). */
 export const DEFAULT_TEMPLATES: Readonly<Partial<Record<string, string>>> = {
   consent_request:
     'Для обращения в поддержку необходимо согласие на обработку данных. Политика: {policy_url}\n' +

@@ -11,7 +11,6 @@ const STATUS_LABELS: Record<Ticket['status'], string> = {
   closed: 'Закрыта',
 };
 
-/** Replies to the client's history command with their 20 most recent tickets. */
 export async function sendTicketHistory(
   tx: Sql,
   ctx: Ctx,

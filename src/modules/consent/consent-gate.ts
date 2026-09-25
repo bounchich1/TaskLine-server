@@ -7,11 +7,6 @@ import { queueBotMessage } from '../outbox/index.js';
 import { sendConsentPrompt } from './consent-prompt.js';
 import { bufferPreconsentInput } from './preconsent-buffers.js';
 
-/**
- * Lets input through when the client has usable consent: granted, and either for the current
- * policy or for an already open ticket (a policy update does not interrupt a conversation).
- * Otherwise holds a message for later, asks for consent, and returns false.
- */
 export async function passesConsentGate(
   tx: Sql,
   ctx: Ctx,

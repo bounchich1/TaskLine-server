@@ -5,7 +5,6 @@ const SCAN_TIMEOUT_MS = 60_000;
 const MAX_RESPONSE_LENGTH = 4096;
 const CHUNK_SIZE = 64 * 1024;
 
-/** Scans a file with clamd's INSTREAM command. Resolves true when clean, false when infected. */
 export async function clamScan(path: string, host: string, port: number): Promise<boolean> {
   const socket = new Socket();
   const verdict = readVerdict(socket);
@@ -49,7 +48,6 @@ function readVerdict(socket: Socket): Promise<boolean> {
   });
 }
 
-/** INSTREAM framing: 4-byte big-endian length, then the bytes; waits for drain when needed. */
 async function writeChunk(socket: Socket, bytes: Buffer): Promise<void> {
   const size = Buffer.alloc(4);
   size.writeUInt32BE(bytes.length);

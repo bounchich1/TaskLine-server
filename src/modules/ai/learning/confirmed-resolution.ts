@@ -4,11 +4,6 @@ const CONFIRMS_FIX =
   /(?:теперь\s+(?:всё\s+)?работает|заработало|проблема\s+решена|ошибка\s+исчезла|всё\s+получилось)/i;
 const DENIES_FIX = /(?:не\s+работает|не\s+решена|не\s+помог)/i;
 
-/**
- * A resolution counts as confirmed (and may be recalled for future tickets) only if a
- * delivered staff message cited as a step is followed by a cited client message saying the
- * problem is gone.
- */
 export function confirmedResolution(resolution: Resolution, entries: SnapshotEntry[]): boolean {
   if (resolution.outcome !== 'resolved') {
     return false;

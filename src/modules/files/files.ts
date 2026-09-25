@@ -15,7 +15,6 @@ import { scanAttachment } from './scan.js';
 import { ObjectStorage } from './storage.js';
 import { prepareUpload, receiveUpload } from './uploads.js';
 
-/** Attachment pipeline: staff uploads, client media download, scanning, storage access. */
 export class Files {
   private readonly deps: FileDeps;
 

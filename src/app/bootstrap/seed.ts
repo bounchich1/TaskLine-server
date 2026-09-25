@@ -2,7 +2,6 @@ import { DEFAULT_TEMPLATES } from '../../modules/templates/index.js';
 import type { Config } from '../../shared/config.js';
 import type { Database, Sql } from '../../shared/db.js';
 
-/** Reserved dictionary entries: [dimension, code, label, rank]. */
 const DEFAULT_DICTIONARY: [string, string, string, number][] = [
   ['tag', 'undefined', 'Не определён', 0],
   ['urgency', 'low', 'Низкая', 0],
@@ -14,10 +13,6 @@ const DEFAULT_DICTIONARY: [string, string, string, number][] = [
   ['complexity', 'high', 'Высокая', 2],
 ];
 
-/**
- * Creates the organization and its defaults (AI settings, memory writer slot, dictionary,
- * bot templates). Idempotent: existing rows, including admin edits, are left alone.
- */
 export async function seed(db: Database, config: Config): Promise<void> {
   await db.tx(async (tx) => {
     await tx.query(

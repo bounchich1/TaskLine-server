@@ -11,11 +11,9 @@ export interface ResolveRequest {
   employee: Employee;
   messageId: string;
   action: 'cancel' | 'retry';
-  /** Required from a supervisor when the previous send may have reached the client. */
   evidence?: string;
 }
 
-/** Manual retry or cancel of a staff reply whose delivery failed or has an unknown result. */
 export async function resolveDelivery(
   tx: Sql,
   ctx: Ctx,
@@ -54,7 +52,6 @@ interface ResolveTarget {
   actor: Employee;
 }
 
-/** Locks client → ticket → delivery and re-checks that the employee may still act. */
 async function lockForResolve(
   tx: Sql,
   ctx: Ctx,

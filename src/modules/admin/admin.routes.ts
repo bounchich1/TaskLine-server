@@ -14,16 +14,11 @@ import type { Admin, AdminRequest } from './admin.js';
 
 const ROLES = ['support', 'supervisor', 'admin'];
 
-/**
- * The admin console. Reads check the admin role here; mutations re-check it inside the
- * transaction (see runAdminMutation), together with the version and idempotency key.
- */
 export const adminRoutes: FastifyPluginAsync<{ admin: Admin }> = async (app, { admin }) => {
   addAdminReads(app, admin);
   addAdminMutations(app, admin);
 };
 
-/** Diagnostics and job retries, for supervisors as well as admins. */
 export const opsRoutes: FastifyPluginAsync<{ admin: Admin }> = async (app, { admin }) => {
   app.get('/v1/admin/diagnostics', async (request) => {
     requireOps(request);
@@ -74,7 +69,6 @@ function addAdminMutations(app: FastifyInstance, admin: Admin): void {
   app.put('/v1/admin/settings', async (request) => admin.settings(mutation(request)));
 }
 
-/** The common part of every admin mutation request. */
 function mutation(request: FastifyRequest): AdminRequest {
   return {
     actor: staffOf(request).employee,

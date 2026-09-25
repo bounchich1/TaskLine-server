@@ -10,7 +10,6 @@ const UPDATE_TYPES = [
   'bot_started',
 ];
 
-/** `subscribe`: registers the webhook with MAX (live mode, public HTTPS URL only). */
 export const subscribeCommand: CliCommand = async ({ config }) => {
   ensure(
     config.MAX_MODE === 'live' && new URL(config.PUBLIC_URL).protocol === 'https:',

@@ -4,12 +4,7 @@ import type { Ctx } from '../../shared/context.js';
 import type { Database, Sql } from '../../shared/db.js';
 import { emit } from '../../shared/events.js';
 
-/**
- * Periodic housekeeping (every 20th poll, ~5 s): domain timers, then in one transaction:
- * overdue triage, recovery of abandoned work, and pruning of expired rows.
- */
 export async function runMaintenance(db: Database, ctx: Ctx): Promise<void> {
-  // Rating timers first, then pre-consent expiry.
   await new RatingTimers(db, ctx.config).run();
   await new PreconsentExpiry(db, ctx.config).run();
   await db.tx(async (tx) => {
@@ -19,7 +14,6 @@ export async function runMaintenance(db: Database, ctx: Ctx): Promise<void> {
   });
 }
 
-/** Triage is only useful right after a ticket arrives: after 2 minutes staff take over. */
 async function expireOverdueTriage(tx: Sql, ctx: Ctx): Promise<void> {
   const { rows: expired } = await tx.query<{ id: string }>(
     `UPDATE tickets SET ai_status='failed',review_required=true,version=version+1
@@ -36,11 +30,6 @@ async function expireOverdueTriage(tx: Sql, ctx: Ctx): Promise<void> {
   }
 }
 
-/**
- * Model calls running for 3 minutes lost their gateway: they become uncertain and keep their
- * permits (only an operator can release them). Jobs claimed 5 minutes ago lost their worker
- * and are simply requeued.
- */
 async function recoverAbandonedWork(tx: Sql, ctx: Ctx): Promise<void> {
   await tx.query(
     "UPDATE ai_permits SET state='uncertain' WHERE state='running' AND started_at<now()-interval '3 minutes'",

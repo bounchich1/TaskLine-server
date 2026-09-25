@@ -15,10 +15,6 @@ import type { Model, ModelProvider, ModelReply, ModelRequest } from './model.js'
 import { callOpenAi } from './openai-provider.js';
 import { settleFailure, settleSuccess } from './settle.js';
 
-/**
- * The only component that talks to the model provider (it runs as its own process). Enforces
- * the organization-wide concurrency cap and makes every (job, step) call at most once.
- */
 export class Gateway implements Model {
   private readonly ctx: Ctx;
 
@@ -39,8 +35,6 @@ export class Gateway implements Model {
     if ('cached' in admission) {
       return admission.cached;
     }
-    // A crash after admission intentionally keeps the permit: a clock-based lease could not
-    // stop the remote work it would pretend to release.
     let completed = false;
     try {
       if (!(await this.isStillRunnable(job))) {
@@ -63,7 +57,6 @@ export class Gateway implements Model {
     }
   }
 
-  /** Entry point for workers calling over HTTP (see GatewayClient). */
   async execute({ job_id: jobId, generation, step, request }: ExecuteRequest) {
     const job = await one<Job>(this.db, 'SELECT * FROM jobs WHERE id=$1 AND org_id=$2', [
       jobId,
@@ -74,12 +67,10 @@ export class Gateway implements Model {
     return this.complete(job, step, request);
   }
 
-  /** Permit slots and their states, for the gateway health check. */
   async permits() {
     return (await this.db.query('SELECT slot,state FROM ai_permits ORDER BY slot')).rows;
   }
 
-  /** The job may have been superseded or become ineligible while waiting for a permit. */
   private async isStillRunnable(job: Job): Promise<boolean> {
     const current = await one<Job>(this.db, 'SELECT * FROM jobs WHERE id=$1', [job.id]);
     return (

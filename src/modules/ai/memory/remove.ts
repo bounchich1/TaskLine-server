@@ -4,10 +4,6 @@ import { AppError, ensure } from '../../../shared/errors.js';
 import type { MemoryDeps, MemoryRecord } from './memory-record.js';
 import { reconcileMemory } from './reconcile.js';
 
-/**
- * Deletes a record everywhere (consent withdrawal, invalidation): first hidden from recall,
- * then every upstream copy forgotten and verified gone, then marked deleted.
- */
 export async function removeMemory(deps: MemoryDeps, id: string): Promise<void> {
   const { db, config, upstream } = deps;
   if (!config.MEMORY_ENABLED) {
@@ -22,7 +18,6 @@ export async function removeMemory(deps: MemoryDeps, id: string): Promise<void> 
     return;
   }
   await db.query('UPDATE memory_records SET eligible=false WHERE id=$1', [id]);
-  // An unknown write must be found first, or its copy would survive the deletion.
   if (['writing', 'write_unknown'].includes(record.state)) {
     await reconcileMemory(deps, id);
   }

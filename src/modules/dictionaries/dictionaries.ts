@@ -3,7 +3,6 @@ import type { Row } from '../../shared/types/entities.js';
 
 export type DictionaryDimension = 'tag' | 'urgency' | 'complexity';
 
-/** Active entries in the shape the AI triage snapshot (and its version hash) is built from. */
 export async function snapshotActiveDictionaries(tx: Sql, org: string): Promise<Row[]> {
   const result = await tx.query(
     `SELECT dimension,code,label,rank,version FROM dictionaries
@@ -26,7 +25,6 @@ export async function findActiveDictionaryEntry(
   );
 }
 
-/** Label and version of an active entry: what a ticket stores next to a classification code. */
 export async function findActiveDictionaryLabel(
   tx: Sql,
   org: string,
@@ -40,7 +38,6 @@ export async function findActiveDictionaryLabel(
   );
 }
 
-/** Every entry, active or not, for the classification pickers and the admin console. */
 export async function listDictionaries(db: Sql, org: string) {
   const result = await db.query(
     'SELECT * FROM dictionaries WHERE org_id=$1 ORDER BY dimension,rank DESC,code',

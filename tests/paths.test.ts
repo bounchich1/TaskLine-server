@@ -5,8 +5,6 @@ import { expect, it } from 'vitest';
 
 import { serverFile } from '../src/shared/paths.js';
 
-// Files outside src/ are read at runtime through serverFile(); moving shared/paths.ts to a
-// different depth would silently point these at the wrong directory.
 it.each([
   'package.json',
   'migrations/001_initial.sql',

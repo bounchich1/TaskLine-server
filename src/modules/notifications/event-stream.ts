@@ -31,11 +31,6 @@ export interface EventStreamOptions {
   raw: ServerResponse;
 }
 
-/**
- * Forwards new UI events to one mini-app connection, polling every 2 s, until the client goes
- * away or its session ends. The session is re-checked on every poll, so logout or blocking an
- * employee closes their streams.
- */
 export class UiEventStream {
   private alive = true;
   private polls = 0;
@@ -76,7 +71,6 @@ export class UiEventStream {
       [org, this.cursor],
     );
     for (const event of rows) {
-      // A full socket buffer means a slow or stalled client: stop after this poll.
       if (!raw.write(changeFrame(event))) {
         this.alive = false;
         break;
@@ -88,7 +82,6 @@ export class UiEventStream {
     }
   }
 
-  /** If events after the client's cursor were pruned, it must reload; continue from the newest. */
   private async skipPrunedEvents(): Promise<void> {
     const { db, org, raw } = this.options;
     const bounds = await one<{ first: string | null; last: string | null }>(

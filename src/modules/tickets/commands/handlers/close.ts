@@ -5,10 +5,6 @@ import type { Client, Closure, Ticket } from '../../../../shared/types/entities.
 import { queueBotMessage } from '../../../outbox/index.js';
 import { requireOwner, type TicketCommandHandler } from '../command-context.js';
 
-/**
- * Close a ticket in work: opens a rating cycle (the client is asked for a 1–10 rating) and queues
- * learning from the resolution. Refused while replies or client input are still in flight.
- */
 export const close: TicketCommandHandler = async (tx, ctx, command) => {
   const { actor, client, ticket, body } = command;
   requireOwner(command);

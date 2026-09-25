@@ -7,21 +7,15 @@ import type { Closure, Job, Message, Row, Ticket } from '../../../shared/types/e
 import { redact } from '../contracts/redact.js';
 import { eligibleJob } from '../gateway/job-eligibility.js';
 
-/** Files still being scanned delay the snapshot by up to a minute after closing. */
 const FILE_WAIT_MS = 60000;
 const UNFINISHED_FILE_STATES = ['pending', 'quarantined', 'receiving'];
 
 export interface Snapshot {
   cycle: Closure;
   entries: SnapshotEntry[];
-  /** `id:status:coverage` of attachments whose text is not fully available. */
   missing: string[];
 }
 
-/**
- * The redacted conversation up to the closure, frozen (encrypted) on first use so every
- * learning step of the job sees exactly the same input.
- */
 export async function takeSnapshot(tx: Sql, ctx: Ctx, job: Job): Promise<Snapshot> {
   const { cycle, ticket } = await lockCycle(tx, ctx, job);
   ensure(await eligibleJob(tx, ctx.org, job), 'job_ineligible');
@@ -39,7 +33,6 @@ export async function takeSnapshot(tx: Sql, ctx: Ctx, job: Job): Promise<Snapsho
   return { cycle, entries, missing };
 }
 
-/** Locks client → ticket → closure, like every other writer of these rows. */
 async function lockCycle(tx: Sql, ctx: Ctx, job: Job): Promise<{ cycle: Closure; ticket: Ticket }> {
   const initial = await one<Closure>(tx, 'SELECT * FROM closures WHERE id=$1 AND org_id=$2', [
     job.ref_id,

@@ -14,15 +14,10 @@ import { persistMemory } from './persist.js';
 import { reconcileMemory } from './reconcile.js';
 import { removeMemory } from './remove.js';
 
-/** A record may be recalled only while its case is closed, not reopened, and consented. */
 const RECALLABLE = `r.org_id=$1 AND r.eligible AND r.state='persisted' AND r.expires_at>now()
   AND NOT cl.invalidated AND t.current_cycle_id=cl.id AND t.lifecycle=cl.lifecycle
   AND c.consent_state='granted' AND c.consent_revision=t.consent_revision`;
 
-/**
- * Long-term memory of resolved cases. Upstream search only proposes candidates; every result
- * is re-checked against local records, so withdrawn or reopened cases are never recalled.
- */
 export class Memory implements Recall {
   private readonly deps: MemoryDeps;
 
@@ -45,7 +40,6 @@ export class Memory implements Recall {
     return this.recallable('r.upstream_id=ANY($2::text[])', ids);
   }
 
-  /** Re-reads cases by local id (the ids the model cites). */
   async expand(ids: string[]): Promise<CaseEvidence[]> {
     if (!this.deps.config.MEMORY_ENABLED || !ids.length) {
       return [];

@@ -4,10 +4,6 @@ import { one, requireOne, type Sql } from '../../shared/db.js';
 import type { ClientInput } from '../../shared/types/client-input.js';
 import type { Client } from '../../shared/types/entities.js';
 
-/**
- * Durably records an inbound update before it is acknowledged, numbered per client so it is
- * later routed in arrival order. Idempotent by source key; unusable updates are quarantined.
- */
 export async function recordInput(tx: Sql, ctx: Ctx, input: ClientInput): Promise<void> {
   if (await alreadyReceived(tx, ctx, input.sourceKey)) {
     return;
@@ -29,7 +25,6 @@ export async function recordInput(tx: Sql, ctx: Ctx, input: ClientInput): Promis
     'SELECT * FROM clients WHERE org_id=$1 AND max_user_id=$2 FOR UPDATE',
     [ctx.org, input.userId],
   );
-  // A MAX direct user has one dialog; unexpected changes are quarantined for review.
   if (client.chat_id !== input.chatId) {
     await tx.query(
       `INSERT INTO inbox(org_id,source_key,client_id,kind,state,reason)
@@ -38,7 +33,6 @@ export async function recordInput(tx: Sql, ctx: Ctx, input: ClientInput): Promis
     );
     return;
   }
-  // Checked again now that the client row is locked: a concurrent delivery may have won.
   if (await alreadyReceived(tx, ctx, input.sourceKey)) {
     return;
   }

@@ -5,7 +5,6 @@ import type { Row } from '../../../shared/types/entities.js';
 
 import type { MemoryTransport } from './agent-memory-client.js';
 
-/** A learned resolution: stored locally first, then written to the external memory service. */
 export type MemoryRecord = Row & {
   id: string;
   ticket_id: string;
@@ -19,7 +18,6 @@ export type MemoryRecord = Row & {
   write_generation: number;
 };
 
-/** What triage may show the model about a past case. */
 export type CaseEvidence = {
   id: string;
   problem_summary: string;
@@ -28,7 +26,6 @@ export type CaseEvidence = {
   cautions: string[];
 };
 
-/** Retrieval of resolved cases, as the triage tools use it. */
 export interface Recall {
   search(query: string): Promise<CaseEvidence[]>;
   expand(ids: string[]): Promise<CaseEvidence[]>;
@@ -43,10 +40,6 @@ export interface MemoryDeps {
 export const RECORD_JOINS = `FROM memory_records r JOIN closures cl ON cl.id=r.closure_id
   JOIN tickets t ON t.id=r.ticket_id JOIN clients c ON c.id=t.client_id`;
 
-/**
- * The upstream copy of a record. The source key and content hash lines let reconciliation
- * recognise a write whose outcome was unknown.
- */
 export function serializeRecord(record: MemoryRecord): string {
   const { content, source_key: sourceKey, content_hash: contentHash } = record;
   return `${JSON.stringify(content)}\nSOURCE_KEY=${sourceKey}\nCONTENT_HASH=${contentHash}`;

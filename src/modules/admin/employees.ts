@@ -23,10 +23,6 @@ export async function createEmployee(tx: Sql, org: string, body: EmployeeBody) {
   );
 }
 
-/**
- * Updates an employee. The last active administrator cannot be demoted or blocked, and any
- * change ends the employee's sessions (their permissions may have changed).
- */
 export async function updateEmployee(
   tx: Sql,
   org: string,

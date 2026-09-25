@@ -9,9 +9,6 @@ import type { Attachment, FileDeps } from './attachment.js';
 import { safeFilename } from './content-policy.js';
 import { storeStream } from './store-stream.js';
 
-// Staff attachments are uploaded in three steps: prepare a slot, upload the bytes, then poll
-// until the scan marks it clean. Only then can it be attached to a reply.
-
 export async function prepareUpload(
   { db, ctx }: FileDeps,
   employee: Employee,

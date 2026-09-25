@@ -19,10 +19,6 @@ export const filtersSchema = z
 
 export type Filters = z.infer<typeof filtersSchema>;
 
-/**
- * WHERE clauses with positional parameters. `$n` numbers follow push order, so conditions must
- * be added in the order their values are pushed.
- */
 export class SqlConditions {
   readonly values: unknown[];
   readonly clauses: string[];
@@ -32,13 +28,11 @@ export class SqlConditions {
     this.clauses = ['t.org_id=$1'];
   }
 
-  /** Adds a condition; every `?` in it refers to the single new parameter. */
   add(sql: string, value: unknown): void {
     this.values.push(value);
     this.clauses.push(sql.replaceAll('?', `$${this.values.length}`));
   }
 
-  /** Pushes a parameter without a condition (e.g. LIMIT) and returns its placeholder. */
   param(value: unknown): string {
     this.values.push(value);
     return `$${this.values.length}`;
@@ -69,7 +63,6 @@ export function filterConditions(org: string, filters: Filters): SqlConditions {
   return conditions;
 }
 
-/** "№42" / "42" finds a ticket by number; anything else is Russian full-text search. */
 function addSearch(conditions: SqlConditions, rawQuery: string): void {
   if (!rawQuery.trim()) {
     return;

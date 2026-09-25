@@ -1,6 +1,3 @@
-// Ticket row as the mini-app sees it: padded number, assignee name, current rating cycle and
-// classification labels (frozen label if the dictionary entry changed since, else current).
-
 export const TICKET_PROJECTION = `t.*,lpad(t.ticket_number::text,6,'0') AS number,e.name AS assignee_name,c.rating,c.rated_at,c.learning_status,
   coalesce(t.classification_labels->'tag'->>'label',dt.label,t.tag) AS tag_label,
   coalesce(t.classification_labels->'urgency'->>'label',du.label,t.urgency) AS urgency_label,

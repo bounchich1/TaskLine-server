@@ -11,10 +11,6 @@ import type { ModelReply, ModelRequest } from './model.js';
 const MAX_RESPONSE_BYTES = 128 * 1024;
 const MAX_COMPLETION_TOKENS = 6000;
 
-/**
- * Calls an OpenAI-compatible chat-completions endpoint. A 4xx means the request was rejected
- * (`provider_rejected`); a 5xx or network error leaves the outcome unknown (plain Error).
- */
 export async function callOpenAi(
   config: Config,
   request: ModelRequest,
@@ -49,7 +45,6 @@ function completionBody(config: Config, request: ModelRequest): Row {
   const body: Row = {
     model: config.AI_MODEL,
     messages: request.messages,
-    // Reasoning tokens count toward this cap; the budget (<=4096) leaves room for the answer.
     max_completion_tokens: MAX_COMPLETION_TOKENS,
     store: false,
   };
@@ -69,7 +64,6 @@ function completionBody(config: Config, request: ModelRequest): Row {
   return body;
 }
 
-/** Accepts only a finished answer (text or tool calls), never a truncated one. */
 function parseCompletion(result: Row): Omit<ModelReply, 'providerRef'> {
   const choice = object((result.choices as unknown[] | undefined)?.[0]);
   const message = object(choice.message);

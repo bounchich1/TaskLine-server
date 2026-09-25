@@ -63,7 +63,6 @@ export type Closure = Row & {
   invalidated: boolean;
   snapshot: string | null;
   coverage: Row | null;
-  /** Staff's closing note. */
   note: string | null;
 };
 export type Job = Row & {

@@ -2,7 +2,6 @@ import type { Ctx } from '../../shared/context.js';
 import type { Database } from '../../shared/db.js';
 import type { Row } from '../../shared/types/entities.js';
 
-/** A queued outbound message to one client (bot text, staff reply or callback answer). */
 export type Delivery = Row & {
   id: string;
   client_id: string;
@@ -18,7 +17,6 @@ export type Delivery = Row & {
   staff_version: number | null;
 };
 
-/** Dependencies shared by the delivery steps that run outside a single transaction. */
 export interface DeliveryDeps {
   db: Database;
   ctx: Ctx;

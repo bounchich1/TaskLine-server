@@ -10,12 +10,7 @@ import type { Job } from '../../shared/types/entities.js';
 import { classifyJobFailure, recordJobFailure } from './job-failure.js';
 import { runMaintenance } from './maintenance.js';
 
-/**
- * Runs one background job from the `jobs` table. The queue only carries job ids; the row is
- * the source of truth, claimed with a new generation so a stale worker cannot complete it.
- */
 export class JobRunner {
-  /** Shared with the delivery worker, which uploads attachments. */
   readonly files: Files;
   private readonly ctx: Ctx;
   private readonly memory: Memory;
@@ -57,7 +52,6 @@ export class JobRunner {
     await runMaintenance(this.db, this.ctx);
   }
 
-  /** Returns false when the job has more steps: it goes back to `pending` and runs again. */
   private async dispatch(job: Job): Promise<boolean> {
     switch (job.kind) {
       case 'triage':

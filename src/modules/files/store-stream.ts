@@ -10,10 +10,6 @@ import type { Attachment, FileDeps } from './attachment.js';
 import { sizeLimitFor } from './content-policy.js';
 import { createTempFile } from './temp-file.js';
 
-/**
- * Streams a file (staff upload or client media) into storage, enforcing the size limit while
- * streaming, then quarantines it and queues the malware scan.
- */
 export async function storeStream(
   { db, ctx, storage }: FileDeps,
   file: Attachment,

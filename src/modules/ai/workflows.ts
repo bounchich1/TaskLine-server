@@ -8,7 +8,6 @@ import { runClosureLearning } from './learning/closure-learning.js';
 import type { Recall } from './memory/memory-record.js';
 import { runTriage } from './triage/triage.js';
 
-/** The AI jobs: triage of new tickets and learning from closed ones. */
 export class Workflows {
   private readonly ctx: Ctx;
 
@@ -25,7 +24,6 @@ export class Workflows {
     await runTriage({ db: this.db, ctx: this.ctx, model: this.model, memory: this.memory }, job);
   }
 
-  /** Returns true when learning is complete; false means "run the job again". */
   async learning(job: Job): Promise<boolean> {
     return runClosureLearning({ db: this.db, ctx: this.ctx, model: this.model }, job);
   }

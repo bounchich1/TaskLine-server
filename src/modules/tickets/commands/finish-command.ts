@@ -8,16 +8,11 @@ import type { TicketCommand } from './command-context.js';
 
 export interface FinishedCommand {
   name: string;
-  /** UI event announcing the result. */
   event: string;
   command: TicketCommand;
   commandKey: CommandKey;
 }
 
-/**
- * Common tail of every command: bump the ticket version, audit, notify the UI and store the
- * response for idempotent replays. Returns the updated ticket.
- */
 export async function finishCommand(
   tx: Sql,
   ctx: Ctx,
@@ -46,7 +41,6 @@ export async function finishCommand(
 
 function auditDetail(name: string, { ticket, body }: TicketCommand, result: Ticket): Row {
   if (name === 'classification') {
-    // `ticket` is the state loaded before the command ran.
     return {
       before: { tag: ticket.tag, urgency: ticket.urgency, complexity: ticket.complexity },
       after: body,

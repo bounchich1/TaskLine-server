@@ -7,10 +7,6 @@ import { cancelClientDeliveries, queueBotMessage } from '../outbox/index.js';
 
 import { clearPreconsentBuffers } from './preconsent-buffers.js';
 
-/**
- * The client withdraws consent: stop processing their data, close all their tickets, withdraw
- * them from learning and drop anything still queued. Safe to repeat.
- */
 export async function withdrawConsent(
   tx: Sql,
   ctx: Ctx,

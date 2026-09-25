@@ -8,14 +8,9 @@ export interface NewMessage {
   text: string;
   providerRef: string | null;
   state: string;
-  /** Provider send time in epoch milliseconds (client messages only). */
   timestamp?: number;
 }
 
-/**
- * Appends a message to the ticket's conversation. Bumps the ticket's message sequence and version
- * and mirrors both onto the in-memory `ticket`, which later steps of the same command rely on.
- */
 export async function addMessage(
   tx: Sql,
   ctx: Ctx,

@@ -18,10 +18,6 @@ const devInboundBody = z
   })
   .strict();
 
-/**
- * MAX webhook. An authenticated update that fails to parse is still recorded, as `unknown`
- * keyed by its hash, so it can be diagnosed and a redelivery of it is deduplicated.
- */
 export const webhookRoutes: FastifyPluginAsync<{ inbox: Inbox; config: Config }> = async (
   app,
   { inbox, config },
@@ -46,7 +42,6 @@ function parseUpdate(raw: string): ClientInput {
   }
 }
 
-/** Simulates a client message without MAX (local development, operations staff only). */
 export const devInboundRoutes: FastifyPluginAsync<{ inbox: Inbox }> = async (app, { inbox }) => {
   app.post('/v1/dev/inbound', async (request) => {
     requireOps(request);

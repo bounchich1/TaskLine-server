@@ -13,11 +13,9 @@ export interface MaterializedFile {
   kind: string;
   filename: string;
   mime: string;
-  /** The caller must call this once the file has been sent. */
   cleanup: () => Promise<void>;
 }
 
-/** Copies a clean attachment to a local temporary file for uploading to MAX. */
 export async function materialize(
   { db, ctx, storage }: FileDeps,
   id: string,

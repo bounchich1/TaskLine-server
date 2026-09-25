@@ -9,12 +9,10 @@ import { requireOwner, type TicketCommandHandler } from '../command-context.js';
 const MAX_REPLY_LENGTH = 4000;
 const MAX_REPLY_ATTACHMENTS = 10;
 
-/** Staff reply to the client: recorded in the conversation and queued for delivery. */
 export const reply: TicketCommandHandler = async (tx, ctx, command) => {
   const { actor, client, ticket, body } = command;
   requireOwner(command);
   ensure(ticket.status === 'in_progress', 'ticket_closed');
-  // The API schema guarantees a string (default '').
   const text = ((body.text as string | undefined) ?? '').trim();
   const ids = (body.attachment_ids ?? []) as string[];
   ensure(
@@ -41,7 +39,6 @@ export const reply: TicketCommandHandler = async (tx, ctx, command) => {
   await queueStaffReply(tx, ctx, { client, ticket, message, actor, text, attachmentIds: ids });
 };
 
-/** Every attached upload must be the sender's own, clean, unexpired and not yet sent. */
 async function lockReadyUploads(
   tx: Sql,
   ctx: Ctx,

@@ -18,7 +18,6 @@ let headers: Record<string, string>;
 beforeEach(async () => {
   context = await fixture();
   app = await buildApi(context.db, context.c);
-  // One idempotency key per test: the tests below rely on repeating it.
   headers = (await staffLogin(app, context.c.APP_ORIGIN, '1')).headers();
 });
 afterEach(async () => {

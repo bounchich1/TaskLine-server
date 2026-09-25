@@ -10,7 +10,6 @@ import { fixture, testConfig } from './helpers.js';
 describe.runIf(process.env.RUN_POSTGRES_TESTS === '1')('real PostgreSQL concurrency', () => {
   const schema = `test_${randomUUID().replaceAll('-', '')}`;
   const config = testConfig();
-  // Pools connect lazily: nothing touches the database unless the suite runs.
   const control = new Postgres(config.DATABASE_URL);
   const url = new URL(config.DATABASE_URL);
   url.searchParams.set('options', `-c search_path=${schema}`);
@@ -113,7 +112,6 @@ describe.runIf(process.env.RUN_POSTGRES_TESTS === '1')('real PostgreSQL concurre
   }, 120000);
 });
 
-/** Retries a model call until the gateway admits it (`ai_busy` means all permits are taken). */
 async function completeWhenAdmitted(gateway: Gateway, job: Job): Promise<void> {
   for (;;) {
     try {

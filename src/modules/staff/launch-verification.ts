@@ -9,17 +9,11 @@ const MAX_LAUNCH_AGE_MS = 300_000;
 const MAX_CLOCK_SKEW_MS = 30_000;
 
 export interface VerifiedLaunch {
-  /** MAX user id of the person who opened the mini-app. */
   userId: string;
-  /** Hash of the signed launch data, used to limit replays of the same launch. */
   digest: string;
   startParam?: string;
 }
 
-/**
- * Verifies MAX WebApp launch data (the mini-app's `initData`): the HMAC signature derived from
- * the bot token, and the launch age. Rejects anything malformed as `invalid_launch`.
- */
 export function verifyLaunch(raw: string, botToken: string, now = Date.now()): VerifiedLaunch {
   ensure(
     Buffer.byteLength(raw) <= MAX_LAUNCH_BYTES && raw.length > 0 && botToken.length > 0,
@@ -58,7 +52,6 @@ export function verifyLaunch(raw: string, botToken: string, now = Date.now()): V
   };
 }
 
-/** Strict application/x-www-form-urlencoded parser: duplicate or bare keys are rejected. */
 function parseForm(raw: string): Map<string, string> {
   const result = new Map<string, string>();
   for (const part of raw.split('&')) {
@@ -82,7 +75,6 @@ function decodePair(rawKey: string, rawValue: string): [string, string] {
   }
 }
 
-/** Plain code-unit ordering (not locale-aware), as the signature scheme requires. */
 function compareStrings(left: string, right: string): number {
   if (left < right) {
     return -1;

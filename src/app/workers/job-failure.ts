@@ -8,7 +8,6 @@ const MAX_ATTEMPTS = 6;
 const MAX_BACKOFF_SECONDS = 1800;
 const DISABLED_RETRY_SECONDS = 60;
 
-/** Waiting for capacity or configuration: retried without counting an attempt. */
 const DEFERRED_CODES = [
   'ai_busy',
   'memory_writer_busy',
@@ -17,12 +16,9 @@ const DEFERRED_CODES = [
   'ai_disabled',
   'gateway_unavailable',
 ];
-/** A remote side effect may have happened: never retried automatically. */
 const UNCERTAIN_CODES = ['ai_uncertain', 'memory_write_unknown', 'memory_still_unknown'];
-/** The job no longer applies (consent, reopen, newer generation). */
 const SUPPRESSED_CODES = ['job_ineligible', 'job_stale'];
 const DISABLED_CODES = ['memory_disabled', 'ai_disabled'];
-/** Closure learning status for a learning job that ended without success. */
 const LEARNING_STATUS = { canceled: 'suppressed', unknown: 'needs_review', failed: 'failed' };
 
 export interface JobFailure {
@@ -32,7 +28,6 @@ export interface JobFailure {
   delaySeconds: number;
 }
 
-/** Decides what happens to a job whose run threw. Validation errors (422) fail at once. */
 export function classifyJobFailure(error: unknown, previousRetries: number): JobFailure {
   const code = error instanceof AppError ? error.code : 'worker_error';
   const deferred = DEFERRED_CODES.includes(code);
@@ -65,10 +60,6 @@ function failureState(
   return 'pending';
 }
 
-/**
- * Stores the failure (unless the job was reclaimed meanwhile) and surfaces final failures:
- * learning status on the closure, and "AI failed, review needed" on a triaged ticket.
- */
 export async function recordJobFailure(
   tx: Sql,
   ctx: Ctx,

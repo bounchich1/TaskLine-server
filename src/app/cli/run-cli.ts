@@ -22,7 +22,6 @@ const USAGE =
   'Commands: migrate, bootstrap, subscribe, memory-reconcile <id>, ' +
   'permit-resolve <slot> <evidence>, ai-cap <10..15>';
 
-/** Runs one operator command, e.g. `node dist/cli.js ai-cap 12`. */
 export async function runCli(argv: string[]): Promise<void> {
   const config = readConfig();
   const db = new Postgres(config.DATABASE_URL);

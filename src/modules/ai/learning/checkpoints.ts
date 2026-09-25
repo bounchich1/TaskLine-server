@@ -2,7 +2,6 @@ import { decrypt, encrypt } from '../../../shared/crypto.js';
 import { one, type Database, type Sql } from '../../../shared/db.js';
 import type { Job, Row } from '../../../shared/types/entities.js';
 
-/** Encrypted output of each finished learning step, so a resumed job never repeats a call. */
 export class CheckpointStore {
   constructor(
     private readonly db: Database,
@@ -19,7 +18,6 @@ export class CheckpointStore {
     return row ? decrypt<Row>(String(row.output), this.encryptionKey) : undefined;
   }
 
-  /** `coveredIds`: the messages this step's input covered (deduplicated). */
   async save(
     stepKey: string,
     { value, coveredIds, inputHash }: { value: unknown; coveredIds: string[]; inputHash: string },

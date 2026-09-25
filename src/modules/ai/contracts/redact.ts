@@ -1,7 +1,3 @@
-/**
- * Masks secrets and personal contacts before text reaches the model or long-term memory:
- * API keys and JWTs, e-mail addresses, Russian phone numbers, and `password: …`-style values.
- */
 export function redact(text: string): string {
   return text
     .replace(/\b(?:Bearer\s+)?(?:sk-[A-Za-z0-9_-]{12,}|eyJ[A-Za-z0-9_.-]{20,})\b/g, '[СЕКРЕТ]')

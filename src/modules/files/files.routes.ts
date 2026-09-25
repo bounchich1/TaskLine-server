@@ -18,7 +18,6 @@ const prepareBody = z
   .strict();
 const grantParam = z.string().min(32).max(128);
 
-/** Staff uploads (prepare, send bytes, poll, discard) and attachment downloads. */
 export const filesRoutes: FastifyPluginAsync<{ files: Files }> = async (app, { files }) => {
   addUploadRoutes(app, files);
   addDownloadRoutes(app, files);
@@ -64,7 +63,6 @@ function addDownloadRoutes(app: FastifyInstance, files: Files): void {
   app.post('/v1/attachments/:id/download-grant', async (request) =>
     files.grantDownload(staffOf(request), paramsId(request)),
   );
-  // Outside /v1: authorized by the grant in the URL, not by the session.
   app.get('/download/:grant', async (request, reply) => {
     const attachment = await files.redeemGrant(grantParam.parse(routeParam(request, 'grant')));
     reply

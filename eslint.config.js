@@ -9,11 +9,7 @@ import unicorn from 'eslint-plugin-unicorn';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-/**
- * Allowed module → module dependencies (see ARCHITECTURE.md). Every edge points to a lower
- * layer, so the graph stays acyclic. Adding an edge here is an architectural decision.
- * @type {Record<string, string[]>}
- */
+/** @type {Record<string, string[]>} */
 const MODULE_DEPENDENCIES = {
   templates: [],
   learning: [],
@@ -32,7 +28,6 @@ const MODULE_DEPENDENCIES = {
   ai: ['dictionaries'],
 };
 
-/** Modules and integrations are consumed only through their public `index.ts`. */
 const publicApi = (/** @type {string} */ type, /** @type {string[] | undefined} */ names) => ({
   element: {
     type,
@@ -61,11 +56,8 @@ export default tseslint.config(
       parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
     },
   },
-  // Before the budget block: eslint-config-prettier turns off `curly` and `max-len`,
-  // which are deliberately re-enabled below.
   prettier,
 
-  // Readability budget: the rules that keep the code from sliding back into dense one-liners.
   {
     plugins: { 'import-x': importX, unicorn },
     settings: {
@@ -96,7 +88,6 @@ export default tseslint.config(
         'error',
         { min: 2, exceptions: ['_', 'i', 'j', 'x', 'y'], properties: 'never' },
       ],
-      // `type` and `interface` are both fine; forcing interfaces drops implicit index signatures.
       '@typescript-eslint/consistent-type-definitions': 'off',
       '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'inline-type-imports' }],
       '@typescript-eslint/consistent-type-exports': 'error',
@@ -117,14 +108,12 @@ export default tseslint.config(
     },
   },
 
-  // Architecture: where files may live and what they may import.
   {
     files: ['src/**/*.ts'],
     plugins: { boundaries },
     settings: {
       'import/resolver': { typescript: { alwaysTryTypes: true } },
       'boundaries/include': ['src/**/*.ts'],
-      // Process entry points: role/command dispatch only.
       'boundaries/ignore': ['src/main.ts', 'src/cli.ts'],
       'boundaries/elements': [
         { type: 'app', pattern: 'src/app', partialMatch: false },
@@ -179,7 +168,6 @@ export default tseslint.config(
     },
   },
 
-  // Fastify route plugins and handlers are async by contract, whether or not they await.
   {
     files: ['src/**/*.routes.ts'],
     rules: { '@typescript-eslint/require-await': 'off' },

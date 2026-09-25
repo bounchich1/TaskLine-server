@@ -7,14 +7,11 @@ import { listTickets } from './ticket-list.js';
 import { TICKET_JOINS, TICKET_PROJECTION } from './ticket-projection.js';
 
 export interface MessagePage {
-  /** Messages with seq below this (older page). */
   before?: number;
-  /** Messages with seq above this (newer page, ascending). */
   after?: number;
   limit?: number;
 }
 
-/** Read side of tickets for the staff mini-app. */
 export class TicketQueries {
   constructor(
     private readonly db: Database,
@@ -25,7 +22,6 @@ export class TicketQueries {
     return listTickets(this.db, this.org, filters, countsOnly);
   }
 
-  /** A ticket with its rating/closure cycles and the attachments of sent messages. */
   async ticket(id: string) {
     const ticket = await one<Ticket>(
       this.db,
@@ -51,7 +47,6 @@ export class TicketQueries {
     return { ...ticket, closures, attachments };
   }
 
-  /** One page of the conversation, returned in ascending order. */
   async messages(id: string, { before, after, limit = 50 }: MessagePage = {}) {
     ensure(
       await one(this.db, 'SELECT id FROM tickets WHERE org_id=$1 AND id=$2', [this.org, id]),

@@ -8,9 +8,6 @@ import { serverFile } from '../../../shared/paths.js';
 import type { Resolution, TriageResult } from '../../../shared/types/ai.js';
 import type { Row } from '../../../shared/types/entities.js';
 
-// JSON contracts for model output (contracts/*.schema.json). Schema validation is followed by
-// checks the schema cannot express: known dictionary codes and evidence that was actually
-// supplied to the model.
 
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 
@@ -26,9 +23,7 @@ const validateResolution = ajv.compile(resolutionSchema as AnySchema);
 export interface TriageExpectations {
   dictionaryVersion: string;
   dictionaries: Row[];
-  /** Messages the model was shown; evidence must cite only these. */
   messageIds: string[];
-  /** Resolved cases the model retrieved during this triage. */
   memoryIds: string[];
 }
 
@@ -59,7 +54,6 @@ export function parseTriage(raw: string, expected: TriageExpectations): TriageRe
   return value;
 }
 
-/** A resolved outcome must name the steps taken, the observed result and the solution. */
 export function parseResolution(raw: string, evidenceIds: string[]): Resolution {
   const result = strictJson(raw);
   ensure(validateResolution(result), 'invalid_memory_schema', 422);

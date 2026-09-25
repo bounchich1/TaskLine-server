@@ -4,10 +4,6 @@ import type { ClaimedDelivery } from './claim.js';
 import type { DeliveryDeps } from './delivery.js';
 import type { SendOutcome } from './send.js';
 
-/**
- * Stores the send result unless the delivery changed hands meanwhile (a newer generation, or
- * the stale-send sweep marked it unknown), and mirrors it onto the chat message.
- */
 export async function recordOutcome(
   { db, ctx }: DeliveryDeps,
   { delivery, client }: ClaimedDelivery,

@@ -13,10 +13,6 @@ import { waitForSendSlot } from './send-rate.js';
 import { sendDelivery } from './send.js';
 import { markStaleSendsUnknown } from './stale-sends.js';
 
-/**
- * Sends queued deliveries to MAX, one client at a time and in chat order: claim the head in a
- * transaction, send it outside any transaction, then record the outcome.
- */
 export class DeliveryWorker {
   private readonly deps: DeliveryDeps;
 
@@ -29,12 +25,10 @@ export class DeliveryWorker {
     this.deps = { db, ctx: createCtx(config) };
   }
 
-  /** Rate limiter for MaxClient: waits for the next organization-wide send slot. */
   async rate(): Promise<void> {
     await waitForSendSlot(this.deps.db);
   }
 
-  /** Sends the client's next due delivery. Returns false when there was nothing to send. */
   async deliver(clientId: string): Promise<boolean> {
     const { db, ctx } = this.deps;
     const claimed = await db.tx(async (tx) => claimNextDelivery(tx, ctx, clientId));

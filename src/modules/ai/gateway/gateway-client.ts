@@ -11,7 +11,6 @@ import type { Model, ModelReply, ModelRequest } from './model.js';
 const MAX_RESPONSE_BYTES = 128 * 1024;
 const TIMEOUT_MS = 150000;
 
-/** The workers' Model: forwards each call to the gateway process. */
 export class GatewayClient implements Model {
   constructor(private readonly config: Config) {}
 

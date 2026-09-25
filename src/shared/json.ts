@@ -1,11 +1,6 @@
 const MAX_DEPTH = 40;
 const LITERAL = /^(true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)/;
 
-/**
- * Bounded JSON parser for untrusted input: size and depth limits, duplicate keys rejected,
- * objects without a prototype. With `losslessIds`, integers beyond 2^53 are returned as their
- * digits (MAX user and chat ids) instead of being rounded.
- */
 export function strictJson(text: string, losslessIds = false, maxBytes = 32768): unknown {
   if (Buffer.byteLength(text) > maxBytes) {
     throw new Error('json_too_large');
@@ -71,7 +66,6 @@ class StrictJsonParser {
     }
   }
 
-  /** A member name and the colon after it. */
   private memberName(seen: Set<string>): string {
     this.skipWhitespace();
     if (this.text.charAt(this.at) !== '"') {
@@ -110,7 +104,6 @@ class StrictJsonParser {
     }
   }
 
-  /** Finds the closing quote (skipping escapes); JSON.parse decodes the escapes. */
   private string(): string {
     const start = this.at++;
     while (this.at < this.text.length) {
@@ -148,10 +141,6 @@ class StrictJsonParser {
   }
 }
 
-/**
- * A scalar field of an external JSON payload as text, rendered exactly as String() renders
- * it. MAX sends ids and codes as strings or numbers.
- */
 export function jsonText(value: unknown): string {
   return String(value);
 }
@@ -163,7 +152,6 @@ export function object(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-/** A MAX numeric id as a decimal string; rejects numbers already rounded by JSON.parse. */
 export function decimalId(value: unknown): string {
   if (typeof value === 'number' && !Number.isSafeInteger(value)) {
     throw new Error('unsafe_id');

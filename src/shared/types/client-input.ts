@@ -1,4 +1,3 @@
-// A normalized inbound update from a client in MAX (produced by integrations/max).
 export type InputAttachment = {
   kind: 'image' | 'video' | 'file';
   filename: string;

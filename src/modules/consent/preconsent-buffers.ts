@@ -4,15 +4,11 @@ import { requireOne, type Sql } from '../../shared/db.js';
 import type { ClientInput } from '../../shared/types/client-input.js';
 import type { Client, Row } from '../../shared/types/entities.js';
 
-// Messages a client sends before consenting are held (encrypted, bounded) and replayed once
-// consent is granted, so the first description of the problem is not lost.
-
 const MAX_BUFFERED_MESSAGES = 5;
 const MAX_BUFFERED_BYTES = 65536;
 
 export type PreconsentBuffer = Row & { payload: string; expires_at: string; created_at: string };
 
-/** Holds the input if the client's buffer has room; returns false when it is full. */
 export async function bufferPreconsentInput(
   tx: Sql,
   ctx: Ctx,

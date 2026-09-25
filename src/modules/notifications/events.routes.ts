@@ -10,7 +10,6 @@ import { writeEventStreamHead } from './sse.js';
 
 const eventsQuery = z.object({ cursor: z.string().regex(/^\d+$/).optional() }).strict();
 
-/** The organization's newest committed event cursor. */
 async function latestCursor(db: Database, org: string): Promise<string> {
   const row = await one<{ cursor: string }>(
     db,
@@ -20,11 +19,6 @@ async function latestCursor(db: Database, org: string): Promise<string> {
   return row?.cursor ?? '0';
 }
 
-/**
- * Live UI updates (SSE). Resumes after `?cursor=` or the browser's `Last-Event-ID`; without
- * either, starts from now (a fresh client has just loaded everything, so history would only
- * repeat it).
- */
 export const eventsRoutes: FastifyPluginAsync<{ db: Database; config: Config }> = async (
   app,
   { db, config },

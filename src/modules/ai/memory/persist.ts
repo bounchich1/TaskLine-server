@@ -9,11 +9,6 @@ import {
   type MemoryRecord,
 } from './memory-record.js';
 
-/**
- * Writes a memory record to the external memory service and verifies it: read back, then
- * indexed for search. One writer per organization at a time. A write whose outcome is unknown
- * is never repeated automatically (see reconcileMemory).
- */
 export async function persistMemory(deps: MemoryDeps, id: string): Promise<void> {
   if (!deps.config.MEMORY_ENABLED) {
     throw new AppError('memory_disabled', 503);
@@ -26,7 +21,6 @@ export async function persistMemory(deps: MemoryDeps, id: string): Promise<void>
   try {
     if (!upstreamId) {
       const written = await writeUpstream(deps, record);
-      // From here on the write is known to exist upstream, even if recording it fails.
       upstreamId = written.id;
       await recordUpstream(deps, record, written);
     }
@@ -37,7 +31,6 @@ export async function persistMemory(deps: MemoryDeps, id: string): Promise<void>
   }
 }
 
-/** Marks the record as being written and takes the writer lock; null if nothing to do. */
 async function claimWrite(
   tx: Sql,
   { config }: MemoryDeps,
@@ -85,7 +78,6 @@ async function claimWrite(
 
 interface UpstreamWrite {
   id: string;
-  /** Older upstream memories the service merged into this one. */
   superseded: unknown[];
 }
 
@@ -100,7 +92,6 @@ async function writeUpstream(
   return { id: external.id, superseded };
 }
 
-/** Stores the upstream id, and every upstream id to delete if the record is ever removed. */
 async function recordUpstream(
   { db }: MemoryDeps,
   record: MemoryRecord,
@@ -128,10 +119,6 @@ export async function recordExternalRef(tx: Sql, recordId: string, upstreamId: u
   );
 }
 
-/**
- * Checks the upstream copy byte for byte, then whether search finds it yet. Not indexed yet:
- * the record stays pending and the job retries (`memory_index_pending`).
- */
 async function verifyAndFinalize(
   { db, config, upstream }: MemoryDeps,
   record: MemoryRecord,
@@ -153,7 +140,6 @@ async function finalizeRecord(
   org: string,
   { record, indexed }: { record: MemoryRecord; indexed: boolean },
 ): Promise<void> {
-  // Consent may have been withdrawn or the ticket reopened while writing.
   const live = await one(
     tx,
     `SELECT r.id ${RECORD_JOINS} WHERE r.org_id=$1 AND r.id=$2 AND NOT cl.invalidated
@@ -178,7 +164,6 @@ async function finalizeRecord(
   });
 }
 
-/** Without an upstream id the write may or may not have happened: mark it unknown. */
 async function releaseAfterFailure(
   { db, config }: MemoryDeps,
   record: MemoryRecord,

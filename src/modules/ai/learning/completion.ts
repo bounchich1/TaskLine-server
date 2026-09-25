@@ -8,10 +8,6 @@ import { LEARNING_SKILL } from '../skills.js';
 
 import type { LearningStep } from './evidence-reduction.js';
 
-/**
- * After the resolution is stored, the model receives the tool receipt and must acknowledge it
- * verbatim. This closes the tool-call exchange; it cannot change what was stored.
- */
 export async function acknowledgeReceipt(
   { model, job, checkpoints }: LearningStep,
   { record, coveredIds }: { record: Row; coveredIds: string[] },

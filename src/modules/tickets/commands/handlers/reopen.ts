@@ -8,10 +8,6 @@ import { addMessage } from '../../../messages/index.js';
 import { cancelCycleDeliveries, queueBotMessage } from '../../../outbox/index.js';
 import { requireOwner, type TicketCommand, type TicketCommandHandler } from '../command-context.js';
 
-/**
- * Reopen a closed ticket (or one awaiting its rating) with a reason. Starts a new lifecycle:
- * the rating cycle is abandoned and the previous resolution is withdrawn from learning.
- */
 export const reopen: TicketCommandHandler = async (tx, ctx, command) => {
   const { actor, client, ticket, body } = command;
   requireOwner(command);
@@ -39,13 +35,11 @@ export const reopen: TicketCommandHandler = async (tx, ctx, command) => {
   await queueBotMessage(tx, ctx, {
     client,
     template: 'ticket_reopened',
-    // `ticket.lifecycle` is the value before the UPDATE above.
     key: `reopened:${ticket.id}:${ticket.lifecycle + 1}`,
     ticket,
   });
 };
 
-/** A client has at most one open ticket (their single conversation with support). */
 async function ensureConversationSlotFree(
   tx: Sql,
   { client, ticket }: TicketCommand,
@@ -63,7 +57,6 @@ async function ensureConversationSlotFree(
   );
 }
 
-/** Reopened tickets go to the requested employee; support staff may only reopen to themselves. */
 async function resolveAssignee(tx: Sql, ctx: Ctx, { actor, body }: TicketCommand): Promise<string> {
   const assigneeId = typeof body.employee_id === 'string' ? body.employee_id : actor.id;
   if (actor.role === 'support') {

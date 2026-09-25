@@ -4,11 +4,6 @@ import { ensure } from '../../../shared/errors.js';
 import { serializeRecord, type MemoryDeps, type MemoryRecord } from './memory-record.js';
 import { persistMemory, recordExternalRef, releaseWriter } from './persist.js';
 
-/**
- * Operator action for a write whose outcome was unknown: finds the upstream copy by its
- * source-key marker, adopts it, then finishes persisting. Never writes again: absence upstream
- * cannot prove that a timed-out write will not still land.
- */
 export async function reconcileMemory(deps: MemoryDeps, id: string): Promise<void> {
   const { db, config, upstream } = deps;
   const org = config.ORG_ID;

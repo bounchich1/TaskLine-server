@@ -7,19 +7,13 @@ import { render } from '../templates/index.js';
 
 export interface BotMessage {
   client: Client;
-  /** Template code, also stored as the delivery kind. */
   template: string;
-  /** Logical key: the same key is never queued twice. */
   key: string;
-  /** When set, the text is also recorded in the ticket's conversation. */
   ticket?: Ticket;
-  /** Rating cycle the message belongs to; cancelled together with the cycle. */
   cycleId?: string;
-  /** Extra delivery body fields, e.g. a keyboard. */
   extra?: Row;
 }
 
-/** Queues a templated bot message to the client (sent later by the delivery worker). */
 export async function queueBotMessage(tx: Sql, ctx: Ctx, bot: BotMessage): Promise<void> {
   const { client, template, key, ticket, cycleId, extra = {} } = bot;
   if (await one(tx, 'SELECT id FROM deliveries WHERE logical_key=$1', [key])) {

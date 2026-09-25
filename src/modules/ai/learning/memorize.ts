@@ -26,11 +26,6 @@ export interface Memorization {
 
 type ToolCall = ModelReply['toolCalls'][number];
 
-/**
- * The final learning step: the model must call the memorize tool with a resolution citing
- * only snapshot messages. The resolution is stored locally and queued for the memory writer;
- * it becomes recallable only if the client confirmed the fix (see confirmedResolution).
- */
 export async function memorize(
   { db, ctx, model }: { db: Database; ctx: Ctx; model: Model },
   memorization: Memorization,
@@ -94,7 +89,6 @@ async function askForResolution(
   return answer.toolCalls[0];
 }
 
-/** What the mock model memorizes. */
 function insufficientEvidence(allIds: string[], missing: string[]): Resolution {
   return {
     schema_version: '1.0',
@@ -170,7 +164,6 @@ async function storeResolution(
   });
 }
 
-/** Idempotent per snapshot: a retried job finds the record it already stored. */
 async function insertRecord(
   tx: Sql,
   ctx: Ctx,

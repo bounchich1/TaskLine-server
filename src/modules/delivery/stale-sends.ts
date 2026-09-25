@@ -2,10 +2,6 @@ import { emit } from '../../shared/events.js';
 
 import type { DeliveryDeps } from './delivery.js';
 
-/**
- * Sends stuck in `sending` for 5 minutes belong to a worker that died mid-send. Whether MAX got
- * the message is unknown, so they are never retried automatically; staff resolve them manually.
- */
 export async function markStaleSendsUnknown({ db, ctx }: DeliveryDeps): Promise<void> {
   await db.tx(async (tx) => {
     const { rows } = await tx.query<{ message_id: string | null; ticket_id: string | null }>(

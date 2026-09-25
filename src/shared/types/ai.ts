@@ -1,4 +1,3 @@
-// Shapes of AI contract payloads (see contracts/*.schema.json).
 export type TriageResult = {
   schema_version: '1.0';
   dictionary_version: string;

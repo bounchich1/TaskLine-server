@@ -18,10 +18,6 @@ export interface ClientContent {
   receivedAt: string;
 }
 
-/**
- * A consenting client wrote to support. The message is a rating when their ticket awaits one;
- * otherwise it is appended to the open ticket, or starts a new ticket (queued for AI triage).
- */
 export async function handleClientContent(
   tx: Sql,
   ctx: Ctx,
@@ -108,7 +104,6 @@ async function createTicket(
   );
 }
 
-/** Records the client's files; each is downloaded and scanned by a background job. */
 async function storeAttachments(
   tx: Sql,
   ctx: Ctx,
@@ -169,7 +164,6 @@ async function announceNewTicket(
       },
     });
   }
-  // `ticket.version` already includes the bump from appending the first message.
   await emit(tx, ctx.org, {
     type: 'ticket.created',
     ticketId: ticket.id,

@@ -35,15 +35,12 @@ export function testConfig(): Config {
     ALTERNATIVE_CONTACT: 'Поддержка',
   });
 }
-/** In-memory PostgreSQL (PGlite) with the schema applied; every statement is traced. */
 async function memoryDb(): Promise<Database> {
   const pg = new PGlite();
   const adapt = (connection: Pick<PGlite, 'query' | 'exec'>): Sql => ({
-    // Same contract as Sql.query: the row type is the caller's claim.
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
     async query<T extends Record<string, unknown>>(sql: string, params: unknown[] = []) {
       traceSql(sql, params);
-      // Multi-statement scripts (the migration) need exec().
       if (!params.length && sql.includes(';')) {
         const results = await connection.exec(sql);
         const result = results.at(-1);
@@ -68,7 +65,6 @@ async function memoryDb(): Promise<Database> {
   await migrate(db);
   return db;
 }
-/** Positional arguments of the pre-refactor `Domain.command` that the tests still use. */
 type LegacyCommandArgs = [
   actor: Employee,
   ticketId: string,
@@ -78,7 +74,6 @@ type LegacyCommandArgs = [
   idempotencyKey: string,
 ];
 
-/** The pre-refactor `Domain` facade the tests are written against, over the new services. */
 function domainAdapter(db: Database, config: Config) {
   const inbox = new Inbox(db, config);
   const commands = new TicketCommands(db, config);
@@ -95,10 +90,6 @@ function domainAdapter(db: Database, config: Config) {
   };
 }
 
-/**
- * A seeded organization with a support employee (MAX user 1) and an admin (MAX user 2), plus
- * shortcuts that drive a client through the bot the way MAX would.
- */
 export async function fixture(existing?: Database, config = testConfig()) {
   const db = existing ?? (await memoryDb());
   await seed(db, config);
@@ -116,11 +107,11 @@ export async function fixture(existing?: Database, config = testConfig()) {
     [config.ORG_ID],
   );
   let seq = 0;
-  /** Routes the client's pending input until nothing is left. */
   const drain = async (clientId: string) => {
-    while (await domain.processClient(clientId)) {
-      /* one input per call */
-    }
+    let more: boolean;
+    do {
+      more = await domain.processClient(clientId);
+    } while (more);
   };
   const input = async (text: string, userId = '100') => {
     const key = `m-${randomUUID()}`;
@@ -140,7 +131,6 @@ export async function fixture(existing?: Database, config = testConfig()) {
     await drain(client.id);
     return client;
   };
-  /** Presses the latest "accept" consent button. */
   const accept = async (client: Client) => {
     const action = await requireOne(
       db,
@@ -158,7 +148,6 @@ export async function fixture(existing?: Database, config = testConfig()) {
     });
     await drain(client.id);
   };
-  /** The client's latest ticket, if any. */
   const findTicket = async (userId = '100') =>
     one<Ticket>(
       db,
@@ -166,7 +155,6 @@ export async function fixture(existing?: Database, config = testConfig()) {
        WHERE t.org_id=$1 AND c.max_user_id=$2 ORDER BY t.created_at DESC LIMIT 1`,
       [config.ORG_ID, userId],
     );
-  /** The client's latest ticket, which must exist. */
   const ticket = async (userId = '100') => {
     const found = await findTicket(userId);
     if (!found) {
@@ -174,13 +162,11 @@ export async function fixture(existing?: Database, config = testConfig()) {
     }
     return found;
   };
-  /** A client writes, accepts the consent request, and a ticket opens. */
   const create = async (text = 'Не работает подключение', userId = '100') => {
     const client = await input(text, userId);
     await accept(client);
     return ticket(userId);
   };
-  /** Runs a ticket command against the client's latest ticket at its current version. */
   const command = async (
     name: string,
     body: Record<string, unknown> = {},

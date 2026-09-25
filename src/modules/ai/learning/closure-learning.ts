@@ -12,7 +12,6 @@ import { memorize } from './memorize.js';
 import { takeSnapshot } from './snapshot.js';
 
 const MAX_CHUNKS = 512;
-/** Room left in the input budget for instructions and coverage metadata. */
 const PROMPT_RESERVE = 5000;
 
 export interface LearningDeps {
@@ -21,10 +20,6 @@ export interface LearningDeps {
   model: Model;
 }
 
-/**
- * Learning from a closed ticket, one model step per invocation: the queue job is re-run until
- * this returns true, so long conversations yield between chunks for fair model admission.
- */
 export async function runClosureLearning(deps: LearningDeps, job: Job): Promise<boolean> {
   const { db, ctx, model } = deps;
   if (!ctx.config.AI_ENABLED) {

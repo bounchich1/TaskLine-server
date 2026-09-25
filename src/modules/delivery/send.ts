@@ -20,21 +20,15 @@ export interface SendDeps {
 export interface SendOutcome {
   state: string;
   reason: string | null;
-  /** MAX message id, when the send succeeded. */
   ref: string | null;
   retryAfter: number;
 }
 
-/** Body written by queueCallbackAnswer; `callback_id` is absent when the update carried none. */
 type CallbackAnswerBody = Row & {
   callback_id?: string;
   notification: string;
 };
 
-/**
- * Performs the network side of a claimed delivery. Never throws: every failure, including a
- * missing file worker, becomes an outcome for recordOutcome.
- */
 export async function sendDelivery(
   deps: SendDeps,
   { delivery, client }: ClaimedDelivery,
@@ -64,7 +58,6 @@ function delivered(ref: string | null): SendOutcome {
   return { state: 'delivered', reason: null, ref, retryAfter: DEFAULT_RETRY_AFTER_SECONDS };
 }
 
-/** Replaces `attachment_ids` with MAX upload tokens for each file. */
 async function withUploadedAttachments(deps: SendDeps, deliveryBody: Row): Promise<Row> {
   const { attachment_ids: attachmentIds, ...body } = deliveryBody;
   if (!Array.isArray(attachmentIds) || !attachmentIds.length) {
@@ -88,7 +81,6 @@ async function uploadAttachment(max: MaxTransport, files: Files, id: string): Pr
   }
 }
 
-/** Rechecked after potentially slow media preparation, right before the customer send. */
 async function wasCanceledMeanwhile(db: Database, delivery: Delivery): Promise<boolean> {
   const current = await one(
     db,
@@ -113,7 +105,6 @@ function failureOutcome(error: unknown, attempts: number): SendOutcome {
   };
 }
 
-/** Retryable failures are retried with backoff up to the attempt limit, then give up. */
 function failureState(failure: TransportFailure, attempts: number): string {
   if (failure.outcome !== 'retry') {
     return failure.outcome;

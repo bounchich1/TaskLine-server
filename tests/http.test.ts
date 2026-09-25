@@ -10,8 +10,6 @@ import { one } from '../src/shared/db.js';
 import { fixture, testConfig } from './helpers.js';
 import { staffLogin } from './support/http-client.js';
 
-// HTTP routes, part 1: health, CORS, the staff session lifecycle, lookups and the SSE stream.
-
 let context: Awaited<ReturnType<typeof fixture>>;
 let app: Awaited<ReturnType<typeof buildApi>>;
 let storagePath: string;
@@ -108,7 +106,6 @@ it('lists employees, dictionaries, counts and notifications, and marks one read'
 });
 
 it('signs a local stand in on every reload', async () => {
-  // More than the 5 logins per launch that a replayed MAX launch gets.
   const tokens = new Set<string>();
   for (let reload = 0; reload < 7; reload++) {
     tokens.add((await login('1')).token);
@@ -116,7 +113,6 @@ it('signs a local stand in on every reload', async () => {
   expect(tokens.size).toBe(7);
 });
 
-/** Opens the SSE stream; `until` reads from it until the text so far contains a marker. */
 async function openEvents(path: string) {
   const { token } = await login('1');
   const address = await app.listen({ port: 0, host: '127.0.0.1' });
@@ -164,7 +160,6 @@ it('starts the SSE stream from now when no cursor is given', async () => {
   await context.create();
   const text = await stream.until('event: change');
   stream.close();
-  // Only events of the ticket created after connecting: the earlier ones are not replayed.
   const ids = [...text.matchAll(/^id: (\d+)$/gm)].map((match) => Number(match[1]));
   expect(ids.length).toBeGreaterThan(0);
   expect(Math.min(...ids)).toBeGreaterThan(Number(before?.cursor));

@@ -24,7 +24,6 @@ const LOOPBACK_ADDRESSES = ['127.0.0.1', '::1'];
 const maxLoginBody = z.object({ init_data: z.string().min(1).max(16384) }).strict();
 const devLoginBody = z.object({ user_id: z.string().regex(/^\d+$/) }).strict();
 
-/** Login (MAX launch or local dev), session info, logout and token rotation. */
 export const authRoutes: FastifyPluginAsync<AuthRouteOptions> = async (app, options) => {
   addMaxLogin(app, options);
   addDevLogin(app, options);
@@ -63,7 +62,6 @@ function verifyLaunchOrReject(initData: string, botToken: string): VerifiedLaunc
   }
 }
 
-/** Sign in as any employee by MAX user id: local development only, from loopback only. */
 function addDevLogin(app: FastifyInstance, { db, config }: AuthRouteOptions): void {
   app.post('/v1/auth/dev', async (request, reply) => {
     ensure(
@@ -74,8 +72,6 @@ function addDevLogin(app: FastifyInstance, { db, config }: AuthRouteOptions): vo
       404,
     );
     const { user_id: userId } = devLoginBody.parse(request.body);
-    // Every dev login is a launch of its own. The replay limit guards signed MAX launch data,
-    // which a dev login has none of; a local stand reloads far more than 5 times in 5 minutes.
     const issued = await issueSession(db, config, userId, hash(`dev:${userId}:${randomUUID()}`));
     reply.setCookie(SESSION_COOKIE, issued.token, {
       httpOnly: true,

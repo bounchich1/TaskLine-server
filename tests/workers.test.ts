@@ -10,8 +10,6 @@ import type { Row } from '../src/shared/types/entities.js';
 
 import { fixture } from './helpers.js';
 
-// Job outcomes (done, deferred, uncertain, failed, canceled) and periodic maintenance.
-
 let context: Awaited<ReturnType<typeof fixture>>;
 
 beforeEach(async () => {

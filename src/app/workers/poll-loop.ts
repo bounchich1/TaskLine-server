@@ -17,27 +17,18 @@ export interface PollDeps {
   queues: Queues;
 }
 
-/**
- * One sweep of the worker loop: route pending client input, send due deliveries, run
- * maintenance every 20th poll, and publish due jobs. Errors are swallowed: every step is
- * driven by database state, so the next sweep simply picks the work up again.
- */
 export async function pollOnce(deps: PollDeps, poll: number): Promise<void> {
-  try {
-    await processPendingInput(deps);
-    await sendDueDeliveries(deps);
-    if (poll % MAINTENANCE_EVERY_POLLS === 0) {
-      await deps.runner.maintenance();
-      await deps.deliveries.markStaleUnknown();
-    }
-    try {
-      await publishDueJobs(deps.db, deps.org, deps.queues);
-    } catch {
-      /* Broker loss cannot discard accepted DB work; next sweep reconstructs queue. */
-    }
-  } catch {
-    /* Health/diagnostic rows expose backlog; no content-bearing error logs. */
+  await sweep(deps, poll).catch(() => undefined);
+}
+
+async function sweep(deps: PollDeps, poll: number): Promise<void> {
+  await processPendingInput(deps);
+  await sendDueDeliveries(deps);
+  if (poll % MAINTENANCE_EVERY_POLLS === 0) {
+    await deps.runner.maintenance();
+    await deps.deliveries.markStaleUnknown();
   }
+  await publishDueJobs(deps.db, deps.org, deps.queues).catch(() => undefined);
 }
 
 async function processPendingInput({ db, org, inbox }: PollDeps): Promise<void> {
@@ -51,7 +42,6 @@ async function processPendingInput({ db, org, inbox }: PollDeps): Promise<void> 
   }
 }
 
-/** Different clients are sent to in parallel; each client's messages stay in order. */
 async function sendDueDeliveries({ db, org, deliveries }: PollDeps): Promise<void> {
   const { rows: clients } = await db.query<{ client_id: string }>(
     `SELECT DISTINCT client_id FROM deliveries

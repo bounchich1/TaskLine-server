@@ -7,10 +7,6 @@ import { clearPreconsentBuffers, grantConsent, listPreconsentBuffers } from '../
 import { queueBotMessage } from '../outbox/index.js';
 import { handleClientContent } from '../tickets/index.js';
 
-/**
- * The client pressed "agree": record consent, then replay the messages they sent before
- * consenting (those still within retention) as if they had just arrived.
- */
 export async function acceptConsent(
   tx: Sql,
   ctx: Ctx,

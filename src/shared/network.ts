@@ -5,7 +5,6 @@ import { Agent, fetch, type RequestInit, type Response } from 'undici';
 
 import { ensure } from './errors.js';
 
-/** Reads a response body as UTF-8, failing once it exceeds `limit` bytes. */
 export async function boundedText(response: Response, limit = 1024 * 1024): Promise<string> {
   const declared = Number(response.headers.get('content-length'));
   if (declared > limit) {
@@ -26,10 +25,6 @@ export async function boundedText(response: Response, limit = 1024 * 1024): Prom
   return Buffer.concat(chunks).toString('utf8');
 }
 
-/**
- * Non-public IPv4 blocks as [first octet, second octet from, to]: this network, private,
- * loopback, link-local, carrier-grade NAT and benchmarking ranges.
- */
 const NON_PUBLIC_IPV4: [number, number, number][] = [
   [0, 0, 255],
   [10, 0, 255],
@@ -41,11 +36,9 @@ const NON_PUBLIC_IPV4: [number, number, number][] = [
   [198, 18, 19],
 ];
 const MULTICAST_IPV4_FROM = 224;
-/** Unspecified/loopback, unique-local, link-local, multicast. */
 const NON_PUBLIC_IPV6 = /^(::|fc|fd|fe[89ab]|ff)/i;
 const DOCUMENTATION_IPV6 = '2001:db8:';
 
-/** Whether an IP literal is publicly routable (guards media fetches against SSRF). */
 export function publicAddress(address: string): boolean {
   const version = isIP(address);
   if (version === 4) {
@@ -62,7 +55,6 @@ export function publicAddress(address: string): boolean {
   }
   return false;
 }
-/** Media requests have no credentials, no redirects and a DNS-pinned public destination. */
 export async function mediaFetch(
   raw: string,
   allowedHosts: string[],

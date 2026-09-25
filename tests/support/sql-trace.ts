@@ -4,11 +4,6 @@ import { basename, join } from 'node:path';
 
 import { afterAll, expect } from 'vitest';
 
-// Refactoring safety net: with SQL_TRACE=<dir>, every statement the in-memory test database
-// runs is recorded per test and written to <dir>/<test-file>.json. Diffing two trace
-// directories shows whether a refactor changed which queries run, in what order, and with
-// which parameter shapes. Whitespace is stripped so reformatting SQL does not show up.
-
 const traceDir = process.env.SQL_TRACE;
 const traces = new Map<string, string[]>();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -25,7 +20,6 @@ function describeParam(value: unknown): string {
 
 function normalize(sql: string): string {
   const compact = sql.replace(/\s+/g, '');
-  // Multi-statement scripts (the migration) are large; a digest is enough to detect changes.
   return compact.length > 2000
     ? `script:${createHash('sha1').update(compact).digest('hex')}`
     : compact;

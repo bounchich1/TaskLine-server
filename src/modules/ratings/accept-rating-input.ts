@@ -12,13 +12,11 @@ const MAX_INVALID_ATTEMPTS = 3;
 
 export interface RatingInput {
   client: Client;
-  /** A ticket in `awaiting_rating`, locked by the caller. */
   ticket: Ticket;
   input: ClientInput;
   receivedAt: string;
 }
 
-/** Interprets a client message sent while their ticket awaits a 1–10 rating. */
 export async function acceptRatingInput(tx: Sql, ctx: Ctx, rating: RatingInput): Promise<void> {
   const { client, ticket, input } = rating;
   const cycle = await requireOne<Closure>(tx, 'SELECT * FROM closures WHERE id=$1 FOR UPDATE', [

@@ -9,7 +9,6 @@ const messageSchema = z
   })
   .strict();
 
-/** Body of the gateway's `POST /execute`, sent by GatewayClient. */
 export const executeRequestSchema = z
   .object({
     job_id: z.uuid(),

@@ -10,13 +10,8 @@ import { sessionToken } from '../../shared/http/request.js';
 const ALLOWED_METHODS = 'GET,POST,PUT,PATCH,DELETE,OPTIONS';
 const ALLOWED_HEADERS =
   'Content-Type,Authorization,X-CSRF-Token,Idempotency-Key,If-Match,Last-Event-ID';
-/** Login routes: the only /v1 routes reachable without a session. */
 const PUBLIC_API_ROUTES = ['/v1/auth/max', '/v1/auth/dev'];
 
-/**
- * CORS for the mini-app origin, preflight answers, and origin checks: /v1 mutations must come
- * from the mini-app. Added on the root instance so it also covers unknown routes.
- */
 export function addOriginHook(app: FastifyInstance, config: Config): void {
   app.addHook('onRequest', async (request, reply) => {
     const origin = request.headers.origin;
@@ -43,10 +38,6 @@ export function addOriginHook(app: FastifyInstance, config: Config): void {
   });
 }
 
-/**
- * Attaches the staff session to every /v1 request except login (unknown /v1 routes answer 401,
- * not 404) and checks the CSRF token on mutations.
- */
 export function addSessionHook(app: FastifyInstance, db: Database, config: Config): void {
   app.addHook('preHandler', async (request) => {
     if (!request.url.startsWith('/v1/') || PUBLIC_API_ROUTES.includes(request.url)) {

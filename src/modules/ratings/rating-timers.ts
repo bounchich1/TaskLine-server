@@ -12,7 +12,6 @@ interface DueCycle {
   cycle: Closure;
 }
 
-/** Periodic sweep: expires rating cycles past their deadline and sends the one-time reminder. */
 export class RatingTimers {
   private readonly ctx: Ctx;
 
@@ -73,7 +72,6 @@ async function processDueCycle(tx: Sql, ctx: Ctx, clientId: string): Promise<voi
 }
 
 async function expireCycle(tx: Sql, ctx: Ctx, { client, ticket, cycle }: DueCycle): Promise<void> {
-  // A rating received before the deadline but not yet routed must win over expiry.
   const pendingInput = await one(
     tx,
     "SELECT id FROM inbox WHERE client_id=$1 AND state='pending' AND received_at<=$2 LIMIT 1",

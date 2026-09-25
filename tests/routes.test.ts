@@ -4,9 +4,6 @@ import { buildApi } from '../src/app/http/build-api.js';
 
 import { fixture } from './helpers.js';
 
-// Refactoring safety net: the HTTP surface (paths and methods) must not change while routes move
-// into feature modules. The route tree is flattened and sorted so registration order is irrelevant.
-
 let context: Awaited<ReturnType<typeof fixture>>;
 let app: Awaited<ReturnType<typeof buildApi>>;
 
@@ -30,7 +27,6 @@ function flattenRouteTree(tree: string): string[] {
       continue;
     }
     const [, indent = '', segment = ''] = match;
-    // The method group is optional: intermediate tree nodes have no handlers of their own.
     const methods = match.at(3);
     const depth = indent.length / 4;
     const path = (depth > 0 ? (prefixes[depth - 1] ?? '') : '') + segment;

@@ -76,7 +76,6 @@ describe('strict JSON and MAX identifiers', () => {
     expect(normalizeUpdate(raw).kind).toBe('unknown');
   });
   it('normalizes lossless direct messages', () => {
-    // Hand-written: JSON.stringify cannot produce integers beyond 2^53.
     const raw =
       '{"update_type":"message_created","message":{"sender":{"user_id":9223372036854775807},' +
       '"recipient":{"chat_id":9223372036854775806,"chat_type":"dialog"},' +

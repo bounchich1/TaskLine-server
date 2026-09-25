@@ -22,7 +22,6 @@ const messagePageQuery = z
   })
   .strict();
 
-/** The ticket queue, a ticket with its conversation, and one route per ticket command. */
 export const ticketRoutes: FastifyPluginAsync<TicketRouteOptions> = async (app, options) => {
   addQueryRoutes(app, options.queries);
   addCommandRoutes(app, options.commands);
@@ -44,14 +43,12 @@ function addQueryRoutes(app: FastifyInstance, queries: TicketQueries): void {
   });
 }
 
-/** `PATCH /v1/tickets/:id/classification`, and `POST /v1/tickets/:id/<command>` for the rest. */
 function addCommandRoutes(app: FastifyInstance, commands: TicketCommands): void {
   for (const [name, schema] of Object.entries(COMMAND_SCHEMAS)) {
     app.route({
       method: name === 'classification' ? 'PATCH' : 'POST',
       url: `/v1/tickets/:id/${name}`,
       handler: async (request, reply) => {
-        // Read order decides which validation error wins (see shared/http/request.ts).
         const ticketId = paramsId(request);
         const body = schema.parse(request.body ?? {}) as Row;
         const result = await commands.run({

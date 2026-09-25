@@ -32,14 +32,8 @@ export interface LearningStep {
   checkpoints: CheckpointStore;
 }
 
-/** Either the evidence for memorization, or "one model step done, yield and resume". */
 export type EvidenceProgress = { ready: true; evidence: unknown } | { ready: false };
 
-/**
- * A conversation too long for one prompt is summarized chunk by chunk, then the summaries are
- * merged pairwise until they fit. One model call per invocation; progress lives in checkpoints
- * keyed `chunk-<i>` and `reduce-<round>-<i>`.
- */
 export async function gatherEvidence(
   step: LearningStep,
   { entries, chunks, limit }: { entries: SnapshotEntry[]; chunks: Part[][]; limit: number },
@@ -131,7 +125,6 @@ async function summarize(
     'forged_chunk_evidence',
     422,
   );
-  // Coverage comes from the assigned input, never from the model's choice of cited messages.
   await checkpoints.save(key, {
     value: output,
     coveredIds: unique,

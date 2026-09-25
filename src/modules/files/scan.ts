@@ -14,10 +14,6 @@ import { createTempFile } from './temp-file.js';
 
 const MAX_EXTRACTED_TEXT = 32000;
 
-/**
- * Background job: checks a quarantined file's real type, scans it for malware and, for plain
- * text, extracts its content for AI triage. Only a clean file becomes usable.
- */
 export async function scanAttachment(deps: FileDeps, id: string): Promise<void> {
   const { db, ctx, storage } = deps;
   const file = await one<Attachment>(db, 'SELECT * FROM attachments WHERE org_id=$1 AND id=$2', [
@@ -67,7 +63,6 @@ async function markClean(
   const extracted = text === null ? null : text.slice(0, MAX_EXTRACTED_TEXT);
   const coverage = extractionCoverage(text);
   await db.tx(async (tx) => {
-    // Consent may have been withdrawn while the scan ran.
     if (!(await ticketHasValidConsent(tx, file.ticket_id))) {
       await tx.query("UPDATE attachments SET status='canceled' WHERE id=$1", [file.id]);
       return;

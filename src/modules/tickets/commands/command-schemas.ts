@@ -10,7 +10,6 @@ const classificationRevisions = z
   })
   .strict();
 
-/** Request body of each ticket command, keyed by command (and route) name. */
 export const COMMAND_SCHEMAS: Readonly<Record<string, z.ZodType>> = {
   assign: z.object({}).strict(),
   transfer: z.object({ employee_id: uuid, comment: z.string().trim().min(1).max(2000) }).strict(),

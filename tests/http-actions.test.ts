@@ -12,8 +12,6 @@ import { one } from '../src/shared/db.js';
 import { fixture, testConfig } from './helpers.js';
 import { staffLogin, uploadNote } from './support/http-client.js';
 
-// HTTP routes, part 2: delivery resolution, uploads and downloads, the admin console and dev inbound.
-
 let context: Awaited<ReturnType<typeof fixture>>;
 let app: Awaited<ReturnType<typeof buildApi>>;
 let storagePath: string;

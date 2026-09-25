@@ -24,20 +24,17 @@ import {
 
 export interface AdminRequest {
   actor: Employee;
-  /** Unvalidated request body. */
   body: unknown;
   expectedVersion: number;
   idempotencyKey: string;
 }
 
-/** Administration of staff, dictionaries, bot templates and organization settings. */
 export class Admin {
   constructor(
     private readonly db: Database,
     private readonly org: string,
   ) {}
 
-  /** Creates an employee (no `employeeId`) or updates one. */
   async employee(request: AdminRequest & { employeeId?: string }) {
     const { employeeId, expectedVersion } = request;
     const body = employeeBody.parse(request.body);

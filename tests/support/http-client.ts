@@ -5,7 +5,6 @@ import { expect } from 'vitest';
 
 export type StaffHeaders = (extra?: Record<string, string>) => Record<string, string>;
 
-/** Signs in through dev auth; the returned function builds headers for one mutating request. */
 export async function staffLogin(
   app: FastifyInstance,
   origin: string,
@@ -29,7 +28,6 @@ export async function staffLogin(
   return { headers, token };
 }
 
-/** Uploads a small text file through the two-step upload API; returns the attachment id. */
 export async function uploadNote(
   app: FastifyInstance,
   headers: StaffHeaders,

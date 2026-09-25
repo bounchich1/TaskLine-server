@@ -2,19 +2,12 @@ import { requireOne, type Sql } from './db.js';
 import { ensure } from './errors.js';
 import type { Row } from './types/entities.js';
 
-// Idempotent staff mutations: a client-supplied Idempotency-Key is stored with a hash of the
-// request, and the first response is replayed for retries with the same key.
-
 export interface CommandKey {
   principal: string;
   route: string;
   key: string;
 }
 
-/**
- * Claims the key (or finds the earlier claim) and locks it. Reusing a key for a different request
- * is a conflict. Returns the stored response when this is a retry of a completed request.
- */
 export async function claimCommandKey(
   tx: Sql,
   commandKey: CommandKey,

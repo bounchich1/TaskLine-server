@@ -7,10 +7,6 @@ import { queueCallbackAnswer } from '../outbox/index.js';
 
 import { acceptConsent } from './accept-consent.js';
 
-/**
- * An inline button was pressed. Buttons are single-use nonces; the press is always answered
- * (MAX expects it), but only an unused button for the current policy has an effect.
- */
 export async function handleCallback(
   tx: Sql,
   ctx: Ctx,

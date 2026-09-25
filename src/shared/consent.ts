@@ -1,9 +1,5 @@
 import { one, type Sql } from './db.js';
 
-/**
- * Whether the ticket's client still consents under the revision the ticket was opened with.
- * Work on client data (files, AI) must stop as soon as this turns false.
- */
 export async function ticketHasValidConsent(db: Sql, ticketId: string): Promise<boolean> {
   const ticket = await one(
     db,

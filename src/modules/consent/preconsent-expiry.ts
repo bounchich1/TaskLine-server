@@ -6,7 +6,6 @@ import { one, type Database, type Sql } from '../../shared/db.js';
 import type { Client } from '../../shared/types/entities.js';
 import { queueBotMessage } from '../outbox/index.js';
 
-/** Periodic sweep: drops held pre-consent messages past their retention and tells the client. */
 export class PreconsentExpiry {
   private readonly ctx: Ctx;
 

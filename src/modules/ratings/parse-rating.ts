@@ -1,4 +1,3 @@
-/** Grammar is deliberately independent of the language model. */
 export function parseRating(raw: string): number | null {
   const text = raw.normalize('NFC').replace(/\s/gu, ' ').trim();
   if (

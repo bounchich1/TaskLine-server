@@ -13,7 +13,6 @@ import { createQueues, createRedisConnections, QUEUE_CONCURRENCY, QUEUE_NAMES } 
 const POLL_INTERVAL_MS = 250;
 const LOCK_DURATION_MS = 180000;
 
-/** Starts the worker process (queue consumers plus the poll loop); returns its shutdown. */
 export function startWorkers(db: Database, config: Config): () => Promise<void> {
   const { producer, consumer } = createRedisConnections(config.REDIS_URL);
   const queues = createQueues(producer);
@@ -30,9 +29,7 @@ export function startWorkers(db: Database, config: Config): () => Promise<void> 
       concurrency: QUEUE_CONCURRENCY[name],
       lockDuration: LOCK_DURATION_MS,
     });
-    worker.on('error', () => {
-      /* Not logged: a failed job is recorded in the jobs table by JobRunner. */
-    });
+    worker.on('error', () => undefined);
     return worker;
   });
   const deps = { db, org: config.ORG_ID, inbox: new Inbox(db, config), deliveries, runner, queues };

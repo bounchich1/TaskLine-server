@@ -14,7 +14,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Format, lint (incl. architecture boundaries), typecheck, knip, unit tests, build.
       - run: npm run check
 
   integration:

@@ -10,7 +10,6 @@ import { TICKET_JOINS, TICKET_PROJECTION } from './ticket-projection.js';
 const OPEN_STATUSES = "t.status IN('open','in_progress')";
 const CLOSED_STATUSES = "t.status IN('awaiting_rating','closed')";
 
-/** Primary sort score per sort option (higher first); ties break by creation date, then id. */
 const SORT_SCORES: Record<Filters['sort'], string> = {
   urgency: 'coalesce(du.rank,0)',
   complexity: 'coalesce(dc.rank,0)',
@@ -21,10 +20,6 @@ const SORT_SCORES: Record<Filters['sort'], string> = {
 
 const cursorSchema = z.tuple([z.number(), z.number(), z.uuid()]);
 
-/**
- * The ticket queue: filtered, sorted and keyset-paginated. Tab counts ignore the tab and the
- * page, so they are computed before those conditions are added.
- */
 export async function listTickets(db: Sql, org: string, filters: Filters, countsOnly = false) {
   const conditions = filterConditions(org, filters);
   const counts = await one(

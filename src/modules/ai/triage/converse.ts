@@ -8,7 +8,6 @@ import type { Recall } from '../memory/memory-record.js';
 import { RECALL_TOOLS, RecallSession } from './recall-session.js';
 
 const MAX_TURNS = 3;
-/** Capacity problems: the job is retried later instead of storing a fallback. */
 const RETRY_LATER_CODES = ['ai_busy', 'gateway_unavailable'];
 const REPAIR_PROMPT =
   'Invalid schema or evidence. Return one corrected JSON object using only the supplied ' +
@@ -20,21 +19,15 @@ export interface Conversation {
   messageId: string;
   dictionaryVersion: string;
   dictionaries: Row[];
-  /** Stored when the model gives no valid answer; also what the mock model answers. */
   fallback: TriageResult;
 }
 
 export interface TriageOutcome {
   result: TriageResult;
   success: boolean;
-  /** Why triage failed (audited); meaningful only when `success` is false. */
   failure: string;
 }
 
-/**
- * Up to three model turns, each either a recall tool call or the answer. An invalid answer
- * gets exactly one repair attempt. Any other failure yields the fallback suggestion.
- */
 export async function converse(
   deps: { model: Model; memory: Recall },
   conversation: Conversation,

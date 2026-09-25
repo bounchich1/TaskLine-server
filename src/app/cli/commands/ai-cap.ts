@@ -3,7 +3,6 @@ import { ensure } from '../../../shared/errors.js';
 import { audit } from '../../../shared/events.js';
 import type { CliCommand } from '../cli-command.js';
 
-/** `ai-cap <10..15>`: changes the global AI concurrency cap; lowering it needs free permits. */
 export const aiCapCommand: CliCommand = async ({ db, config, args }) => {
   const cap = Number(args[0]);
   ensure(Number.isInteger(cap) && cap >= 10 && cap <= 15, 'invalid_cap', 422);

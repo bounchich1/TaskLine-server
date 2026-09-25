@@ -10,12 +10,10 @@ import type { ModelReply } from './model.js';
 export interface CallRequest {
   job: Job;
   step: string;
-  /** Hash of the model request: a retried step must ask exactly the same thing. */
   digest: string;
   callId: string;
 }
 
-/** A concurrency slot held for one call; `generation` guards against releasing a reused slot. */
 export interface Permit {
   slot: number;
   generation: number;
@@ -23,11 +21,6 @@ export interface Permit {
 
 export type Admission = { cached: ModelReply } | Permit;
 
-/**
- * Admits one model call: the job must still be running and eligible, and each (job, step) is
- * called at most once. A completed step replays its stored reply; a failed or uncertain one
- * needs an operator. Otherwise takes a free permit, if the configured cap allows.
- */
 export async function admitCall(tx: Sql, ctx: Ctx, call: CallRequest): Promise<Admission> {
   const { job, step } = call;
   const current = await one<Job>(tx, 'SELECT * FROM jobs WHERE id=$1 AND org_id=$2 FOR UPDATE', [
@@ -62,7 +55,6 @@ function replayPrevious(previous: Row, digest: string, encryptionKey: string): M
 async function takePermit(tx: Sql, ctx: Ctx, call: CallRequest): Promise<Permit> {
   const settings = await one(tx, 'SELECT cap FROM ai_settings WHERE id=1 FOR UPDATE');
   ensure(settings, 'ai_not_initialized', 503);
-  // Count every occupied slot, including uncertain slots above a reduced cap.
   const occupied = await requireOne(
     tx,
     "SELECT count(*)::int AS n FROM ai_permits WHERE state<>'free'",

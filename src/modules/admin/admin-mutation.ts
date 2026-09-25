@@ -8,18 +8,12 @@ import type { Employee, Row } from '../../shared/types/entities.js';
 
 export interface AdminMutation {
   actor: Employee;
-  /** Audit action and idempotency scope, e.g. `admin.template:ticket_closed`. */
   route: string;
   body: Row;
   expectedVersion: number;
   idempotencyKey: string;
 }
 
-/**
- * Envelope for every admin change: admin-only, idempotent, audited and announced to the UI.
- * Admin mutations serialize on the organization row (e.g. so two admins cannot demote each
- * other concurrently and leave no administrator).
- */
 export async function runAdminMutation(
   db: Database,
   org: string,
@@ -51,10 +45,6 @@ export async function runAdminMutation(
   });
 }
 
-/**
- * Audit object id: the body's `id`, else its `code` (dictionary entries), else the organization.
- * Note: employee bodies carry neither, so employee changes are audited against the organization.
- */
 function auditObjectId(body: Row, org: string): string {
   const id = body.id ?? body.code;
   return typeof id === 'string' ? id : org;

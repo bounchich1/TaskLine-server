@@ -1,9 +1,5 @@
 import { requireOne, type Database } from '../../shared/db.js';
 
-/**
- * Waits for this process's turn in the organization-wide MAX send budget: one request every
- * 40 ms, coordinated through a shared row so every worker process respects it.
- */
 export async function waitForSendSlot(db: Database): Promise<void> {
   const result = await db.tx(async (tx) =>
     requireOne(

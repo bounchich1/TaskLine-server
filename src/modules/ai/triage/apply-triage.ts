@@ -13,11 +13,6 @@ import type { TriageOutcome } from './converse.js';
 const FIELDS = ['tag', 'urgency', 'complexity'] as const;
 const DEFAULT_CODES = { tag: 'undefined', urgency: 'medium', complexity: 'medium' };
 
-/**
- * Stores the suggestion on the ticket (locking client, then ticket) if the job is still
- * eligible. Classification fields staff changed since triage started are left alone. If the
- * client edited the first message meanwhile, the suggestion is marked stale instead.
- */
 export async function applyTriage(
   tx: Sql,
   ctx: Ctx,
@@ -73,10 +68,6 @@ async function lockTicket(tx: Sql, ctx: Ctx, job: Job): Promise<Ticket | undefin
   ]);
 }
 
-/**
- * Replaces codes that are no longer active with defaults (returns false if any was), and
- * writes each field whose revision still matches the one triage started from.
- */
 async function applyClassification(
   tx: Sql,
   ctx: Ctx,

@@ -12,7 +12,6 @@ export function validateTemplate(body: string): void {
   }
 }
 
-/** Renders a bot message: the organization's override if any, else the built-in text. */
 export async function render(
   db: Sql,
   org: string,

@@ -3,7 +3,6 @@ import { ZodError } from 'zod';
 
 import { AppError } from '../../shared/errors.js';
 
-/** What Fastify, zod, pg and our own code may throw into a handler. */
 type HandlerError = Error & { code?: string; statusCode?: number; validation?: unknown };
 
 interface ErrorResponse {
@@ -13,10 +12,6 @@ interface ErrorResponse {
   retryable: boolean;
 }
 
-/**
- * Maps errors to the API's error shape `{ code, message, request_id, retryable }`. Anything not
- * recognised is logged (without details that could leak data) and reported as a retryable 503.
- */
 export function handleError(
   error: HandlerError,
   request: FastifyRequest,

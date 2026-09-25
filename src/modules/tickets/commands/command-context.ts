@@ -4,7 +4,6 @@ import { ensure } from '../../../shared/errors.js';
 import { canActOnTicket } from '../../../shared/staff.js';
 import type { Client, Employee, Row, Ticket } from '../../../shared/types/entities.js';
 
-/** A staff command after its target client and ticket are locked and validated. */
 export interface TicketCommand {
   actor: Employee;
   client: Client;

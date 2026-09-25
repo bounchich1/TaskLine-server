@@ -27,10 +27,6 @@ export const RECALL_TOOLS: Row[] = [
 const searchArgs = z.object({ query: z.string().min(1).max(2000) }).strict();
 const expandArgs = z.object({ ids: z.array(z.string()).max(3) }).strict();
 
-/**
- * The model's access to past cases during one triage: at most one search, then at most one
- * expansion of ids from that search, one tool call per turn.
- */
 export class RecallSession {
   private cases: CaseEvidence[] = [];
   private calls = 0;
@@ -43,12 +39,10 @@ export class RecallSession {
     return this.calls < MAX_TOOL_CALLS;
   }
 
-  /** Ids of the cases the model has seen; the only memory evidence it may cite. */
   get caseIds(): string[] {
     return this.cases.map((evidence) => evidence.id);
   }
 
-  /** Runs the tool the model asked for and appends the exchange to the conversation. */
   async answer(reply: ModelReply, messages: ModelMessage[]): Promise<void> {
     ensure(reply.toolCalls.length === 1 && this.calls < MAX_TOOL_CALLS, 'ai_tool_budget', 422);
     this.calls++;
@@ -81,7 +75,6 @@ export class RecallSession {
     throw new AppError('forbidden_ai_tool', 422);
   }
 
-  /** A memory outage is reported to the model, which then triages without past cases. */
   private async search(args: Row): Promise<unknown> {
     ensure(!this.searched, 'ai_tool_budget', 422);
     this.searched = true;

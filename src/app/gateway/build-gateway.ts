@@ -8,10 +8,6 @@ import { AppError } from '../../shared/errors.js';
 
 const MAX_BODY_BYTES = 512 * 1024;
 
-/**
- * The AI gateway process: the only holder of the provider API key. Workers call `/execute`
- * with the shared gateway secret; errors come back as `{ code }` with the matching status.
- */
 export async function buildGateway(db: Database, config: Config): Promise<FastifyInstance> {
   const app = Fastify({ bodyLimit: MAX_BODY_BYTES, logger: false });
   const gateway = new Gateway(db, config);

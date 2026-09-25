@@ -23,12 +23,10 @@ async function claim(kind: string) {
 }
 const noRecall = { search: () => Promise.resolve([]), expand: () => Promise.resolve([]) };
 
-/** The external memory service, in memory. */
 class FakeMemory implements MemoryTransport {
   records = new Map<string, Row>();
   calls = 0;
   unknown = false;
-  /** With `unknown` set, the write lands but the call fails, like a timeout after commit. */
   remember(content: string, project: string) {
     const memory = { id: `mem_${++this.calls}`, content, project };
     this.records.set(memory.id, memory);

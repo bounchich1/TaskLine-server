@@ -14,9 +14,6 @@ import { one } from '../src/shared/db.js';
 
 import { fixture, testConfig } from './helpers.js';
 
-// End-to-end attachment pipeline through public entry points only: HTTP upload, the scan job,
-// and sending a staff reply with the attachment through the delivery worker.
-
 let context: Awaited<ReturnType<typeof fixture>>;
 let app: Awaited<ReturnType<typeof buildApi>>;
 let storagePath: string;
@@ -109,8 +106,6 @@ it('scans an upload clean and sends it with a staff reply', async () => {
     new MaxClient(context.c),
     new Files(context.db, context.c),
   );
-  // Drain the client's queue in order (bot messages, then the reply with the file). The worker
-  // keeps sends to one client at least 550 ms apart, so wait between attempts.
   for (let attempt = 0; attempt < 10 && (await staffDeliveryState()) !== 'delivered'; attempt++) {
     await worker.deliver(ticket.client_id);
     await new Promise((resolve) => setTimeout(resolve, 600));
@@ -124,8 +119,6 @@ it('rejects content that does not match the declared kind, and infected files', 
   const fakeImage = await upload(ticket.id, { name: 'photo.png', kind: 'image', content: 'text' });
   await runScanJob(fakeImage);
   expect(await status(fakeImage)).toBe('rejected');
-  // The mock scanner flags this marker. Deliberately not the full EICAR test string: real
-  // antivirus (e.g. Windows Defender) would quarantine the temp file mid-upload.
   const marker = 'EICAR-STANDARD-ANTIVIRUS-TEST-FILE';
   const infected = await upload(ticket.id, { name: 'virus.txt', kind: 'file', content: marker });
   await runScanJob(infected);

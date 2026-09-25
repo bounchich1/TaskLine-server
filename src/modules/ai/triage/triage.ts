@@ -19,10 +19,6 @@ export interface TriageDeps {
   memory: Recall;
 }
 
-/**
- * First-response triage of a new ticket: suggested classification and solution from the first
- * message (redacted) and similar resolved cases. The result is a suggestion for staff.
- */
 export async function runTriage(deps: TriageDeps, job: Job): Promise<void> {
   const conversation = await startConversation(deps, job);
   if (!conversation) {
@@ -80,7 +76,6 @@ async function startConversation(
   return { job, messages, messageId: message.id, dictionaryVersion, dictionaries, fallback };
 }
 
-/** Cited cases must still be recallable when the suggestion is stored (e.g. not reopened). */
 async function dropStaleMemoryEvidence(
   memory: Recall,
   { outcome, conversation }: { outcome: TriageOutcome; conversation: Conversation },

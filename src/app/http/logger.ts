@@ -2,10 +2,6 @@ import type { FastifyServerOptions } from 'fastify';
 
 import type { Config } from '../../shared/config.js';
 
-/**
- * Request logging without secrets: auth headers and cookies are redacted, query strings are
- * dropped, and download-grant URLs (which are bearer secrets) are masked.
- */
 export function loggerOptions(config: Config): FastifyServerOptions['logger'] {
   if (config.NODE_ENV === 'test') {
     return false;

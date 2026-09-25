@@ -10,11 +10,6 @@ export interface ClaimedDelivery {
   client: Client;
 }
 
-/**
- * Takes the client's next delivery for sending, in chat order. Returns null when there is
- * nothing due, a send is already in flight, or the head was canceled because its sender lost
- * the right to send it.
- */
 export async function claimNextDelivery(
   tx: Sql,
   ctx: Ctx,
@@ -39,7 +34,6 @@ export async function claimNextDelivery(
   return { delivery: await markSending(tx, head, client), client };
 }
 
-/** The oldest open delivery, if it is due and the per-client send spacing has elapsed. */
 async function findDueHead(tx: Sql, ctx: Ctx, client: Client): Promise<Delivery | undefined> {
   const head = await one<Delivery>(
     tx,
@@ -59,10 +53,6 @@ async function findDueHead(tx: Sql, ctx: Ctx, client: Client): Promise<Delivery 
   return due ? head : undefined;
 }
 
-/**
- * Staff replies need the ticket still in progress, consent still granted and the same, still
- * permitted employee version; rating prompts need their closure cycle still open.
- */
 async function isStillAuthorized(
   tx: Sql,
   ctx: Ctx,
