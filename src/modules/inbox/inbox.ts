@@ -9,51 +9,54 @@ import { routeClientInput } from './dialog-router.js';
 import { recordInput } from './record-input.js';
 
 interface Receipt {
-  [column: string]: unknown;
-  id: string;
-  payload: string;
-  received_at: string;
+    [column: string]: unknown;
+    id: string;
+    payload: string;
+    received_at: string;
 }
 
 export class Inbox {
-  private readonly ctx: Ctx;
+    private readonly ctx: Ctx;
 
-  constructor(
-    private readonly db: Database,
-    config: Config,
-  ) {
-    this.ctx = createCtx(config);
-  }
+    constructor(
+        private readonly db: Database,
+        config: Config,
+    ) {
+        this.ctx = createCtx(config);
+    }
 
-  async ingest(input: ClientInput): Promise<void> {
-    await this.db.tx((tx) => recordInput(tx, this.ctx, input));
-  }
+    async ingest(input: ClientInput): Promise<void> {
+        await this.db.tx((tx) => recordInput(tx, this.ctx, input));
+    }
 
-  async processClient(clientId: string): Promise<boolean> {
-    return this.db.tx(async (tx) => {
-      const client = await one<Client>(
-        tx,
-        'SELECT * FROM clients WHERE org_id=$1 AND id=$2 FOR UPDATE',
-        [this.ctx.org, clientId],
-      );
-      if (!client) {
-        return false;
-      }
-      const receipt = await one<Receipt>(
-        tx,
-        `SELECT * FROM inbox WHERE org_id=$1 AND client_id=$2 AND state='pending'
+    async processClient(clientId: string): Promise<boolean> {
+        return this.db.tx(async (tx) => {
+            const client = await one<Client>(tx, 'SELECT * FROM clients WHERE org_id=$1 AND id=$2 FOR UPDATE', [
+                this.ctx.org,
+                clientId,
+            ]);
+
+            if (!client) {
+                return false;
+            }
+
+            const receipt = await one<Receipt>(
+                tx,
+                `SELECT * FROM inbox WHERE org_id=$1 AND client_id=$2 AND state='pending'
          ORDER BY ingress_seq LIMIT 1 FOR UPDATE`,
-        [this.ctx.org, client.id],
-      );
-      if (!receipt) {
-        return false;
-      }
-      const input = decrypt<ClientInput>(receipt.payload, this.ctx.config.ENCRYPTION_KEY);
-      await routeClientInput(tx, this.ctx, { client, input, receivedAt: receipt.received_at });
-      await tx.query("UPDATE inbox SET state='done',payload=NULL,processed_at=now() WHERE id=$1", [
-        receipt.id,
-      ]);
-      return true;
-    });
-  }
+                [this.ctx.org, client.id],
+            );
+
+            if (!receipt) {
+                return false;
+            }
+
+            const input = decrypt<ClientInput>(receipt.payload, this.ctx.config.ENCRYPTION_KEY);
+
+            await routeClientInput(tx, this.ctx, { client, input, receivedAt: receipt.received_at });
+            await tx.query("UPDATE inbox SET state='done',payload=NULL,processed_at=now() WHERE id=$1", [receipt.id]);
+
+            return true;
+        });
+    }
 }

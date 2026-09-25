@@ -12,207 +12,200 @@ import tseslint from 'typescript-eslint';
 
 /** @type {Record<string, string[]>} */
 const MODULE_DEPENDENCIES = {
-  templates: [],
-  learning: [],
-  dictionaries: [],
-  staff: [],
-  files: [],
-  messages: ['learning'],
-  outbox: ['templates', 'messages'],
-  ratings: ['outbox'],
-  consent: ['outbox', 'learning'],
-  tickets: ['messages', 'outbox', 'ratings', 'learning', 'dictionaries'],
-  inbox: ['consent', 'tickets', 'messages', 'outbox'],
-  delivery: ['files'],
-  notifications: ['staff'],
-  admin: ['templates', 'dictionaries'],
-  ai: ['dictionaries'],
+    templates: [],
+    learning: [],
+    dictionaries: [],
+    staff: [],
+    files: [],
+    messages: ['learning'],
+    outbox: ['templates', 'messages'],
+    ratings: ['outbox'],
+    consent: ['outbox', 'learning'],
+    tickets: ['messages', 'outbox', 'ratings', 'learning', 'dictionaries'],
+    inbox: ['consent', 'tickets', 'messages', 'outbox'],
+    delivery: ['files'],
+    notifications: ['staff'],
+    admin: ['templates', 'dictionaries'],
+    ai: ['dictionaries'],
 };
 
 const publicApi = (/** @type {string} */ type, /** @type {string[] | undefined} */ names) => ({
-  element: {
-    type,
-    fileInternalPath: 'index.ts',
-    ...(names ? { captured: names.map((name) => ({ name })) } : {}),
-  },
+    element: {
+        type,
+        fileInternalPath: 'index.ts',
+        ...(names ? { captured: names.map((name) => ({ name })) } : {}),
+    },
 });
 
 const moduleDependencyPolicies = Object.entries(MODULE_DEPENDENCIES)
-  .filter(([, deps]) => deps.length > 0)
-  .map(([name, deps]) => ({
-    from: { element: { type: 'module', captured: { name } } },
-    allow: { to: publicApi('module', deps) },
-  }));
+    .filter(([, deps]) => deps.length > 0)
+    .map(([name, deps]) => ({
+        from: { element: { type: 'module', captured: { name } } },
+        allow: { to: publicApi('module', deps) },
+    }));
 
 const SPACED_STATEMENTS = [
-  'multiline-const',
-  'multiline-let',
-  'multiline-expression',
-  'multiline-export',
-  'multiline-type',
-  'block-like',
-  'class',
-  'interface',
+    'multiline-const',
+    'multiline-let',
+    'multiline-expression',
+    'multiline-export',
+    'multiline-type',
+    'block-like',
+    'class',
+    'interface',
 ];
 
 export default tseslint.config(
-  {
-    ignores: ['dist/**', 'coverage/**', 'node_modules/**', '.data/**', 'infra/**', '.sql-trace/**'],
-  },
-  js.configs.recommended,
-  tseslint.configs.strictTypeChecked,
-  tseslint.configs.stylisticTypeChecked,
-  {
-    languageOptions: {
-      globals: globals.node,
-      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+    {
+        ignores: ['dist/**', 'coverage/**', 'node_modules/**', '.data/**', 'infra/**', '.sql-trace/**'],
     },
-  },
-  prettier,
+    js.configs.recommended,
+    tseslint.configs.strictTypeChecked,
+    tseslint.configs.stylisticTypeChecked,
+    {
+        languageOptions: {
+            globals: globals.node,
+            parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+        },
+    },
+    prettier,
 
-  {
-    plugins: { '@stylistic': stylistic, 'import-x': importX, unicorn },
-    settings: {
-      'import-x/resolver-next': [createTypeScriptImportResolver()],
+    {
+        plugins: { '@stylistic': stylistic, 'import-x': importX, unicorn },
+        settings: {
+            'import-x/resolver-next': [createTypeScriptImportResolver()],
+        },
+        rules: {
+            'max-lines': ['error', { max: 250, skipBlankLines: true, skipComments: true }],
+            'max-lines-per-function': ['error', { max: 60, skipBlankLines: true, skipComments: true }],
+            complexity: ['error', 12],
+            'max-depth': ['error', 3],
+            'max-nested-callbacks': ['error', 3],
+            '@typescript-eslint/max-params': ['error', { max: 4 }],
+            '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+            'max-statements-per-line': ['error', { max: 1 }],
+            'max-len': [
+                'error',
+                {
+                    code: 120,
+                    ignoreUrls: true,
+                    ignoreRegExpLiterals: true,
+                    ignoreTemplateLiterals: true,
+                    ignoreStrings: false,
+                },
+            ],
+            curly: ['error', 'all'],
+            'no-nested-ternary': 'error',
+            '@stylistic/padding-line-between-statements': [
+                'error',
+                { blankLine: 'always', prev: '*', next: 'return' },
+                { blankLine: 'always', prev: ['const', 'let'], next: '*' },
+                {
+                    blankLine: 'any',
+                    prev: ['singleline-const', 'singleline-let'],
+                    next: ['singleline-const', 'singleline-let'],
+                },
+                { blankLine: 'always', prev: '*', next: SPACED_STATEMENTS },
+                { blankLine: 'always', prev: SPACED_STATEMENTS, next: '*' },
+            ],
+            '@stylistic/lines-between-class-members': ['error', 'always', { exceptAfterSingleLine: true }],
+            'id-length': ['error', { min: 2, exceptions: ['_', 'i', 'j', 'x', 'y'], properties: 'never' }],
+            '@typescript-eslint/consistent-type-definitions': 'off',
+            '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'inline-type-imports' }],
+            '@typescript-eslint/consistent-type-exports': 'error',
+            'import-x/no-cycle': 'error',
+            'import-x/no-self-import': 'error',
+            'import-x/no-duplicates': ['error', { 'prefer-inline': true }],
+            'import-x/no-useless-path-segments': 'error',
+            'import-x/no-default-export': 'error',
+            'import-x/order': [
+                'error',
+                {
+                    groups: ['builtin', 'external', 'internal', 'parent', ['sibling', 'index']],
+                    'newlines-between': 'always',
+                    alphabetize: { order: 'asc', caseInsensitive: true },
+                },
+            ],
+            'unicorn/filename-case': ['error', { case: 'kebabCase' }],
+        },
     },
-    rules: {
-      'max-lines': ['error', { max: 250, skipBlankLines: true, skipComments: true }],
-      'max-lines-per-function': ['error', { max: 60, skipBlankLines: true, skipComments: true }],
-      complexity: ['error', 12],
-      'max-depth': ['error', 3],
-      'max-nested-callbacks': ['error', 3],
-      '@typescript-eslint/max-params': ['error', { max: 4 }],
-      '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
-      'max-statements-per-line': ['error', { max: 1 }],
-      'max-len': [
-        'error',
-        {
-          code: 120,
-          ignoreUrls: true,
-          ignoreRegExpLiterals: true,
-          ignoreTemplateLiterals: true,
-          ignoreStrings: false,
-        },
-      ],
-      curly: ['error', 'all'],
-      'no-nested-ternary': 'error',
-      '@stylistic/padding-line-between-statements': [
-        'error',
-        { blankLine: 'always', prev: '*', next: 'return' },
-        { blankLine: 'always', prev: ['const', 'let'], next: '*' },
-        {
-          blankLine: 'any',
-          prev: ['singleline-const', 'singleline-let'],
-          next: ['singleline-const', 'singleline-let'],
-        },
-        { blankLine: 'always', prev: '*', next: SPACED_STATEMENTS },
-        { blankLine: 'always', prev: SPACED_STATEMENTS, next: '*' },
-      ],
-      '@stylistic/lines-between-class-members': ['error', 'always', { exceptAfterSingleLine: true }],
-      'id-length': [
-        'error',
-        { min: 2, exceptions: ['_', 'i', 'j', 'x', 'y'], properties: 'never' },
-      ],
-      '@typescript-eslint/consistent-type-definitions': 'off',
-      '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'inline-type-imports' }],
-      '@typescript-eslint/consistent-type-exports': 'error',
-      'import-x/no-cycle': 'error',
-      'import-x/no-self-import': 'error',
-      'import-x/no-duplicates': ['error', { 'prefer-inline': true }],
-      'import-x/no-useless-path-segments': 'error',
-      'import-x/no-default-export': 'error',
-      'import-x/order': [
-        'error',
-        {
-          groups: ['builtin', 'external', 'internal', 'parent', ['sibling', 'index']],
-          'newlines-between': 'always',
-          alphabetize: { order: 'asc', caseInsensitive: true },
-        },
-      ],
-      'unicorn/filename-case': ['error', { case: 'kebabCase' }],
-    },
-  },
 
-  {
-    files: ['src/**/*.ts'],
-    plugins: { boundaries },
-    settings: {
-      'import/resolver': { typescript: { alwaysTryTypes: true } },
-      'boundaries/include': ['src/**/*.ts'],
-      'boundaries/ignore': ['src/main.ts', 'src/cli.ts'],
-      'boundaries/elements': [
-        { type: 'app', pattern: 'src/app', partialMatch: false },
-        { type: 'module', pattern: 'src/modules/*', capture: ['name'], partialMatch: false },
-        {
-          type: 'integration',
-          pattern: 'src/integrations/*',
-          capture: ['name'],
-          partialMatch: false,
+    {
+        files: ['src/**/*.ts'],
+        plugins: { boundaries },
+        settings: {
+            'import/resolver': { typescript: { alwaysTryTypes: true } },
+            'boundaries/include': ['src/**/*.ts'],
+            'boundaries/ignore': ['src/main.ts', 'src/cli.ts'],
+            'boundaries/elements': [
+                { type: 'app', pattern: 'src/app', partialMatch: false },
+                { type: 'module', pattern: 'src/modules/*', capture: ['name'], partialMatch: false },
+                {
+                    type: 'integration',
+                    pattern: 'src/integrations/*',
+                    capture: ['name'],
+                    partialMatch: false,
+                },
+                { type: 'shared', pattern: 'src/shared', partialMatch: false },
+            ],
         },
-        { type: 'shared', pattern: 'src/shared', partialMatch: false },
-      ],
-    },
-    rules: {
-      'boundaries/no-unknown-files': 'error',
-      'boundaries/dependencies': [
-        'error',
-        {
-          default: 'disallow',
-          message:
-            'Architecture boundary: other modules are importable only via their index.ts, and only ' +
-            'along the edges in MODULE_DEPENDENCIES (eslint.config.js). See ARCHITECTURE.md.',
-          policies: [
-            { allow: { to: { module: { origin: ['external', 'core'] } } } },
-            { allow: { dependency: { relationship: { to: 'internal' } } } },
-            {
-              from: { element: { type: 'shared' } },
-              allow: { to: { element: { type: 'shared' } } },
-            },
-            {
-              from: { element: { type: 'integration' } },
-              allow: { to: { element: { type: 'shared' } } },
-            },
-            {
-              from: { element: { type: 'module' } },
-              allow: { to: [{ element: { type: 'shared' } }, publicApi('integration')] },
-            },
-            ...moduleDependencyPolicies,
-            {
-              from: { element: { type: 'app' } },
-              allow: {
-                to: [
-                  { element: { type: 'shared' } },
-                  publicApi('integration'),
-                  publicApi('module'),
-                ],
-              },
-            },
-          ],
+        rules: {
+            'boundaries/no-unknown-files': 'error',
+            'boundaries/dependencies': [
+                'error',
+                {
+                    default: 'disallow',
+                    message:
+                        'Architecture boundary: other modules are importable only via their index.ts, and only ' +
+                        'along the edges in MODULE_DEPENDENCIES (eslint.config.js). See ARCHITECTURE.md.',
+                    policies: [
+                        { allow: { to: { module: { origin: ['external', 'core'] } } } },
+                        { allow: { dependency: { relationship: { to: 'internal' } } } },
+                        {
+                            from: { element: { type: 'shared' } },
+                            allow: { to: { element: { type: 'shared' } } },
+                        },
+                        {
+                            from: { element: { type: 'integration' } },
+                            allow: { to: { element: { type: 'shared' } } },
+                        },
+                        {
+                            from: { element: { type: 'module' } },
+                            allow: { to: [{ element: { type: 'shared' } }, publicApi('integration')] },
+                        },
+                        ...moduleDependencyPolicies,
+                        {
+                            from: { element: { type: 'app' } },
+                            allow: {
+                                to: [{ element: { type: 'shared' } }, publicApi('integration'), publicApi('module')],
+                            },
+                        },
+                    ],
+                },
+            ],
         },
-      ],
     },
-  },
 
-  {
-    files: ['src/**/*.routes.ts'],
-    rules: { '@typescript-eslint/require-await': 'off' },
-  },
-
-  {
-    files: ['tests/**/*.ts'],
-    plugins: { vitest },
-    rules: {
-      ...vitest.configs.recommended.rules,
-      'max-lines-per-function': 'off',
-      '@typescript-eslint/no-non-null-assertion': 'off',
+    {
+        files: ['src/**/*.routes.ts'],
+        rules: { '@typescript-eslint/require-await': 'off' },
     },
-  },
-  {
-    files: ['**/*.js', '**/*.mjs'],
-    extends: [tseslint.configs.disableTypeChecked],
-  },
-  {
-    files: ['eslint.config.js', 'vitest.config.ts'],
-    rules: { 'import-x/no-default-export': 'off' },
-  },
+
+    {
+        files: ['tests/**/*.ts'],
+        plugins: { vitest },
+        rules: {
+            ...vitest.configs.recommended.rules,
+            'max-lines-per-function': 'off',
+            '@typescript-eslint/no-non-null-assertion': 'off',
+        },
+    },
+    {
+        files: ['**/*.js', '**/*.mjs'],
+        extends: [tseslint.configs.disableTypeChecked],
+    },
+    {
+        files: ['eslint.config.js', 'vitest.config.ts'],
+        rules: { 'import-x/no-default-export': 'off' },
+    },
 );

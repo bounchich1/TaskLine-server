@@ -12,31 +12,34 @@ import { storageInitCommand } from './commands/storage-init.js';
 import { subscribeCommand } from './commands/subscribe.js';
 
 const COMMANDS = new Map<string, CliCommand>([
-  ['migrate', migrateCommand],
-  ['bootstrap', bootstrapCommand],
-  ['subscribe', subscribeCommand],
-  ['storage-init', storageInitCommand],
-  ['media-hosts', mediaHostsCommand],
-  ['memory-reconcile', memoryReconcileCommand],
-  ['permit-resolve', permitResolveCommand],
-  ['ai-cap', aiCapCommand],
+    ['migrate', migrateCommand],
+    ['bootstrap', bootstrapCommand],
+    ['subscribe', subscribeCommand],
+    ['storage-init', storageInitCommand],
+    ['media-hosts', mediaHostsCommand],
+    ['memory-reconcile', memoryReconcileCommand],
+    ['permit-resolve', permitResolveCommand],
+    ['ai-cap', aiCapCommand],
 ]);
 
 const USAGE =
-  'Commands: migrate, bootstrap, subscribe, storage-init, media-hosts, memory-reconcile <id>, ' +
-  'permit-resolve <slot> <evidence>, ai-cap <10..15>';
+    'Commands: migrate, bootstrap, subscribe, storage-init, media-hosts, memory-reconcile <id>, ' +
+    'permit-resolve <slot> <evidence>, ai-cap <10..15>';
 
 export async function runCli(argv: string[]): Promise<void> {
-  const config = readConfig();
-  const db = new Postgres(config.DATABASE_URL);
-  try {
-    const command = COMMANDS.get(argv.at(0) ?? '');
-    const args = argv.slice(1);
-    if (!command) {
-      throw new Error(USAGE);
+    const config = readConfig();
+    const db = new Postgres(config.DATABASE_URL);
+
+    try {
+        const command = COMMANDS.get(argv.at(0) ?? '');
+        const args = argv.slice(1);
+
+        if (!command) {
+            throw new Error(USAGE);
+        }
+
+        console.log(await command({ db, config, args }));
+    } finally {
+        await db.close();
     }
-    console.log(await command({ db, config, args }));
-  } finally {
-    await db.close();
-  }
 }

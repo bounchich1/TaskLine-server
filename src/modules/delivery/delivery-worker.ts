@@ -14,43 +14,48 @@ import { sendDelivery } from './send.js';
 import { markStaleSendsUnknown } from './stale-sends.js';
 
 export class DeliveryWorker {
-  private readonly deps: DeliveryDeps;
+    private readonly deps: DeliveryDeps;
 
-  constructor(
-    db: Database,
-    config: Config,
-    private readonly max: MaxTransport,
-    private readonly files?: Files,
-  ) {
-    this.deps = { db, ctx: createCtx(config) };
-  }
-
-  async rate(): Promise<void> {
-    await waitForSendSlot(this.deps.db);
-  }
-
-  async deliver(clientId: string): Promise<boolean> {
-    const { db, ctx } = this.deps;
-    const claimed = await db.tx(async (tx) => claimNextDelivery(tx, ctx, clientId));
-    if (!claimed) {
-      return false;
+    constructor(
+        db: Database,
+        config: Config,
+        private readonly max: MaxTransport,
+        private readonly files?: Files,
+    ) {
+        this.deps = { db, ctx: createCtx(config) };
     }
-    const outcome = await sendDelivery({ db, max: this.max, files: this.files }, claimed);
-    await recordOutcome(this.deps, claimed, outcome);
-    return true;
-  }
 
-  async resolve(
-    employee: Employee,
-    messageId: string,
-    action: 'cancel' | 'retry',
-    evidence?: string,
-  ): Promise<{ state: string }> {
-    const request = { employee, messageId, action, evidence };
-    return this.deps.db.tx(async (tx) => resolveDelivery(tx, this.deps.ctx, request));
-  }
+    async rate(): Promise<void> {
+        await waitForSendSlot(this.deps.db);
+    }
 
-  async markStaleUnknown(): Promise<void> {
-    await markStaleSendsUnknown(this.deps);
-  }
+    async deliver(clientId: string): Promise<boolean> {
+        const { db, ctx } = this.deps;
+        const claimed = await db.tx(async (tx) => claimNextDelivery(tx, ctx, clientId));
+
+        if (!claimed) {
+            return false;
+        }
+
+        const outcome = await sendDelivery({ db, max: this.max, files: this.files }, claimed);
+
+        await recordOutcome(this.deps, claimed, outcome);
+
+        return true;
+    }
+
+    async resolve(
+        employee: Employee,
+        messageId: string,
+        action: 'cancel' | 'retry',
+        evidence?: string,
+    ): Promise<{ state: string }> {
+        const request = { employee, messageId, action, evidence };
+
+        return this.deps.db.tx(async (tx) => resolveDelivery(tx, this.deps.ctx, request));
+    }
+
+    async markStaleUnknown(): Promise<void> {
+        await markStaleSendsUnknown(this.deps);
+    }
 }

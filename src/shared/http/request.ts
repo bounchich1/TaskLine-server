@@ -9,40 +9,43 @@ const uuid = z.uuid();
 const idempotencyKeySchema = z.string().min(8).max(128);
 
 export function paramsId(request: FastifyRequest): string {
-  return uuid.parse((request.params as Row).id);
+    return uuid.parse((request.params as Row).id);
 }
 
 export function routeParam(request: FastifyRequest, name: string): unknown {
-  return (request.params as Row)[name];
+    return (request.params as Row)[name];
 }
 
 export function idempotencyKey(request: FastifyRequest): string {
-  return idempotencyKeySchema.parse(request.headers['idempotency-key']);
+    return idempotencyKeySchema.parse(request.headers['idempotency-key']);
 }
 
 export function ifMatchVersion(request: FastifyRequest): number {
-  const raw = request.headers['if-match'];
-  ensure(typeof raw === 'string' && /^"?\d+"?$/.test(raw), 'version_required', 422);
-  return Number(raw.replaceAll('"', ''));
+    const raw = request.headers['if-match'];
+
+    ensure(typeof raw === 'string' && /^"?\d+"?$/.test(raw), 'version_required', 422);
+
+    return Number(raw.replaceAll('"', ''));
 }
 
 export function sessionToken(request: FastifyRequest): string | undefined {
-  return request.headers.authorization?.startsWith('Bearer ')
-    ? request.headers.authorization.slice(7)
-    : request.cookies.support_session;
+    return request.headers.authorization?.startsWith('Bearer ')
+        ? request.headers.authorization.slice(7)
+        : request.cookies.support_session;
 }
 
 export function staffOf(request: FastifyRequest): Session {
-  if (!request.staff) {
-    throw new Error('Route requires an authenticated staff session');
-  }
-  return request.staff;
+    if (!request.staff) {
+        throw new Error('Route requires an authenticated staff session');
+    }
+
+    return request.staff;
 }
 
 export function requireAdmin(request: FastifyRequest): void {
-  ensure(staffOf(request).employee.role === 'admin', 'forbidden', 403);
+    ensure(staffOf(request).employee.role === 'admin', 'forbidden', 403);
 }
 
 export function requireOps(request: FastifyRequest): void {
-  ensure(staffOf(request).employee.role !== 'support', 'forbidden', 403);
+    ensure(staffOf(request).employee.role !== 'support', 'forbidden', 403);
 }

@@ -5,60 +5,67 @@ import type { ClientInput } from '../../shared/types/client-input.js';
 import type { Client } from '../../shared/types/entities.js';
 
 export async function recordInput(tx: Sql, ctx: Ctx, input: ClientInput): Promise<void> {
-  if (await alreadyReceived(tx, ctx, input.sourceKey)) {
-    return;
-  }
-  if (!input.userId || !input.chatId || input.kind === 'unknown') {
-    await tx.query(
-      `INSERT INTO inbox(org_id,source_key,kind,state,reason)
+    if (await alreadyReceived(tx, ctx, input.sourceKey)) {
+        return;
+    }
+
+    if (!input.userId || !input.chatId || input.kind === 'unknown') {
+        await tx.query(
+            `INSERT INTO inbox(org_id,source_key,kind,state,reason)
        VALUES($1,$2,$3,'quarantined','unsupported_update') ON CONFLICT DO NOTHING`,
-      [ctx.org, input.sourceKey, input.kind],
-    );
-    return;
-  }
-  await tx.query(
-    'INSERT INTO clients(org_id,max_user_id,chat_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
-    [ctx.org, input.userId, input.chatId],
-  );
-  const client = await requireOne<Client>(
-    tx,
-    'SELECT * FROM clients WHERE org_id=$1 AND max_user_id=$2 FOR UPDATE',
-    [ctx.org, input.userId],
-  );
-  if (client.chat_id !== input.chatId) {
-    await tx.query(
-      `INSERT INTO inbox(org_id,source_key,client_id,kind,state,reason)
+            [ctx.org, input.sourceKey, input.kind],
+        );
+
+        return;
+    }
+
+    await tx.query('INSERT INTO clients(org_id,max_user_id,chat_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [
+        ctx.org,
+        input.userId,
+        input.chatId,
+    ]);
+
+    const client = await requireOne<Client>(tx, 'SELECT * FROM clients WHERE org_id=$1 AND max_user_id=$2 FOR UPDATE', [
+        ctx.org,
+        input.userId,
+    ]);
+
+    if (client.chat_id !== input.chatId) {
+        await tx.query(
+            `INSERT INTO inbox(org_id,source_key,client_id,kind,state,reason)
        VALUES($1,$2,$3,$4,'quarantined','chat_mismatch') ON CONFLICT DO NOTHING`,
-      [ctx.org, input.sourceKey, client.id, input.kind],
+            [ctx.org, input.sourceKey, client.id, input.kind],
+        );
+
+        return;
+    }
+
+    if (await alreadyReceived(tx, ctx, input.sourceKey)) {
+        return;
+    }
+
+    const sequence = await requireOne(
+        tx,
+        'UPDATE clients SET next_ingress=next_ingress+1 WHERE id=$1 RETURNING next_ingress',
+        [client.id],
     );
-    return;
-  }
-  if (await alreadyReceived(tx, ctx, input.sourceKey)) {
-    return;
-  }
-  const sequence = await requireOne(
-    tx,
-    'UPDATE clients SET next_ingress=next_ingress+1 WHERE id=$1 RETURNING next_ingress',
-    [client.id],
-  );
-  await tx.query(
-    `INSERT INTO inbox(org_id,source_key,client_id,ingress_seq,kind,payload)
+
+    await tx.query(
+        `INSERT INTO inbox(org_id,source_key,client_id,ingress_seq,kind,payload)
      VALUES($1,$2,$3,$4,$5,$6)`,
-    [
-      ctx.org,
-      input.sourceKey,
-      client.id,
-      sequence.next_ingress,
-      input.kind,
-      encrypt(input, ctx.config.ENCRYPTION_KEY),
-    ],
-  );
+        [
+            ctx.org,
+            input.sourceKey,
+            client.id,
+            sequence.next_ingress,
+            input.kind,
+            encrypt(input, ctx.config.ENCRYPTION_KEY),
+        ],
+    );
 }
 
 async function alreadyReceived(tx: Sql, ctx: Ctx, sourceKey: string): Promise<boolean> {
-  const receipt = await one(tx, 'SELECT id FROM inbox WHERE org_id=$1 AND source_key=$2', [
-    ctx.org,
-    sourceKey,
-  ]);
-  return receipt !== undefined;
+    const receipt = await one(tx, 'SELECT id FROM inbox WHERE org_id=$1 AND source_key=$2', [ctx.org, sourceKey]);
+
+    return receipt !== undefined;
 }

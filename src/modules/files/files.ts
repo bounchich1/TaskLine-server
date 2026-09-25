@@ -16,56 +16,53 @@ import { ObjectStorage } from './storage.js';
 import { prepareUpload, receiveUpload } from './uploads.js';
 
 export class Files {
-  private readonly deps: FileDeps;
+    private readonly deps: FileDeps;
 
-  constructor(db: Database, config: Config) {
-    this.deps = { db, ctx: createCtx(config), storage: new ObjectStorage(config) };
-  }
+    constructor(db: Database, config: Config) {
+        this.deps = { db, ctx: createCtx(config), storage: new ObjectStorage(config) };
+    }
 
-  async read(key: string): Promise<Readable> {
-    return this.deps.storage.read(key);
-  }
+    async read(key: string): Promise<Readable> {
+        return this.deps.storage.read(key);
+    }
 
-  async prepare(employee: Employee, upload: { ticketId: string; filename: string; kind: string }) {
-    return prepareUpload(this.deps, employee, upload);
-  }
+    async prepare(employee: Employee, upload: { ticketId: string; filename: string; kind: string }) {
+        return prepareUpload(this.deps, employee, upload);
+    }
 
-  async receive(
-    employee: Employee,
-    upload: { id: string; stream: Readable; isTruncated?: () => boolean },
-  ) {
-    return receiveUpload(this.deps, employee, upload);
-  }
+    async receive(employee: Employee, upload: { id: string; stream: Readable; isTruncated?: () => boolean }) {
+        return receiveUpload(this.deps, employee, upload);
+    }
 
-  async draftStatus(employee: Employee, id: string) {
-    return draftUploadStatus(this.deps, { employeeId: employee.id, id });
-  }
+    async draftStatus(employee: Employee, id: string) {
+        return draftUploadStatus(this.deps, { employeeId: employee.id, id });
+    }
 
-  async cancelDraft(employee: Employee, id: string): Promise<void> {
-    await cancelDraftUpload(this.deps, { employeeId: employee.id, id });
-  }
+    async cancelDraft(employee: Employee, id: string): Promise<void> {
+        await cancelDraftUpload(this.deps, { employeeId: employee.id, id });
+    }
 
-  async sentAttachment(id: string): Promise<Attachment> {
-    return findSentAttachment(this.deps, id);
-  }
+    async sentAttachment(id: string): Promise<Attachment> {
+        return findSentAttachment(this.deps, id);
+    }
 
-  async grantDownload(session: Session, attachmentId: string) {
-    return grantDownload(this.deps, { attachmentId, session });
-  }
+    async grantDownload(session: Session, attachmentId: string) {
+        return grantDownload(this.deps, { attachmentId, session });
+    }
 
-  async redeemGrant(grant: string): Promise<Attachment> {
-    return redeemDownloadGrant(this.deps, grant);
-  }
+    async redeemGrant(grant: string): Promise<Attachment> {
+        return redeemDownloadGrant(this.deps, grant);
+    }
 
-  async downloadInbound(id: string): Promise<void> {
-    await downloadInbound(this.deps, id);
-  }
+    async downloadInbound(id: string): Promise<void> {
+        await downloadInbound(this.deps, id);
+    }
 
-  async scan(id: string): Promise<void> {
-    await scanAttachment(this.deps, id);
-  }
+    async scan(id: string): Promise<void> {
+        await scanAttachment(this.deps, id);
+    }
 
-  async materialize(id: string): Promise<MaterializedFile> {
-    return materialize(this.deps, id);
-  }
+    async materialize(id: string): Promise<MaterializedFile> {
+        return materialize(this.deps, id);
+    }
 }

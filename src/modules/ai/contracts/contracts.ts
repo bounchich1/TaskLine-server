@@ -29,13 +29,16 @@ export interface TriageExpectations {
 
 export function parseTriage(raw: string, expected: TriageExpectations): TriageResult {
   const result = strictJson(raw);
+
   ensure(validateTriage(result), 'invalid_ai_schema', 422);
   const value = result as TriageResult;
+
   ensure(
     value.dictionary_version === expected.dictionaryVersion,
     'invalid_dictionary_version',
     422,
   );
+
   for (const field of ['tag', 'urgency', 'complexity'] as const) {
     ensure(
       expected.dictionaries.some(
@@ -45,28 +48,34 @@ export function parseTriage(raw: string, expected: TriageExpectations): TriageRe
       422,
     );
   }
+
   ensure(
     value.evidence_message_ids.every((id) => expected.messageIds.includes(id)) &&
       value.evidence_memory_ids.every((id) => expected.memoryIds.includes(id)),
     'forged_ai_evidence',
     422,
   );
+
   return value;
 }
 
 export function parseResolution(raw: string, evidenceIds: string[]): Resolution {
   const result = strictJson(raw);
+
   ensure(validateResolution(result), 'invalid_memory_schema', 422);
   const value = result as Resolution;
+
   const cited = [
     ...value.evidence_message_ids,
     ...value.steps.flatMap((step) => step.evidence_message_ids),
   ];
+
   ensure(
     cited.every((id) => evidenceIds.includes(id)),
     'forged_memory_evidence',
     422,
   );
+
   if (value.outcome === 'resolved') {
     ensure(
       value.steps.length > 0 && !!value.observed_result && !!value.solution_summary,
@@ -74,5 +83,6 @@ export function parseResolution(raw: string, evidenceIds: string[]): Resolution 
       422,
     );
   }
+
   return value;
 }

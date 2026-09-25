@@ -9,101 +9,98 @@ import { capabilities } from './capabilities.js';
 
 const MAX_LOGINS_PER_LAUNCH = 5;
 
-export async function authenticate(
-  db: Sql,
-  org: string,
-  rawToken: string | undefined,
-): Promise<Session> {
-  ensure(
-    rawToken && rawToken.length <= 128,
-    'unauthorized',
-    401,
-    'Сессия истекла. Откройте приложение заново.',
-  );
-  const sessionHash = hash(rawToken);
-  const row = await one<Employee & { csrf_hash: string }>(
-    db,
-    `SELECT e.*,s.csrf_hash FROM staff_sessions s JOIN employees e ON e.id=s.employee_id AND e.org_id=s.org_id
+export async function authenticate(db: Sql, org: string, rawToken: string | undefined): Promise<Session> {
+    ensure(rawToken && rawToken.length <= 128, 'unauthorized', 401, 'Сессия истекла. Откройте приложение заново.');
+    const sessionHash = hash(rawToken);
+
+    const row = await one<Employee & { csrf_hash: string }>(
+        db,
+        `SELECT e.*,s.csrf_hash FROM staff_sessions s JOIN employees e ON e.id=s.employee_id AND e.org_id=s.org_id
     WHERE s.hash=$1 AND s.org_id=$2 AND NOT s.revoked AND NOT e.blocked AND s.employee_version=e.version
     AND s.expires_at>now() AND s.last_seen_at>now()-interval '30 minutes'`,
-    [sessionHash, org],
-  );
-  ensure(row, 'unauthorized', 401, 'Сессия истекла. Откройте приложение заново.');
-  await db.query('UPDATE staff_sessions SET last_seen_at=now() WHERE hash=$1', [sessionHash]);
-  return { employee: row, hash: sessionHash, csrfHash: row.csrf_hash };
+        [sessionHash, org],
+    );
+
+    ensure(row, 'unauthorized', 401, 'Сессия истекла. Откройте приложение заново.');
+    await db.query('UPDATE staff_sessions SET last_seen_at=now() WHERE hash=$1', [sessionHash]);
+
+    return { employee: row, hash: sessionHash, csrfHash: row.csrf_hash };
 }
 
-export async function issueSession(
-  db: Database,
-  config: Config,
-  userId: string,
-  launchHash: string,
-) {
-  return db.tx(async (tx) => {
-    const employee = await one<Employee>(
-      tx,
-      'SELECT * FROM employees WHERE org_id=$1 AND max_user_id=$2 AND NOT blocked FOR UPDATE',
-      [config.ORG_ID, userId],
-    );
-    ensure(employee, 'access_denied', 403, 'Доступ к службе поддержки не предоставлен.');
-    const recent = await one(
-      tx,
-      `SELECT count(*)::int AS n FROM staff_sessions
+export async function issueSession(db: Database, config: Config, userId: string, launchHash: string) {
+    return db.tx(async (tx) => {
+        const employee = await one<Employee>(
+            tx,
+            'SELECT * FROM employees WHERE org_id=$1 AND max_user_id=$2 AND NOT blocked FOR UPDATE',
+            [config.ORG_ID, userId],
+        );
+
+        ensure(employee, 'access_denied', 403, 'Доступ к службе поддержки не предоставлен.');
+
+        const recent = await one(
+            tx,
+            `SELECT count(*)::int AS n FROM staff_sessions
        WHERE launch_hash=$1 AND issued_at>now()-interval '5 minutes'`,
-      [launchHash],
-    );
-    ensure(
-      Number(recent?.n) < MAX_LOGINS_PER_LAUNCH,
-      'launch_replay_limit',
-      429,
-      'Слишком много входов. Откройте приложение заново.',
-    );
-    const secret = token();
-    const csrf = token();
-    await tx.query(
-      `INSERT INTO staff_sessions(hash,org_id,employee_id,employee_version,csrf_hash,launch_hash)
+            [launchHash],
+        );
+
+        ensure(
+            Number(recent?.n) < MAX_LOGINS_PER_LAUNCH,
+            'launch_replay_limit',
+            429,
+            'Слишком много входов. Откройте приложение заново.',
+        );
+
+        const secret = token();
+        const csrf = token();
+
+        await tx.query(
+            `INSERT INTO staff_sessions(hash,org_id,employee_id,employee_version,csrf_hash,launch_hash)
        VALUES($1,$2,$3,$4,$5,$6)`,
-      [hash(secret), config.ORG_ID, employee.id, employee.version, hash(csrf), launchHash],
-    );
-    await tx.query(
-      "INSERT INTO audit(org_id,actor_id,action,object_id) VALUES($1,$2,'auth.login',$3)",
-      [config.ORG_ID, employee.id, employee.id],
-    );
-    return {
-      token: secret,
-      csrf,
-      employee,
-      organization: { name: config.ORG_NAME, timezone: config.ORG_TIMEZONE },
-      capabilities: capabilities(employee),
-    };
-  });
+            [hash(secret), config.ORG_ID, employee.id, employee.version, hash(csrf), launchHash],
+        );
+
+        await tx.query("INSERT INTO audit(org_id,actor_id,action,object_id) VALUES($1,$2,'auth.login',$3)", [
+            config.ORG_ID,
+            employee.id,
+            employee.id,
+        ]);
+
+        return {
+            token: secret,
+            csrf,
+            employee,
+            organization: { name: config.ORG_NAME, timezone: config.ORG_TIMEZONE },
+            capabilities: capabilities(employee),
+        };
+    });
 }
 
 export async function revokeSession(db: Sql, sessionHash: string): Promise<void> {
-  await db.query('UPDATE staff_sessions SET revoked=true WHERE hash=$1', [sessionHash]);
+    await db.query('UPDATE staff_sessions SET revoked=true WHERE hash=$1', [sessionHash]);
 }
 
-export async function rotateSession(
-  db: Database,
-  sessionHash: string,
-): Promise<{ token: string; csrf: string }> {
-  const secret = token();
-  const csrf = token();
-  await db.tx(async (tx) => {
-    const row = await tx.query(
-      `UPDATE staff_sessions SET hash=$2,csrf_hash=$3,last_seen_at=now()
+export async function rotateSession(db: Database, sessionHash: string): Promise<{ token: string; csrf: string }> {
+    const secret = token();
+    const csrf = token();
+
+    await db.tx(async (tx) => {
+        const row = await tx.query(
+            `UPDATE staff_sessions SET hash=$2,csrf_hash=$3,last_seen_at=now()
        WHERE hash=$1 AND NOT revoked AND expires_at>now() RETURNING hash`,
-      [sessionHash, hash(secret), hash(csrf)],
-    );
-    ensure(row.rows.length, 'unauthorized', 401);
-  });
-  return { token: secret, csrf };
+            [sessionHash, hash(secret), hash(csrf)],
+        );
+
+        ensure(row.rows.length, 'unauthorized', 401);
+    });
+
+    return { token: secret, csrf };
 }
 
 export async function describeSession(db: Sql, org: string, employee: Employee) {
-  return {
-    employee,
-    capabilities: capabilities(employee),
-    organization: await one(db, 'SELECT name,timezone FROM organizations WHERE id=$1', [org]),
-  };
+    return {
+        employee,
+        capabilities: capabilities(employee),
+        organization: await one(db, 'SELECT name,timezone FROM organizations WHERE id=$1', [org]),
+    };
 }

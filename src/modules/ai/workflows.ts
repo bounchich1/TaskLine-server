@@ -9,22 +9,22 @@ import type { Recall } from './memory/memory-record.js';
 import { runTriage } from './triage/triage.js';
 
 export class Workflows {
-  private readonly ctx: Ctx;
+    private readonly ctx: Ctx;
 
-  constructor(
-    private readonly db: Database,
-    config: Config,
-    private readonly model: Model,
-    private readonly memory: Recall,
-  ) {
-    this.ctx = createCtx(config);
-  }
+    constructor(
+        private readonly db: Database,
+        config: Config,
+        private readonly model: Model,
+        private readonly memory: Recall,
+    ) {
+        this.ctx = createCtx(config);
+    }
 
-  async triage(job: Job): Promise<void> {
-    await runTriage({ db: this.db, ctx: this.ctx, model: this.model, memory: this.memory }, job);
-  }
+    async triage(job: Job): Promise<void> {
+        await runTriage({ db: this.db, ctx: this.ctx, model: this.model, memory: this.memory }, job);
+    }
 
-  async learning(job: Job): Promise<boolean> {
-    return runClosureLearning({ db: this.db, ctx: this.ctx, model: this.model }, job);
-  }
+    async learning(job: Job): Promise<boolean> {
+        return runClosureLearning({ db: this.db, ctx: this.ctx, model: this.model }, job);
+    }
 }

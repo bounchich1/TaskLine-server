@@ -14,80 +14,89 @@ const FIELDS = ['tag', 'urgency', 'complexity'] as const;
 const DEFAULT_CODES = { tag: 'undefined', urgency: 'medium', complexity: 'medium' };
 
 export async function applyTriage(
-  tx: Sql,
-  ctx: Ctx,
-  { job, messageId, outcome }: { job: Job; messageId: string; outcome: TriageOutcome },
+    tx: Sql,
+    ctx: Ctx,
+    { job, messageId, outcome }: { job: Job; messageId: string; outcome: TriageOutcome },
 ): Promise<void> {
-  const ticket = await lockTicket(tx, ctx, job);
-  if (!ticket || !(await eligibleJob(tx, ctx.org, job))) {
-    return;
-  }
-  const current = await one<Message>(tx, 'SELECT * FROM messages WHERE id=$1', [messageId]);
-  if (current?.revision !== job.payload.revision) {
-    await tx.query(
-      `UPDATE tickets SET ai_status='failed',suggestion_stale=true,review_required=true
+    const ticket = await lockTicket(tx, ctx, job);
+
+    if (!ticket || !(await eligibleJob(tx, ctx.org, job))) {
+        return;
+    }
+
+    const current = await one<Message>(tx, 'SELECT * FROM messages WHERE id=$1', [messageId]);
+
+    if (current?.revision !== job.payload.revision) {
+        await tx.query(
+            `UPDATE tickets SET ai_status='failed',suggestion_stale=true,review_required=true
        WHERE id=$1`,
-      [ticket.id],
-    );
-    return;
-  }
-  const { result, failure } = outcome;
-  const codesActive = await applyClassification(tx, ctx, { job, ticket, result });
-  const success = outcome.success && codesActive;
-  await tx.query(
-    'UPDATE tickets SET ai_status=$2,suggestion=$3,review_required=$4,version=version+1 WHERE id=$1',
-    [
-      ticket.id,
-      success ? 'done' : 'failed',
-      JSON.stringify(result),
-      !success || result.needs_review,
-    ],
-  );
-  await audit(tx, ctx.org, {
-    actor: null,
-    action: 'ai.triage',
-    objectId: ticket.id,
-    detail: {
-      success,
-      reason: success ? null : failure,
-      skill_hash: hash(TRIAGE_SKILL),
-    },
-  });
-  await emit(tx, ctx.org, { type: 'ticket.classified', ticketId: ticket.id });
+            [ticket.id],
+        );
+
+        return;
+    }
+
+    const { result, failure } = outcome;
+    const codesActive = await applyClassification(tx, ctx, { job, ticket, result });
+    const success = outcome.success && codesActive;
+
+    await tx.query('UPDATE tickets SET ai_status=$2,suggestion=$3,review_required=$4,version=version+1 WHERE id=$1', [
+        ticket.id,
+        success ? 'done' : 'failed',
+        JSON.stringify(result),
+        !success || result.needs_review,
+    ]);
+
+    await audit(tx, ctx.org, {
+        actor: null,
+        action: 'ai.triage',
+        objectId: ticket.id,
+        detail: {
+            success,
+            reason: success ? null : failure,
+            skill_hash: hash(TRIAGE_SKILL),
+        },
+    });
+
+    await emit(tx, ctx.org, { type: 'ticket.classified', ticketId: ticket.id });
 }
 
 async function lockTicket(tx: Sql, ctx: Ctx, job: Job): Promise<Ticket | undefined> {
-  const ref = await one(tx, 'SELECT client_id FROM tickets WHERE id=$1', [job.ref_id]);
-  if (!ref) {
-    return undefined;
-  }
-  await tx.query('SELECT id FROM clients WHERE id=$1 FOR UPDATE', [ref.client_id]);
-  return one<Ticket>(tx, 'SELECT * FROM tickets WHERE id=$1 AND org_id=$2 FOR UPDATE', [
-    job.ref_id,
-    ctx.org,
-  ]);
+    const ref = await one(tx, 'SELECT client_id FROM tickets WHERE id=$1', [job.ref_id]);
+
+    if (!ref) {
+        return undefined;
+    }
+
+    await tx.query('SELECT id FROM clients WHERE id=$1 FOR UPDATE', [ref.client_id]);
+
+    return one<Ticket>(tx, 'SELECT * FROM tickets WHERE id=$1 AND org_id=$2 FOR UPDATE', [job.ref_id, ctx.org]);
 }
 
 async function applyClassification(
-  tx: Sql,
-  ctx: Ctx,
-  { job, ticket, result }: { job: Job; ticket: Ticket; result: TriageResult },
+    tx: Sql,
+    ctx: Ctx,
+    { job, ticket, result }: { job: Job; ticket: Ticket; result: TriageResult },
 ): Promise<boolean> {
-  let allActive = true;
-  const startRevisions = job.payload.field_revisions as Row;
-  for (const field of FIELDS) {
-    const active = await findActiveDictionaryLabel(tx, ctx.org, field, result.tags[field]);
-    if (!active) {
-      result.tags[field] = DEFAULT_CODES[field];
-      allActive = false;
-    }
-    if (ticket[`${field}_revision`] === Number(startRevisions[field])) {
-      await tx.query(
-        `UPDATE tickets SET ${field}=$2,
+    let allActive = true;
+    const startRevisions = job.payload.field_revisions as Row;
+
+    for (const field of FIELDS) {
+        const active = await findActiveDictionaryLabel(tx, ctx.org, field, result.tags[field]);
+
+        if (!active) {
+            result.tags[field] = DEFAULT_CODES[field];
+            allActive = false;
+        }
+
+        if (ticket[`${field}_revision`] === Number(startRevisions[field])) {
+            await tx.query(
+                `UPDATE tickets SET ${field}=$2,
          classification_labels=jsonb_set(classification_labels,ARRAY[$3],$4::jsonb) WHERE id=$1`,
-        [ticket.id, result.tags[field], field, JSON.stringify(active ?? {})],
-      );
+                [ticket.id, result.tags[field], field, JSON.stringify(active ?? {})],
+            );
+        }
     }
-  }
-  return allActive;
+
+    return allActive;
 }

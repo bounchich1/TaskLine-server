@@ -18,51 +18,59 @@ import { transfer } from './handlers/transfer.js';
 import { lockCommandTarget } from './lock-target.js';
 
 const COMMANDS = new Map<string, { handle: TicketCommandHandler; event: string }>([
-  ['assign', { handle: assign, event: 'ticket.assigned' }],
-  ['classification', { handle: classify, event: 'ticket.classified' }],
-  ['transfer', { handle: transfer, event: 'ticket.updated' }],
-  ['messages', { handle: reply, event: 'message.from_agent' }],
-  ['close', { handle: close, event: 'ticket.closed' }],
-  ['reopen', { handle: reopen, event: 'ticket.reopened' }],
+    ['assign', { handle: assign, event: 'ticket.assigned' }],
+    ['classification', { handle: classify, event: 'ticket.classified' }],
+    ['transfer', { handle: transfer, event: 'ticket.updated' }],
+    ['messages', { handle: reply, event: 'message.from_agent' }],
+    ['close', { handle: close, event: 'ticket.closed' }],
+    ['reopen', { handle: reopen, event: 'ticket.reopened' }],
 ]);
 
 export interface TicketCommandRequest {
-  actor: Employee;
-  ticketId: string;
-  name: string;
-  body: Row;
-  expectedVersion: number;
-  idempotencyKey: string;
+    actor: Employee;
+    ticketId: string;
+    name: string;
+    body: Row;
+    expectedVersion: number;
+    idempotencyKey: string;
 }
 
 export class TicketCommands {
-  private readonly ctx: Ctx;
+    private readonly ctx: Ctx;
 
-  constructor(
-    private readonly db: Database,
-    config: Config,
-  ) {
-    this.ctx = createCtx(config);
-  }
+    constructor(
+        private readonly db: Database,
+        config: Config,
+    ) {
+        this.ctx = createCtx(config);
+    }
 
-  async run(request: TicketCommandRequest): Promise<Ticket> {
-    const { ticketId, name, body, expectedVersion, idempotencyKey: key } = request;
-    ensure(key.length >= 8 && key.length <= 128, 'idempotency_required', 422);
-    const requestHash = hash(JSON.stringify({ body, expected: expectedVersion }));
-    const commandKey = { principal: request.actor.id, route: `${ticketId}:${name}`, key };
-    return this.db.tx(async (tx) => {
-      const claim = await claimCommandKey(tx, commandKey, requestHash);
-      const actor = await findActiveEmployee(tx, this.ctx.org, request.actor.id);
-      ensure(actor?.version === request.actor.version, 'access_denied', 403);
-      if (claim.response) {
-        return claim.response as Ticket;
-      }
-      const { client, ticket } = await lockCommandTarget(tx, this.ctx, ticketId, expectedVersion);
-      const definition = COMMANDS.get(name);
-      ensure(definition, 'unknown_command', 404);
-      const command = { actor, client, ticket, body };
-      await definition.handle(tx, this.ctx, command);
-      return finishCommand(tx, this.ctx, { name, event: definition.event, command, commandKey });
-    });
-  }
+    async run(request: TicketCommandRequest): Promise<Ticket> {
+        const { ticketId, name, body, expectedVersion, idempotencyKey: key } = request;
+
+        ensure(key.length >= 8 && key.length <= 128, 'idempotency_required', 422);
+        const requestHash = hash(JSON.stringify({ body, expected: expectedVersion }));
+        const commandKey = { principal: request.actor.id, route: `${ticketId}:${name}`, key };
+
+        return this.db.tx(async (tx) => {
+            const claim = await claimCommandKey(tx, commandKey, requestHash);
+            const actor = await findActiveEmployee(tx, this.ctx.org, request.actor.id);
+
+            ensure(actor?.version === request.actor.version, 'access_denied', 403);
+
+            if (claim.response) {
+                return claim.response as Ticket;
+            }
+
+            const { client, ticket } = await lockCommandTarget(tx, this.ctx, ticketId, expectedVersion);
+            const definition = COMMANDS.get(name);
+
+            ensure(definition, 'unknown_command', 404);
+            const command = { actor, client, ticket, body };
+
+            await definition.handle(tx, this.ctx, command);
+
+            return finishCommand(tx, this.ctx, { name, event: definition.event, command, commandKey });
+        });
+    }
 }

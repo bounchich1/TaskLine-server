@@ -7,36 +7,37 @@ import { clearPreconsentBuffers, grantConsent, listPreconsentBuffers } from '../
 import { queueBotMessage } from '../outbox/index.js';
 import { handleClientContent } from '../tickets/index.js';
 
-export async function acceptConsent(
-  tx: Sql,
-  ctx: Ctx,
-  client: Client,
-  sourceKey: string,
-): Promise<void> {
-  const granted = await grantConsent(tx, ctx, client, sourceKey);
-  if (!granted) {
-    return;
-  }
-  const buffers = await listPreconsentBuffers(tx, granted.id);
-  const now = await requireOne(tx, 'SELECT now() AS now');
-  let expired = false;
-  for (const buffer of buffers) {
-    if (new Date(buffer.expires_at).getTime() <= new Date(String(now.now)).getTime()) {
-      expired = true;
-      continue;
+export async function acceptConsent(tx: Sql, ctx: Ctx, client: Client, sourceKey: string): Promise<void> {
+    const granted = await grantConsent(tx, ctx, client, sourceKey);
+
+    if (!granted) {
+        return;
     }
-    await handleClientContent(tx, ctx, {
-      client: granted,
-      input: decrypt<ClientInput>(buffer.payload, ctx.config.ENCRYPTION_KEY),
-      receivedAt: buffer.created_at,
-    });
-  }
-  await clearPreconsentBuffers(tx, granted.id);
-  if (expired) {
-    await queueBotMessage(tx, ctx, {
-      client: granted,
-      template: 'buffer_expired',
-      key: `expired:${sourceKey}`,
-    });
-  }
+
+    const buffers = await listPreconsentBuffers(tx, granted.id);
+    const now = await requireOne(tx, 'SELECT now() AS now');
+    let expired = false;
+
+    for (const buffer of buffers) {
+        if (new Date(buffer.expires_at).getTime() <= new Date(String(now.now)).getTime()) {
+            expired = true;
+            continue;
+        }
+
+        await handleClientContent(tx, ctx, {
+            client: granted,
+            input: decrypt<ClientInput>(buffer.payload, ctx.config.ENCRYPTION_KEY),
+            receivedAt: buffer.created_at,
+        });
+    }
+
+    await clearPreconsentBuffers(tx, granted.id);
+
+    if (expired) {
+        await queueBotMessage(tx, ctx, {
+            client: granted,
+            template: 'buffer_expired',
+            key: `expired:${sourceKey}`,
+        });
+    }
 }

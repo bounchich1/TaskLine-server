@@ -12,102 +12,109 @@ const MAX_RETRY_BACKOFF_SECONDS = 1800;
 const MAX_RETRIED_ATTEMPTS = 6;
 
 export interface SendDeps {
-  db: Database;
-  max: MaxTransport;
-  files?: Files;
+    db: Database;
+    max: MaxTransport;
+    files?: Files;
 }
 
 export interface SendOutcome {
-  state: string;
-  reason: string | null;
-  ref: string | null;
-  retryAfter: number;
+    state: string;
+    reason: string | null;
+    ref: string | null;
+    retryAfter: number;
 }
 
 type CallbackAnswerBody = Row & {
-  callback_id?: string;
-  notification: string;
+    callback_id?: string;
+    notification: string;
 };
 
-export async function sendDelivery(
-  deps: SendDeps,
-  { delivery, client }: ClaimedDelivery,
-): Promise<SendOutcome> {
-  try {
-    if (delivery.kind === 'callback_answer') {
-      const answer = delivery.body as CallbackAnswerBody;
-      await deps.max.answer(String(answer.callback_id), answer.notification);
-      return delivered(null);
+export async function sendDelivery(deps: SendDeps, { delivery, client }: ClaimedDelivery): Promise<SendOutcome> {
+    try {
+        if (delivery.kind === 'callback_answer') {
+            const answer = delivery.body as CallbackAnswerBody;
+
+            await deps.max.answer(String(answer.callback_id), answer.notification);
+
+            return delivered(null);
+        }
+
+        const body = await withUploadedAttachments(deps, delivery.body);
+
+        if (await wasCanceledMeanwhile(deps.db, delivery)) {
+            return {
+                state: 'canceled',
+                reason: null,
+                ref: null,
+                retryAfter: DEFAULT_RETRY_AFTER_SECONDS,
+            };
+        }
+
+        return delivered(await deps.max.send(client.chat_id, body));
+    } catch (error) {
+        return failureOutcome(error, delivery.attempts);
     }
-    const body = await withUploadedAttachments(deps, delivery.body);
-    if (await wasCanceledMeanwhile(deps.db, delivery)) {
-      return {
-        state: 'canceled',
-        reason: null,
-        ref: null,
-        retryAfter: DEFAULT_RETRY_AFTER_SECONDS,
-      };
-    }
-    return delivered(await deps.max.send(client.chat_id, body));
-  } catch (error) {
-    return failureOutcome(error, delivery.attempts);
-  }
 }
 
 function delivered(ref: string | null): SendOutcome {
-  return { state: 'delivered', reason: null, ref, retryAfter: DEFAULT_RETRY_AFTER_SECONDS };
+    return { state: 'delivered', reason: null, ref, retryAfter: DEFAULT_RETRY_AFTER_SECONDS };
 }
 
 async function withUploadedAttachments(deps: SendDeps, deliveryBody: Row): Promise<Row> {
-  const { attachment_ids: attachmentIds, ...body } = deliveryBody;
-  if (!Array.isArray(attachmentIds) || !attachmentIds.length) {
+    const { attachment_ids: attachmentIds, ...body } = deliveryBody;
+
+    if (!Array.isArray(attachmentIds) || !attachmentIds.length) {
+        return body;
+    }
+
+    ensure(deps.files, 'file_worker_unavailable', 503);
+    const attachments: Row[] = [];
+
+    body.attachments = attachments;
+
+    for (const id of attachmentIds as string[]) {
+        attachments.push(await uploadAttachment(deps.max, deps.files, id));
+    }
+
     return body;
-  }
-  ensure(deps.files, 'file_worker_unavailable', 503);
-  const attachments: Row[] = [];
-  body.attachments = attachments;
-  for (const id of attachmentIds as string[]) {
-    attachments.push(await uploadAttachment(deps.max, deps.files, id));
-  }
-  return body;
 }
 
 async function uploadAttachment(max: MaxTransport, files: Files, id: string): Promise<Row> {
-  const file = await files.materialize(id);
-  try {
-    return await max.upload(file.kind, file.path, file.filename, file.mime);
-  } finally {
-    await file.cleanup();
-  }
+    const file = await files.materialize(id);
+
+    try {
+        return await max.upload(file.kind, file.path, file.filename, file.mime);
+    } finally {
+        await file.cleanup();
+    }
 }
 
 async function wasCanceledMeanwhile(db: Database, delivery: Delivery): Promise<boolean> {
-  const current = await one(
-    db,
-    `SELECT d.state,c.consent_state FROM deliveries d JOIN clients c ON c.id=d.client_id
+    const current = await one(
+        db,
+        `SELECT d.state,c.consent_state FROM deliveries d JOIN clients c ON c.id=d.client_id
      WHERE d.id=$1`,
-    [delivery.id],
-  );
-  return (
-    current?.state !== 'sending' ||
-    (delivery.kind === 'staff' && current.consent_state !== 'granted')
-  );
+        [delivery.id],
+    );
+
+    return current?.state !== 'sending' || (delivery.kind === 'staff' && current.consent_state !== 'granted');
 }
 
 function failureOutcome(error: unknown, attempts: number): SendOutcome {
-  const failure =
-    error instanceof TransportFailure ? error : new TransportFailure('unknown', 'delivery_unknown');
-  return {
-    state: failureState(failure, attempts),
-    reason: failure.reason,
-    ref: null,
-    retryAfter: Math.max(failure.retryAfter, Math.min(MAX_RETRY_BACKOFF_SECONDS, 2 ** attempts)),
-  };
+    const failure = error instanceof TransportFailure ? error : new TransportFailure('unknown', 'delivery_unknown');
+
+    return {
+        state: failureState(failure, attempts),
+        reason: failure.reason,
+        ref: null,
+        retryAfter: Math.max(failure.retryAfter, Math.min(MAX_RETRY_BACKOFF_SECONDS, 2 ** attempts)),
+    };
 }
 
 function failureState(failure: TransportFailure, attempts: number): string {
-  if (failure.outcome !== 'retry') {
-    return failure.outcome;
-  }
-  return attempts <= MAX_RETRIED_ATTEMPTS ? 'retry_wait' : 'failed';
+    if (failure.outcome !== 'retry') {
+        return failure.outcome;
+    }
+
+    return attempts <= MAX_RETRIED_ATTEMPTS ? 'retry_wait' : 'failed';
 }

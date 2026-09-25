@@ -9,83 +9,94 @@ const MAX_BACKOFF_SECONDS = 1800;
 const DISABLED_RETRY_SECONDS = 60;
 
 const DEFERRED_CODES = [
-  'ai_busy',
-  'memory_writer_busy',
-  'snapshot_waiting_files',
-  'memory_disabled',
-  'ai_disabled',
-  'gateway_unavailable',
+    'ai_busy',
+    'memory_writer_busy',
+    'snapshot_waiting_files',
+    'memory_disabled',
+    'ai_disabled',
+    'gateway_unavailable',
 ];
+
 const UNCERTAIN_CODES = ['ai_uncertain', 'memory_write_unknown', 'memory_still_unknown'];
 const SUPPRESSED_CODES = ['job_ineligible', 'job_stale'];
 const DISABLED_CODES = ['memory_disabled', 'ai_disabled'];
 const LEARNING_STATUS = { canceled: 'suppressed', unknown: 'needs_review', failed: 'failed' };
 
 export interface JobFailure {
-  code: string;
-  state: 'canceled' | 'unknown' | 'failed' | 'pending';
-  retries: number;
-  delaySeconds: number;
+    code: string;
+    state: 'canceled' | 'unknown' | 'failed' | 'pending';
+    retries: number;
+    delaySeconds: number;
 }
 
 export function classifyJobFailure(error: unknown, previousRetries: number): JobFailure {
-  const code = error instanceof AppError ? error.code : 'worker_error';
-  const deferred = DEFERRED_CODES.includes(code);
-  const retries = previousRetries + (deferred ? 0 : 1);
-  const rejected = error instanceof AppError && error.status === 422;
-  const delaySeconds = DISABLED_CODES.includes(code)
-    ? DISABLED_RETRY_SECONDS
-    : Math.min(MAX_BACKOFF_SECONDS, 2 ** Math.min(retries + 1, 10));
-  return {
-    code,
-    state: failureState(code, { deferred, retries, rejected }),
-    retries,
-    delaySeconds,
-  };
+    const code = error instanceof AppError ? error.code : 'worker_error';
+    const deferred = DEFERRED_CODES.includes(code);
+    const retries = previousRetries + (deferred ? 0 : 1);
+    const rejected = error instanceof AppError && error.status === 422;
+
+    const delaySeconds = DISABLED_CODES.includes(code)
+        ? DISABLED_RETRY_SECONDS
+        : Math.min(MAX_BACKOFF_SECONDS, 2 ** Math.min(retries + 1, 10));
+
+    return {
+        code,
+        state: failureState(code, { deferred, retries, rejected }),
+        retries,
+        delaySeconds,
+    };
 }
 
 function failureState(
-  code: string,
-  { deferred, retries, rejected }: { deferred: boolean; retries: number; rejected: boolean },
+    code: string,
+    { deferred, retries, rejected }: { deferred: boolean; retries: number; rejected: boolean },
 ): JobFailure['state'] {
-  if (SUPPRESSED_CODES.includes(code)) {
-    return 'canceled';
-  }
-  if (UNCERTAIN_CODES.includes(code)) {
-    return 'unknown';
-  }
-  if (!deferred && (retries >= MAX_ATTEMPTS || rejected)) {
-    return 'failed';
-  }
-  return 'pending';
+    if (SUPPRESSED_CODES.includes(code)) {
+        return 'canceled';
+    }
+
+    if (UNCERTAIN_CODES.includes(code)) {
+        return 'unknown';
+    }
+
+    if (!deferred && (retries >= MAX_ATTEMPTS || rejected)) {
+        return 'failed';
+    }
+
+    return 'pending';
 }
 
 export async function recordJobFailure(
-  tx: Sql,
-  ctx: Ctx,
-  { job, failure }: { job: Job; failure: JobFailure },
+    tx: Sql,
+    ctx: Ctx,
+    { job, failure }: { job: Job; failure: JobFailure },
 ): Promise<void> {
-  const { code, state, retries, delaySeconds } = failure;
-  const updated = await tx.query(
-    `UPDATE jobs SET state=$3,reason=$4,payload=jsonb_set(payload,'{retry_count}',$5::jsonb),
+    const { code, state, retries, delaySeconds } = failure;
+
+    const updated = await tx.query(
+        `UPDATE jobs SET state=$3,reason=$4,payload=jsonb_set(payload,'{retry_count}',$5::jsonb),
      due_at=now()+($6*interval '1 second')
      WHERE id=$1 AND generation=$2 AND state='running' RETURNING id`,
-    [job.id, job.generation, state, code, JSON.stringify(retries), delaySeconds],
-  );
-  if (!updated.rows.length) {
-    return;
-  }
-  if (job.kind === 'learning' && state !== 'pending') {
-    await tx.query('UPDATE closures SET learning_status=$2 WHERE id=$1 AND NOT invalidated', [
-      job.ref_id,
-      LEARNING_STATUS[state],
-    ]);
-  }
-  if (job.kind === 'triage' && state === 'failed') {
-    await tx.query(
-      "UPDATE tickets SET ai_status='failed',review_required=true WHERE id=$1 AND ai_status='pending'",
-      [job.ref_id],
+        [job.id, job.generation, state, code, JSON.stringify(retries), delaySeconds],
     );
-    await emit(tx, ctx.org, { type: 'ticket.classified', ticketId: job.ref_id });
-  }
+
+    if (!updated.rows.length) {
+        return;
+    }
+
+    if (job.kind === 'learning' && state !== 'pending') {
+        await tx.query('UPDATE closures SET learning_status=$2 WHERE id=$1 AND NOT invalidated', [
+            job.ref_id,
+            LEARNING_STATUS[state],
+        ]);
+    }
+
+    if (job.kind === 'triage' && state === 'failed') {
+        await tx.query(
+            "UPDATE tickets SET ai_status='failed',review_required=true WHERE id=$1 AND ai_status='pending'",
+            [job.ref_id],
+        );
+
+        await emit(tx, ctx.org, { type: 'ticket.classified', ticketId: job.ref_id });
+    }
 }

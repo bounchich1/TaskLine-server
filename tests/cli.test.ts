@@ -12,41 +12,42 @@ import { fixture } from './helpers.js';
 let context: Awaited<ReturnType<typeof fixture>>;
 
 beforeEach(async () => {
-  context = await fixture();
+    context = await fixture();
 });
 
 afterEach(async () => {
-  await context.db.close();
+    await context.db.close();
 });
 
-const run = (command: typeof migrateCommand) =>
-  command({ db: context.db, config: context.c, args: [] });
+const run = (command: typeof migrateCommand) => command({ db: context.db, config: context.c, args: [] });
 
 it('reports an up-to-date schema on a repeated migrate', async () => {
-  expect(await run(migrateCommand)).toBe('Schema up to date; reserved defaults ready.');
+    expect(await run(migrateCommand)).toBe('Schema up to date; reserved defaults ready.');
 });
 
 it('lists the hosts of attachments waiting for download', async () => {
-  expect(await run(mediaHostsCommand)).toBe('No attachments are waiting for download.');
-  const client = (await context.create()).client_id;
-  const { max_user_id: userId, chat_id: chatId } = await requireOne<Client>(
-    context.db,
-    'SELECT * FROM clients WHERE id=$1',
-    [client],
-  );
-  const key = `m-${randomUUID()}`;
-  await context.domain.ingest({
-    kind: 'message',
-    userId,
-    chatId,
-    messageId: key,
-    sourceKey: key,
-    text: 'Скриншот ошибки',
-    attachments: [{ kind: 'image', filename: 'error.png', url: 'https://files.example.test/a/1' }],
-  });
-  await context.domain.processClient(client);
+    expect(await run(mediaHostsCommand)).toBe('No attachments are waiting for download.');
+    const client = (await context.create()).client_id;
 
-  expect(await run(mediaHostsCommand)).toBe(
-    'Hosts of attachments waiting for download: files.example.test',
-  );
+    const { max_user_id: userId, chat_id: chatId } = await requireOne<Client>(
+        context.db,
+        'SELECT * FROM clients WHERE id=$1',
+        [client],
+    );
+
+    const key = `m-${randomUUID()}`;
+
+    await context.domain.ingest({
+        kind: 'message',
+        userId,
+        chatId,
+        messageId: key,
+        sourceKey: key,
+        text: 'Скриншот ошибки',
+        attachments: [{ kind: 'image', filename: 'error.png', url: 'https://files.example.test/a/1' }],
+    });
+
+    await context.domain.processClient(client);
+
+    expect(await run(mediaHostsCommand)).toBe('Hosts of attachments waiting for download: files.example.test');
 });

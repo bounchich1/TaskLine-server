@@ -12,100 +12,116 @@ const PAGE_SIZE = 250;
 const MAX_ENUMERATED = 100000;
 
 export interface MemoryTransport {
-  remember(content: string, project: string, concepts: string[]): Promise<Row>;
-  get(id: string): Promise<Row | null>;
-  search(query: string): Promise<string[]>;
-  list(): Promise<Row[]>;
-  forget(id: string): Promise<void>;
+    remember(content: string, project: string, concepts: string[]): Promise<Row>;
+    get(id: string): Promise<Row | null>;
+    search(query: string): Promise<string[]>;
+    list(): Promise<Row[]>;
+    forget(id: string): Promise<void>;
 }
 
 export class AgentMemoryClient implements MemoryTransport {
-  constructor(private readonly config: Config) {}
+    constructor(private readonly config: Config) {}
 
-  async remember(content: string, project: string, concepts: string[]): Promise<Row> {
-    const result = await this.request('/agentmemory/remember', {
-      content,
-      type: 'workflow',
-      concepts,
-      project,
-      agentId: AGENT_ID,
-      ttlDays: 180,
-    });
-    ensure(result?.success === true, 'memory_write_unknown', 503);
-    return object(result.memory);
-  }
+    async remember(content: string, project: string, concepts: string[]): Promise<Row> {
+        const result = await this.request('/agentmemory/remember', {
+            content,
+            type: 'workflow',
+            concepts,
+            project,
+            agentId: AGENT_ID,
+            ttlDays: 180,
+        });
 
-  async get(id: string): Promise<Row | null> {
-    const result = await this.request(`/agentmemory/memories/${encodeURIComponent(id)}`);
-    return result ? object(result.memory) : null;
-  }
+        ensure(result?.success === true, 'memory_write_unknown', 503);
 
-  async search(query: string): Promise<string[]> {
-    const result = await this.request('/agentmemory/smart-search', {
-      query: query.slice(0, 2000),
-      limit: 20,
-      includeLessons: false,
-      agentId: AGENT_ID,
-    });
-    ensure(Array.isArray(result?.results), 'invalid_memory_response', 503);
-    return (result.results as unknown[])
-      .map((item) => object(item).obsId)
-      .filter((id): id is string => typeof id === 'string' && id.startsWith('mem_'));
-  }
-
-  async list(): Promise<Row[]> {
-    const all: Row[] = [];
-    let total: number | undefined;
-    for (;;) {
-      const result = await this.request(
-        `/agentmemory/memories?agentId=${AGENT_ID}&limit=${PAGE_SIZE}&offset=${all.length}`,
-      );
-      ensure(
-        Array.isArray(result?.memories) && Number.isInteger(result.total),
-        'invalid_memory_enumeration',
-        503,
-      );
-      ensure(total === undefined || total === result.total, 'unstable_memory_enumeration', 503);
-      total = Number(result.total);
-      const page = (result.memories as unknown[]).map(object);
-      all.push(...page);
-      if (all.length >= total) {
-        return all;
-      }
-      ensure(page.length > 0 && all.length < MAX_ENUMERATED, 'memory_enumeration_limit', 503);
+        return object(result.memory);
     }
-  }
 
-  async forget(id: string): Promise<void> {
-    const result = await this.request('/agentmemory/forget', { memoryId: id });
-    ensure(result?.success === true, 'memory_delete_failed', 503);
-  }
+    async get(id: string): Promise<Row | null> {
+        const result = await this.request(`/agentmemory/memories/${encodeURIComponent(id)}`);
 
-  private async request(path: string, body?: Row): Promise<Row | null> {
-    const response = await fetch(new URL(path, this.config.AGENTMEMORY_URL), {
-      method: body ? 'POST' : 'GET',
-      headers: {
-        Authorization: `Bearer ${this.config.AGENTMEMORY_SECRET}`,
-        'Content-Type': 'application/json',
-      },
-      body: body ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(10000),
-      redirect: 'error',
-    });
-    if (response.status === 404 && !body) {
-      await response.body?.cancel();
-      return null;
+        return result ? object(result.memory) : null;
     }
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new Error('memory_unavailable');
+
+    async search(query: string): Promise<string[]> {
+        const result = await this.request('/agentmemory/smart-search', {
+            query: query.slice(0, 2000),
+            limit: 20,
+            includeLessons: false,
+            agentId: AGENT_ID,
+        });
+
+        ensure(Array.isArray(result?.results), 'invalid_memory_response', 503);
+
+        return (result.results as unknown[])
+            .map((item) => object(item).obsId)
+            .filter((id): id is string => typeof id === 'string' && id.startsWith('mem_'));
     }
-    const result = object(
-      strictJson(await boundedText(response, MAX_RESPONSE_BYTES), false, MAX_RESPONSE_BYTES),
-    );
-    if (result.success === false) {
-      throw new Error('memory_rejected');
+
+    async list(): Promise<Row[]> {
+        const all: Row[] = [];
+        let total: number | undefined;
+
+        for (;;) {
+            const result = await this.request(
+                `/agentmemory/memories?agentId=${AGENT_ID}&limit=${PAGE_SIZE}&offset=${all.length}`,
+            );
+
+            ensure(
+                Array.isArray(result?.memories) && Number.isInteger(result.total),
+                'invalid_memory_enumeration',
+                503,
+            );
+
+            ensure(total === undefined || total === result.total, 'unstable_memory_enumeration', 503);
+            total = Number(result.total);
+            const page = (result.memories as unknown[]).map(object);
+
+            all.push(...page);
+
+            if (all.length >= total) {
+                return all;
+            }
+
+            ensure(page.length > 0 && all.length < MAX_ENUMERATED, 'memory_enumeration_limit', 503);
+        }
     }
-    return result;
-  }
+
+    async forget(id: string): Promise<void> {
+        const result = await this.request('/agentmemory/forget', { memoryId: id });
+
+        ensure(result?.success === true, 'memory_delete_failed', 503);
+    }
+
+    private async request(path: string, body?: Row): Promise<Row | null> {
+        const response = await fetch(new URL(path, this.config.AGENTMEMORY_URL), {
+            method: body ? 'POST' : 'GET',
+            headers: {
+                Authorization: `Bearer ${this.config.AGENTMEMORY_SECRET}`,
+                'Content-Type': 'application/json',
+            },
+            body: body ? JSON.stringify(body) : undefined,
+            signal: AbortSignal.timeout(10000),
+            redirect: 'error',
+        });
+
+        if (response.status === 404 && !body) {
+            await response.body?.cancel();
+
+            return null;
+        }
+
+        if (!response.ok) {
+            await response.body?.cancel();
+            throw new Error('memory_unavailable');
+        }
+
+        const result = object(strictJson(await boundedText(response, MAX_RESPONSE_BYTES), false, MAX_RESPONSE_BYTES));
+
+        if (result.success === false) {
+            throw new Error('memory_rejected');
+        }
+
+        return result;
+    }
 }

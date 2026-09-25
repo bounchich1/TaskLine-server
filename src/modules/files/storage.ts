@@ -5,87 +5,93 @@ import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 import {
-  CreateBucketCommand,
-  GetObjectCommand,
-  HeadBucketCommand,
-  PutBucketVersioningCommand,
-  PutObjectCommand,
-  S3Client,
+    CreateBucketCommand,
+    GetObjectCommand,
+    HeadBucketCommand,
+    PutBucketVersioningCommand,
+    PutObjectCommand,
+    S3Client,
 } from '@aws-sdk/client-s3';
 
 import type { Config } from '../../shared/config.js';
 import { ensure } from '../../shared/errors.js';
 
 export class ObjectStorage {
-  private readonly s3?: S3Client;
+    private readonly s3?: S3Client;
 
-  constructor(private readonly config: Config) {
-    if (config.STORAGE_MODE === 's3') {
-      this.s3 = new S3Client({
-        region: config.S3_REGION,
-        endpoint: config.S3_ENDPOINT,
-        forcePathStyle: !!config.S3_ENDPOINT,
-        credentials: {
-          accessKeyId: config.S3_ACCESS_KEY_ID,
-          secretAccessKey: config.S3_SECRET_ACCESS_KEY,
-        },
-      });
+    constructor(private readonly config: Config) {
+        if (config.STORAGE_MODE === 's3') {
+            this.s3 = new S3Client({
+                region: config.S3_REGION,
+                endpoint: config.S3_ENDPOINT,
+                forcePathStyle: !!config.S3_ENDPOINT,
+                credentials: {
+                    accessKeyId: config.S3_ACCESS_KEY_ID,
+                    secretAccessKey: config.S3_SECRET_ACCESS_KEY,
+                },
+            });
+        }
     }
-  }
 
-  async prepareBucket(): Promise<void> {
-    ensure(this.s3, 'storage_not_s3', 422, 'STORAGE_MODE=s3 required');
-    const bucket = this.config.S3_BUCKET;
-    try {
-      await this.s3.send(new HeadBucketCommand({ Bucket: bucket }));
-    } catch (error) {
-      if (
-        (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode !== 404
-      ) {
-        throw error;
-      }
-      await this.s3.send(new CreateBucketCommand({ Bucket: bucket }));
+    async prepareBucket(): Promise<void> {
+        ensure(this.s3, 'storage_not_s3', 422, 'STORAGE_MODE=s3 required');
+        const bucket = this.config.S3_BUCKET;
+
+        try {
+            await this.s3.send(new HeadBucketCommand({ Bucket: bucket }));
+        } catch (error) {
+            if ((error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode !== 404) {
+                throw error;
+            }
+
+            await this.s3.send(new CreateBucketCommand({ Bucket: bucket }));
+        }
+
+        await this.s3.send(
+            new PutBucketVersioningCommand({
+                Bucket: bucket,
+                VersioningConfiguration: { Status: 'Enabled' },
+            }),
+        );
     }
-    await this.s3.send(
-      new PutBucketVersioningCommand({
-        Bucket: bucket,
-        VersioningConfiguration: { Status: 'Enabled' },
-      }),
-    );
-  }
 
-  async put(key: string, path: string, mime: string): Promise<void> {
-    if (this.s3) {
-      await this.s3.send(
-        new PutObjectCommand({
-          Bucket: this.config.S3_BUCKET,
-          Key: key,
-          Body: createReadStream(path),
-          ContentType: mime,
-          ContentLength: (await stat(path)).size,
-          ServerSideEncryption: 'AES256',
-        }),
-      );
-      return;
+    async put(key: string, path: string, mime: string): Promise<void> {
+        if (this.s3) {
+            await this.s3.send(
+                new PutObjectCommand({
+                    Bucket: this.config.S3_BUCKET,
+                    Key: key,
+                    Body: createReadStream(path),
+                    ContentType: mime,
+                    ContentLength: (await stat(path)).size,
+                    ServerSideEncryption: 'AES256',
+                }),
+            );
+
+            return;
+        }
+
+        const target = this.localPath(key);
+
+        await mkdir(resolve(target, '..'), { recursive: true });
+        await pipeline(createReadStream(path), createWriteStream(target, { flags: 'w', mode: 0o600 }));
     }
-    const target = this.localPath(key);
-    await mkdir(resolve(target, '..'), { recursive: true });
-    await pipeline(createReadStream(path), createWriteStream(target, { flags: 'w', mode: 0o600 }));
-  }
 
-  async read(key: string): Promise<Readable> {
-    if (this.s3) {
-      const result = await this.s3.send(
-        new GetObjectCommand({ Bucket: this.config.S3_BUCKET, Key: key }),
-      );
-      ensure(result.Body, 'object_missing', 404);
-      return result.Body as Readable;
+    async read(key: string): Promise<Readable> {
+        if (this.s3) {
+            const result = await this.s3.send(new GetObjectCommand({ Bucket: this.config.S3_BUCKET, Key: key }));
+
+            ensure(result.Body, 'object_missing', 404);
+
+            return result.Body as Readable;
+        }
+
+        return createReadStream(this.localPath(key));
     }
-    return createReadStream(this.localPath(key));
-  }
 
-  private localPath(key: string): string {
-    ensure(/^[a-f0-9-]{36}\/[a-f0-9-]{36}$/.test(key), 'invalid_object_key', 500);
-    return resolve(this.config.STORAGE_PATH, key);
-  }
+    private localPath(key: string): string {
+        ensure(/^[a-f0-9-]{36}\/[a-f0-9-]{36}$/.test(key), 'invalid_object_key', 500);
+
+        return resolve(this.config.STORAGE_PATH, key);
+    }
 }

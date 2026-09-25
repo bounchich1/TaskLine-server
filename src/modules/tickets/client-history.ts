@@ -5,31 +5,25 @@ import type { Client, Ticket } from '../../shared/types/entities.js';
 import { queueHistoryPage } from '../outbox/index.js';
 
 const STATUS_LABELS: Record<Ticket['status'], string> = {
-  open: 'Открыта',
-  in_progress: 'В работе',
-  awaiting_rating: 'Ожидает оценки',
-  closed: 'Закрыта',
+    open: 'Открыта',
+    in_progress: 'В работе',
+    awaiting_rating: 'Ожидает оценки',
+    closed: 'Закрыта',
 };
 
-export async function sendTicketHistory(
-  tx: Sql,
-  ctx: Ctx,
-  client: Client,
-  sourceKey: string,
-): Promise<void> {
-  const tickets = (
-    await tx.query<Ticket>(
-      'SELECT * FROM tickets WHERE org_id=$1 AND client_id=$2 ORDER BY created_at DESC LIMIT 20',
-      [ctx.org, client.id],
-    )
-  ).rows;
-  const text = tickets.length
-    ? tickets
-        .map(
-          (ticket) =>
-            `№${formatTicketNumber(ticket.ticket_number)} — ${STATUS_LABELS[ticket.status]}`,
+export async function sendTicketHistory(tx: Sql, ctx: Ctx, client: Client, sourceKey: string): Promise<void> {
+    const tickets = (
+        await tx.query<Ticket>(
+            'SELECT * FROM tickets WHERE org_id=$1 AND client_id=$2 ORDER BY created_at DESC LIMIT 20',
+            [ctx.org, client.id],
         )
-        .join('\n')
-    : 'У вас пока нет обращений.';
-  await queueHistoryPage(tx, ctx, client, { sourceKey, text });
+    ).rows;
+
+    const text = tickets.length
+        ? tickets
+              .map((ticket) => `№${formatTicketNumber(ticket.ticket_number)} — ${STATUS_LABELS[ticket.status]}`)
+              .join('\n')
+        : 'У вас пока нет обращений.';
+
+    await queueHistoryPage(tx, ctx, client, { sourceKey, text });
 }

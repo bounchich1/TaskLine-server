@@ -5,53 +5,53 @@ import { queueBotMessage } from '../outbox/index.js';
 
 import { clearPreconsentBuffers } from './preconsent-buffers.js';
 
-export async function grantConsent(
-  tx: Sql,
-  ctx: Ctx,
-  client: Client,
-  sourceKey: string,
-): Promise<Client | undefined> {
-  const policy = ctx.config.POLICY_VERSION;
-  if (client.consent_state === 'granted' && client.consent_version === policy) {
-    return undefined;
-  }
-  const granted = await requireOne<Client>(
-    tx,
-    `UPDATE clients SET consent_state='granted',consent_version=$2,consent_at=now(),
+export async function grantConsent(tx: Sql, ctx: Ctx, client: Client, sourceKey: string): Promise<Client | undefined> {
+    const policy = ctx.config.POLICY_VERSION;
+
+    if (client.consent_state === 'granted' && client.consent_version === policy) {
+        return undefined;
+    }
+
+    const granted = await requireOne<Client>(
+        tx,
+        `UPDATE clients SET consent_state='granted',consent_version=$2,consent_at=now(),
        consent_revision=consent_revision+1
      WHERE id=$1 RETURNING *`,
-    [client.id, policy],
-  );
-  await tx.query(
-    "INSERT INTO consent_events(org_id,client_id,action,policy_version) VALUES($1,$2,'grant',$3)",
-    [ctx.org, granted.id, policy],
-  );
-  await queueBotMessage(tx, ctx, {
-    client: granted,
-    template: 'consent_accepted',
-    key: `accepted:${sourceKey}`,
-  });
-  return granted;
+        [client.id, policy],
+    );
+
+    await tx.query("INSERT INTO consent_events(org_id,client_id,action,policy_version) VALUES($1,$2,'grant',$3)", [
+        ctx.org,
+        granted.id,
+        policy,
+    ]);
+
+    await queueBotMessage(tx, ctx, {
+        client: granted,
+        template: 'consent_accepted',
+        key: `accepted:${sourceKey}`,
+    });
+
+    return granted;
 }
 
-export async function declineConsent(
-  tx: Sql,
-  ctx: Ctx,
-  client: Client,
-  sourceKey: string,
-): Promise<void> {
-  if (client.consent_state === 'granted') {
-    return;
-  }
-  await tx.query("UPDATE clients SET consent_state='declined' WHERE id=$1", [client.id]);
-  await clearPreconsentBuffers(tx, client.id);
-  await tx.query(
-    "INSERT INTO consent_events(org_id,client_id,action,policy_version) VALUES($1,$2,'decline',$3)",
-    [ctx.org, client.id, ctx.config.POLICY_VERSION],
-  );
-  await queueBotMessage(tx, ctx, {
-    client,
-    template: 'consent_declined',
-    key: `declined:${sourceKey}`,
-  });
+export async function declineConsent(tx: Sql, ctx: Ctx, client: Client, sourceKey: string): Promise<void> {
+    if (client.consent_state === 'granted') {
+        return;
+    }
+
+    await tx.query("UPDATE clients SET consent_state='declined' WHERE id=$1", [client.id]);
+    await clearPreconsentBuffers(tx, client.id);
+
+    await tx.query("INSERT INTO consent_events(org_id,client_id,action,policy_version) VALUES($1,$2,'decline',$3)", [
+        ctx.org,
+        client.id,
+        ctx.config.POLICY_VERSION,
+    ]);
+
+    await queueBotMessage(tx, ctx, {
+        client,
+        template: 'consent_declined',
+        key: `declined:${sourceKey}`,
+    });
 }
