@@ -107,26 +107,65 @@ it('lists employees, dictionaries, counts and notifications, and marks one read'
   expect(stored?.read_at).not.toBeNull();
 });
 
-it('streams UI events over SSE', async () => {
-  await context.create();
+it('signs a local stand in on every reload', async () => {
+  // More than the 5 logins per launch that a replayed MAX launch gets.
+  const tokens = new Set<string>();
+  for (let reload = 0; reload < 7; reload++) {
+    tokens.add((await login('1')).token);
+  }
+  expect(tokens.size).toBe(7);
+});
+
+/** Opens the SSE stream; `until` reads from it until the text so far contains a marker. */
+async function openEvents(path: string) {
   const { token } = await login('1');
   const address = await app.listen({ port: 0, host: '127.0.0.1' });
   const abort = new AbortController();
-  const response = await fetch(`${address}/v1/events`, {
+  const response = await fetch(`${address}${path}`, {
     headers: { authorization: `Bearer ${token}`, origin: context.c.APP_ORIGIN },
     signal: abort.signal,
   });
-  expect(response.headers.get('content-type')).toBe('text/event-stream');
-  expect(response.headers.get('access-control-allow-origin')).toBe(context.c.APP_ORIGIN);
   const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader();
   let text = '';
-  while (!text.includes('event: change')) {
-    const { value, done } = await reader.read();
-    if (done) {
-      break;
+  const until = async (marker: string) => {
+    while (!text.includes(marker)) {
+      const { value, done } = await reader.read();
+      if (done) {
+        break;
+      }
+      text += value;
     }
-    text += value;
-  }
-  abort.abort();
+    return text;
+  };
+  const close = () => {
+    abort.abort();
+  };
+  return { response, until, close };
+}
+
+it('streams UI events over SSE, replaying from a cursor', async () => {
+  await context.create();
+  const stream = await openEvents('/v1/events?cursor=0');
+  expect(stream.response.headers.get('content-type')).toBe('text/event-stream');
+  expect(stream.response.headers.get('access-control-allow-origin')).toBe(context.c.APP_ORIGIN);
+  const text = await stream.until('event: change');
+  stream.close();
   expect(text).toMatch(/^event: ready\ndata: \{\}\n\nid: \d+\nevent: change\ndata: \{/);
+});
+
+it('starts the SSE stream from now when no cursor is given', async () => {
+  await context.create();
+  const before = await one<{ cursor: string }>(
+    context.db,
+    'SELECT max(cursor)::text AS cursor FROM ui_events',
+  );
+  const stream = await openEvents('/v1/events');
+  await stream.until('event: ready');
+  await context.create();
+  const text = await stream.until('event: change');
+  stream.close();
+  // Only events of the ticket created after connecting: the earlier ones are not replayed.
+  const ids = [...text.matchAll(/^id: (\d+)$/gm)].map((match) => Number(match[1]));
+  expect(ids.length).toBeGreaterThan(0);
+  expect(Math.min(...ids)).toBeGreaterThan(Number(before?.cursor));
 });

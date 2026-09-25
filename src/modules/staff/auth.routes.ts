@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
@@ -17,8 +19,6 @@ interface AuthRouteOptions {
 
 const SESSION_COOKIE = 'support_session';
 const SESSION_MAX_AGE_SECONDS = 28800;
-/** A dev login is keyed to a 5-minute window, like a MAX launch is to its signed data. */
-const DEV_LOGIN_WINDOW_MS = 300000;
 const LOOPBACK_ADDRESSES = ['127.0.0.1', '::1'];
 
 const maxLoginBody = z.object({ init_data: z.string().min(1).max(16384) }).strict();
@@ -74,8 +74,9 @@ function addDevLogin(app: FastifyInstance, { db, config }: AuthRouteOptions): vo
       404,
     );
     const { user_id: userId } = devLoginBody.parse(request.body);
-    const window = Math.floor(Date.now() / DEV_LOGIN_WINDOW_MS);
-    const issued = await issueSession(db, config, userId, hash(`dev:${userId}:${window}`));
+    // Every dev login is a launch of its own. The replay limit guards signed MAX launch data,
+    // which a dev login has none of; a local stand reloads far more than 5 times in 5 minutes.
+    const issued = await issueSession(db, config, userId, hash(`dev:${userId}:${randomUUID()}`));
     reply.setCookie(SESSION_COOKIE, issued.token, {
       httpOnly: true,
       sameSite: 'strict',
