@@ -35,7 +35,7 @@ function addMaxLogin(app: FastifyInstance, { db, config }: AuthRouteOptions): vo
 
     app.post('/v1/auth/max', { config: { rateLimit } }, async (request, reply) => {
         const body = maxLoginBody.parse(request.body);
-        const launch = verifyLaunchOrReject(body.init_data, config.MAX_BOT_TOKEN);
+        const launch = verifyLaunchOrReject(body.init_data, [config.MAX_STAFF_BOT_TOKEN, config.MAX_BOT_TOKEN]);
         const issued = await issueSession(db, config, launch.userId, launch.digest);
 
         reply.setCookie(SESSION_COOKIE, issued.token, {
@@ -50,9 +50,9 @@ function addMaxLogin(app: FastifyInstance, { db, config }: AuthRouteOptions): vo
     });
 }
 
-function verifyLaunchOrReject(initData: string, botToken: string): VerifiedLaunch {
+function verifyLaunchOrReject(initData: string, botTokens: string[]): VerifiedLaunch {
     try {
-        return verifyLaunch(initData, botToken);
+        return verifyLaunch(initData, botTokens);
     } catch (error) {
         if (error instanceof AppError) {
             throw error;

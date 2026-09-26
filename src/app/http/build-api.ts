@@ -11,7 +11,7 @@ import { dictionariesRoutes } from '../../modules/dictionaries/index.js';
 import { Files, filesRoutes } from '../../modules/files/index.js';
 import { devInboundRoutes, Inbox, webhookRoutes } from '../../modules/inbox/index.js';
 import { eventsRoutes, notificationsRoutes } from '../../modules/notifications/index.js';
-import { authRoutes, employeesRoutes } from '../../modules/staff/index.js';
+import { authRoutes, employeesRoutes, StaffBot, staffBotRoutes } from '../../modules/staff/index.js';
 import { TicketCommands, TicketQueries, ticketRoutes } from '../../modules/tickets/index.js';
 import type { Config } from '../../shared/config.js';
 import type { Database } from '../../shared/db.js';
@@ -73,6 +73,12 @@ async function registerRoutes(app: FastifyInstance, db: Database, config: Config
     await app.register(adminRoutes, { admin });
     await app.register(opsRoutes, { admin });
     await app.register(eventsRoutes, { db, config });
+
+    if (config.MAX_STAFF_WEBHOOK_SECRET) {
+        const bot = new StaffBot(new MaxClient(config, { token: config.MAX_STAFF_BOT_TOKEN }));
+
+        await app.register(staffBotRoutes, { bot, secret: config.MAX_STAFF_WEBHOOK_SECRET });
+    }
 
     if (config.DEV_AUTH_ENABLED && config.NODE_ENV !== 'production') {
         await app.register(devInboundRoutes, { inbox });

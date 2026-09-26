@@ -29,6 +29,8 @@ const schema = z.object({
     MAX_API_URL: z.url().default('https://platform-api2.max.ru'),
     MAX_BOT_TOKEN: z.string().default(''),
     MAX_WEBHOOK_SECRET: z.string().min(32),
+    MAX_STAFF_BOT_TOKEN: z.string().default(''),
+    MAX_STAFF_WEBHOOK_SECRET: z.union([z.literal(''), z.string().regex(/^[\w-]{32,256}$/)]).default(''),
     MAX_MEDIA_HOSTS: z.string().default(''),
     MAX_CA_FILE: z.string().default(''),
     POLICY_VERSION: z.string().min(1),
@@ -73,8 +75,8 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
         throw new Error('MAX_CA_FILE does not exist');
     }
 
-    if (config.MAX_MODE === 'live' && !config.MAX_BOT_TOKEN) {
-        throw new Error('MAX_BOT_TOKEN required for live MAX');
+    if (config.MAX_MODE === 'live') {
+        assertMaxTokens(config);
     }
 
     if (config.AI_ENABLED && config.AI_MODE === 'live' && (!config.AI_API_KEY || !config.AI_MODEL)) {
@@ -86,6 +88,16 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
     }
 
     return config;
+}
+
+function assertMaxTokens(config: Config): void {
+    if (!config.MAX_BOT_TOKEN) {
+        throw new Error('MAX_BOT_TOKEN required for live MAX');
+    }
+
+    if (config.MAX_STAFF_WEBHOOK_SECRET && !config.MAX_STAFF_BOT_TOKEN) {
+        throw new Error('MAX_STAFF_BOT_TOKEN required for the staff bot webhook');
+    }
 }
 
 function assertProductionSafe(config: Config): void {

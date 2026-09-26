@@ -12,4 +12,4 @@ while IFS= read -r line || [ -n "$line" ]; do
     *) printf '%s\n' "$line" ;;
   esac
 done < .env.example > .env
-echo "Wrote .env with fresh secrets. Now set DOMAIN, the images, MAX_BOT_TOKEN and the policy."
+echo "Wrote .env with fresh secrets. Now set DOMAIN, the images, MAX_BOT_TOKEN, MAX_STAFF_BOT_TOKEN and the policy."

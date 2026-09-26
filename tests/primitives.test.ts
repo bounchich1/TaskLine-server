@@ -119,21 +119,21 @@ describe('MAX launch authentication', () => {
     it('verifies raw, outer-wrapped and reordered fields', () => {
         const raw = sign(fields);
 
-        expect(verifyLaunch(raw, 'bot-token', now).userId).toBe('9223372036854775807');
+        expect(verifyLaunch(raw, ['bot-token'], now).userId).toBe('9223372036854775807');
 
-        expect(verifyLaunch(`WebAppData=${encodeURIComponent(raw)}&WebAppPlatform=web`, 'bot-token', now).userId).toBe(
-            '9223372036854775807',
-        );
+        expect(
+            verifyLaunch(`WebAppData=${encodeURIComponent(raw)}&WebAppPlatform=web`, ['bot-token'], now).userId,
+        ).toBe('9223372036854775807');
     });
 
     it('rejects tampered, expired, future and duplicate fields', () => {
         const raw = sign(fields);
 
-        expect(() => verifyLaunch(raw.replace('signed', 'evil'), 'bot-token', now)).toThrow();
-        expect(() => verifyLaunch(raw, 'bot-token', now + 301000)).toThrow();
-        expect(() => verifyLaunch(raw, 'bot-token', now - 31000)).toThrow();
-        expect(() => verifyLaunch(`${raw}&hash=aa`, 'bot-token', now)).toThrow();
-        expect(() => verifyLaunch(`${raw}&user=foo`, 'bot-token', now)).toThrow();
+        expect(() => verifyLaunch(raw.replace('signed', 'evil'), ['bot-token'], now)).toThrow();
+        expect(() => verifyLaunch(raw, ['bot-token'], now + 301000)).toThrow();
+        expect(() => verifyLaunch(raw, ['bot-token'], now - 31000)).toThrow();
+        expect(() => verifyLaunch(`${raw}&hash=aa`, ['bot-token'], now)).toThrow();
+        expect(() => verifyLaunch(`${raw}&user=foo`, ['bot-token'], now)).toThrow();
     });
 });
 

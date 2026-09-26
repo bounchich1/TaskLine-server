@@ -29,11 +29,22 @@ const MAX_RESPONSE_BYTES = 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 20000;
 const noRateLimit = (): Promise<void> => Promise.resolve();
 
+interface MaxClientOptions {
+    rate?: () => Promise<void>;
+    token?: string;
+}
+
 export class MaxClient implements MaxTransport {
+    private rate: () => Promise<void>;
+    private token: string;
+
     constructor(
         private c: Config,
-        private rate: () => Promise<void> = noRateLimit,
-    ) {}
+        options: MaxClientOptions = {},
+    ) {
+        this.rate = options.rate ?? noRateLimit;
+        this.token = options.token ?? c.MAX_BOT_TOKEN;
+    }
 
     async request(path: string, body: Row, query: Record<string, string> = {}): Promise<Row> {
         await this.rate();
@@ -71,7 +82,7 @@ export class MaxClient implements MaxTransport {
         try {
             return await fetch(url, {
                 method: 'POST',
-                headers: { Authorization: this.c.MAX_BOT_TOKEN, 'Content-Type': 'application/json' },
+                headers: { Authorization: this.token, 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
                 redirect: 'error',
                 signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

@@ -21,7 +21,7 @@ export function startWorkers(db: Database, config: Config): () => Promise<void> 
     const deliveries: DeliveryWorker = new DeliveryWorker(
         db,
         config,
-        new MaxClient(config, async (): Promise<void> => deliveries.rate()),
+        new MaxClient(config, { rate: async (): Promise<void> => deliveries.rate() }),
         runner.files,
     );
 

@@ -14,8 +14,10 @@ export interface VerifiedLaunch {
     startParam?: string;
 }
 
-export function verifyLaunch(raw: string, botToken: string, now = Date.now()): VerifiedLaunch {
-    ensure(Buffer.byteLength(raw) <= MAX_LAUNCH_BYTES && raw.length > 0 && botToken.length > 0, 'invalid_launch', 401);
+export function verifyLaunch(raw: string, botTokens: readonly string[], now = Date.now()): VerifiedLaunch {
+    const tokens = botTokens.filter((token) => token.length > 0);
+
+    ensure(Buffer.byteLength(raw) <= MAX_LAUNCH_BYTES && raw.length > 0 && tokens.length > 0, 'invalid_launch', 401);
     let values = parseForm(raw.startsWith('#') ? raw.slice(1) : raw);
     const wrapped = values.get('WebAppData');
 
@@ -33,10 +35,12 @@ export function verifyLaunch(raw: string, botToken: string, now = Date.now()): V
         .map(([key, value]) => `${key}=${value}`)
         .join('\n');
 
-    const secret = createHmac('sha256', 'WebAppData').update(botToken).digest();
-    const expected = createHmac('sha256', secret).update(canonical).digest('hex');
+    ensure(
+        tokens.some((token) => equal(sign(canonical, token), signature.toLowerCase())),
+        'invalid_launch',
+        401,
+    );
 
-    ensure(equal(expected, signature.toLowerCase()), 'invalid_launch', 401);
     const dateText = values.get('auth_date') ?? '';
 
     ensure(/^\d{10,11}$/.test(dateText), 'invalid_launch', 401);
@@ -56,6 +60,12 @@ export function verifyLaunch(raw: string, botToken: string, now = Date.now()): V
         digest: hash(canonical),
         startParam: values.get('start_param'),
     };
+}
+
+function sign(canonical: string, botToken: string): string {
+    const secret = createHmac('sha256', 'WebAppData').update(botToken).digest();
+
+    return createHmac('sha256', secret).update(canonical).digest('hex');
 }
 
 function parseForm(raw: string): Map<string, string> {

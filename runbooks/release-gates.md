@@ -14,6 +14,8 @@ Configuration: `NODE_ENV=production`, `AI_ENABLED=false`, `MEMORY_ENABLED=false`
    (`/health/ready` returns 503 while the schema is behind).
 2. **Webhook.** `subscribe` succeeds. A message to the bot reaches the inbox within seconds.
    A request to `/webhooks/max` with a wrong `X-Max-Bot-Api-Secret` is rejected.
+   `subscribe staff` succeeds; «Начать» in the staff bot answers with the MAX user id and a
+   working copy button; the client bot shows no app button, the staff bot does.
 3. **Consent.** First message → consent prompt with the policy link. «Отказаться» → the
    alternative contact. «Согласен» → «Согласие принято». Text sent before consenting becomes the
    ticket after consenting.

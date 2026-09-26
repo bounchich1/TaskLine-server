@@ -23,7 +23,7 @@ const COMMANDS = new Map<string, CliCommand>([
 ]);
 
 const USAGE =
-    'Commands: migrate, bootstrap, subscribe, storage-init, media-hosts, memory-reconcile <id>, ' +
+    'Commands: migrate, bootstrap, subscribe [staff], storage-init, media-hosts, memory-reconcile <id>, ' +
     'permit-resolve <slot> <evidence>, ai-cap <10..15>';
 
 export async function runCli(argv: string[]): Promise<void> {

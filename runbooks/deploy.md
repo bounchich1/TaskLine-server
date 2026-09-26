@@ -33,13 +33,14 @@ The API and the mini-app share one origin, so `PUBLIC_URL` and `APP_ORIGIN` are 
 git clone <server repository> /opt/max-support
 cd /opt/max-support/deploy
 sh init-env.sh          # .env with fresh secrets
-nano .env               # DOMAIN, image tags, MAX_BOT_TOKEN, POLICY_*, ALTERNATIVE_CONTACT, BOOTSTRAP_MAX_USER_ID
+nano .env               # DOMAIN, image tags, MAX_BOT_TOKEN, MAX_STAFF_BOT_TOKEN, POLICY_*, ALTERNATIVE_CONTACT, BOOTSTRAP_MAX_USER_ID
 docker compose up -d postgres redis s3 clamav
 docker compose run --rm api node dist/cli.js storage-init
 docker compose run --rm api node dist/cli.js migrate
 docker compose run --rm api node dist/cli.js bootstrap
 docker compose up -d
 docker compose run --rm api node dist/cli.js subscribe
+docker compose run --rm api node dist/cli.js subscribe staff
 ```
 
 The server refuses to start in production with placeholders left in: an empty
@@ -50,8 +51,27 @@ To use a managed S3 bucket (Yandex Object Storage, Selectel, VK Cloud) instead o
 `s3` service, set `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET` and the key pair in `.env`, skip
 `storage-init` if the bucket already exists with versioning, and stop the `s3` service.
 
-Then, on the MAX partner platform, set the bot's mini-app URL to `https://DOMAIN/`. Other
-staff are added in the app: Управление → Сотрудники, by MAX user id.
+### Two bots
+
+Clients and staff use separate MAX bots, so clients never see the staff app button:
+
+| Bot    | Token (`.env`)        | Mini-app URL on the partner platform | Webhook               |
+| ------ | --------------------- | ------------------------------------ | --------------------- |
+| client | `MAX_BOT_TOKEN`       | none                                 | `/webhooks/max`       |
+| staff  | `MAX_STAFF_BOT_TOKEN` | `https://DOMAIN/`                    | `/webhooks/max-staff` |
+
+The staff bot answers any message or start with the sender's MAX user id and a copy button.
+New staff open it, send the id to an administrator, who adds them in Управление →
+Сотрудники; then they open the app from the same chat.
+
+Staff login accepts launches signed by either token, so moving the mini-app URL from one bot
+to the other never locks staff out. With `MAX_STAFF_WEBHOOK_SECRET` empty the staff webhook
+is off; with it set, a live server refuses to start without `MAX_STAFF_BOT_TOKEN`.
+
+To add the staff bot to an existing install: create the bot and set its mini-app URL, put
+`MAX_STAFF_BOT_TOKEN=` and `MAX_STAFF_WEBHOOK_SECRET=` (`openssl rand -hex 32`) into `.env`,
+deploy a server image that has the staff bot, run `subscribe staff`, then clear the mini-app
+URL on the client bot.
 
 ### Allowed media hosts
 
@@ -179,7 +199,7 @@ docker compose run --rm api node dist/cli.js <command>   # ai-cap, permit-resolv
 - ClamAV updates its signatures with freshclam; if `docker compose logs clamav` shows download
   errors, point freshclam at a mirror. Scanning keeps working on the signatures in the image.
 - The API allows 180 requests per minute per client IP, MAX webhook deliveries included. Watch
-  for `429` on `/webhooks/max` as traffic grows.
+  for `429` on `/webhooks/max` and `/webhooks/max-staff` as traffic grows.
 - The agentmemory engine keeps its state in memory and writes it to disk every 500 ms
   (`save_interval_ms` in `infra/agentmemory/engine.yaml`); it does not flush on shutdown, so a
   write acknowledged less than 500 ms before the engine stops (crash, kill or restart) is lost.
