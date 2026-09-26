@@ -2,6 +2,8 @@ import { one, type Database } from '../../../shared/db.js';
 import { ensure } from '../../../shared/errors.js';
 import type { Ticket } from '../../../shared/types/entities.js';
 
+import { sourceExcerpt, type SourceRequest } from './source-excerpt.js';
+import { suggestionSources } from './suggestion-sources.js';
 import type { Filters } from './ticket-filters.js';
 import { listTickets } from './ticket-list.js';
 import { TICKET_JOINS, TICKET_PROJECTION } from './ticket-projection.js';
@@ -48,7 +50,13 @@ export class TicketQueries {
             )
         ).rows;
 
-        return { ...ticket, closures, attachments };
+        const sources = await suggestionSources(this.db, this.org, ticket.suggestion);
+
+        return { ...ticket, closures, attachments, suggestion_sources: sources };
+    }
+
+    async openSource(request: SourceRequest) {
+        return sourceExcerpt(this.db, this.org, request);
     }
 
     async messages(id: string, { before, after, limit = 50 }: MessagePage = {}) {

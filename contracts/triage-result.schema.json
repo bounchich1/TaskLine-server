@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:max-support:triage-result:1",
+  "$id": "urn:max-support:triage-result:1.1",
   "title": "Initial triage result",
   "type": "object",
   "additionalProperties": false,
@@ -8,7 +8,8 @@
     "schema_version",
     "dictionary_version",
     "tags",
-    "suggested_solution",
+    "tip",
+    "customer_reply",
     "evidence_message_ids",
     "evidence_memory_ids",
     "missing_information",
@@ -17,7 +18,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "1.0"
+      "const": "1.1"
     },
     "dictionary_version": {
       "type": "string",
@@ -56,7 +57,69 @@
         }
       }
     },
-    "suggested_solution": {
+    "tip": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "summary",
+            "steps",
+            "cautions"
+          ],
+          "properties": {
+            "summary": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "steps": {
+              "type": "array",
+              "maxItems": 5,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "text",
+                  "case_refs"
+                ],
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "case_refs": {
+                    "type": "array",
+                    "maxItems": 3,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  }
+                }
+              }
+            },
+            "cautions": {
+              "type": "array",
+              "maxItems": 3,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            }
+          }
+        }
+      ]
+    },
+    "customer_reply": {
       "anyOf": [
         {
           "type": "null"
@@ -64,7 +127,7 @@
         {
           "type": "string",
           "minLength": 1,
-          "maxLength": 6000
+          "maxLength": 1000
         }
       ]
     },
@@ -91,12 +154,12 @@
     },
     "missing_information": {
       "type": "array",
-      "maxItems": 10,
+      "maxItems": 4,
       "uniqueItems": true,
       "items": {
         "type": "string",
         "minLength": 1,
-        "maxLength": 500
+        "maxLength": 200
       }
     },
     "confidence": {

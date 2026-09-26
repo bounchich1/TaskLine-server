@@ -8,6 +8,8 @@ import { serverFile } from '../../../shared/paths.js';
 import type { Resolution, TriageResult } from '../../../shared/types/ai.js';
 import type { Row } from '../../../shared/types/entities.js';
 
+import { normalizeTriage } from './normalize-triage.js';
+
 
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 
@@ -25,6 +27,7 @@ export interface TriageExpectations {
   dictionaries: Row[];
   messageIds: string[];
   memoryIds: string[];
+  cautionedMemoryIds: string[];
 }
 
 function unwrapEnvelope(value: unknown): unknown {
@@ -46,7 +49,7 @@ function parseModelJson(raw: string): unknown {
 }
 
 export function parseTriage(raw: string, expected: TriageExpectations): TriageResult {
-  const result = parseModelJson(raw);
+  const result = normalizeTriage(parseModelJson(raw), expected.memoryIds);
 
   ensure(validateTriage(result), 'invalid_ai_schema', 422);
   const value = result as TriageResult;
@@ -74,7 +77,16 @@ export function parseTriage(raw: string, expected: TriageExpectations): TriageRe
     422,
   );
 
-  return value;
+  return flagDroppedCautions(value, expected.cautionedMemoryIds);
+}
+
+function flagDroppedCautions(value: TriageResult, cautioned: string[]): TriageResult {
+  const dropped =
+    value.tip !== null &&
+    value.tip.cautions.length === 0 &&
+    value.evidence_memory_ids.some((id) => cautioned.includes(id));
+
+  return dropped ? { ...value, needs_review: true } : value;
 }
 
 export function parseResolution(raw: string, evidenceIds: string[]): Resolution {

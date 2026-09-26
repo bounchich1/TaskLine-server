@@ -46,7 +46,8 @@ Configuration: `NODE_ENV=production`, `AI_ENABLED=false`, `MEMORY_ENABLED=false`
 
 1. The provider is reachable from the host and approved for personal data. `AI_MODE=live`,
    `AI_API_KEY`, `AI_MODEL` set; then `AI_ENABLED=true` and `docker compose up -d`.
-2. New tickets get tags, urgency and a suggested solution within 120 seconds.
+2. New tickets get tags, urgency and a terse staff tip (summary, at most 5 steps, cautions)
+   within 120 seconds; «Вставить в черновик» inserts the separate polite customer reply.
 3. With the provider unreachable (block egress for a minute), tickets still arrive and staff
    can answer; triage falls back to «Необходима проверка сотрудником».
 4. The AI call grid in Управление → Состояние системы never shows more calls than the cap.
@@ -58,6 +59,9 @@ Configuration: `NODE_ENV=production`, `AI_ENABLED=false`, `MEMORY_ENABLED=false`
    restart, delete, Cyrillic recall, wrong secret rejected.
 2. `MEMORY_ENABLED=true`: a closed ticket produces a learning record; a similar new ticket
    recalls it; a reopened ticket's memory is no longer recalled.
+3. A tip built from a recalled case shows the source ticket number; clicking it opens the
+   solution messages of that closure (audit `ticket.source_opened`). Reopening the source marks
+   the chip as reopened; withdrawing the source client's consent makes it «источник недоступен».
 
 ## Provider facts to record
 

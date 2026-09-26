@@ -43,6 +43,10 @@ export class RecallSession {
         return this.cases.map((evidence) => evidence.id);
     }
 
+    get cautionedCaseIds(): string[] {
+        return this.cases.filter((evidence) => evidence.cautions.length > 0).map((evidence) => evidence.id);
+    }
+
     async answer(reply: ModelReply, messages: ModelMessage[]): Promise<void> {
         ensure(reply.toolCalls.length === 1 && this.calls < MAX_TOOL_CALLS, 'ai_tool_budget', 422);
         this.calls++;

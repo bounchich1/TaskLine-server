@@ -30,6 +30,7 @@ for (const [path, method] of [
     ['/v1/tickets/counts', 'get'],
     ['/v1/tickets/{id}', 'get'],
     ['/v1/tickets/{id}/messages', 'get'],
+    ['/v1/tickets/{id}/sources/{memoryId}', 'get'],
     ['/v1/tickets/{id}/assign', 'post'],
     ['/v1/tickets/{id}/transfer', 'post'],
     ['/v1/tickets/{id}/classification', 'patch'],

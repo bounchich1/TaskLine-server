@@ -1,21 +1,29 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "dictionary_version": "dict-2026-09-18-1",
   "tags": {
     "tag": "connectivity",
     "urgency": "medium",
     "complexity": "low"
   },
-  "suggested_solution": "Проверить доступность сервиса и настройки подключения по подтвержденной инструкции. Перед применением сверить условия похожего случая.",
-  "evidence_message_ids": [
-    "msg_example_1"
-  ],
-  "evidence_memory_ids": [
-    "case_example_1"
-  ],
-  "missing_information": [
-    "Не указан текст ошибки"
-  ],
+  "tip": {
+    "summary": "Вечером падает скорость → перегруз Wi-Fi 2.4 ГГц.",
+    "steps": [
+      {
+        "text": "Замер скорости по кабелю и по Wi-Fi.",
+        "case_refs": ["case_example_1"]
+      },
+      {
+        "text": "Кабель норм → сменить канал или перейти на 5 ГГц.",
+        "case_refs": ["case_example_1"]
+      }
+    ],
+    "cautions": ["Не сбрасывать роутер к заводским: у клиента PPPoE."]
+  },
+  "customer_reply": "Здравствуйте! Пожалуйста, измерьте скорость при подключении по кабелю и по Wi-Fi и пришлите оба результата — так мы поймём, в чём причина.",
+  "evidence_message_ids": ["msg_example_1"],
+  "evidence_memory_ids": ["case_example_1"],
+  "missing_information": ["Модель роутера"],
   "confidence": 0.72,
-  "needs_review": true
+  "needs_review": false
 }

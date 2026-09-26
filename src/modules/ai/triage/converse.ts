@@ -102,6 +102,7 @@ async function parseOrRepair(
             dictionaries,
             messageIds: [messageId],
             memoryIds: session.caseIds,
+            cautionedMemoryIds: session.cautionedCaseIds,
         });
 
     try {

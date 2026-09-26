@@ -1,8 +1,13 @@
+type TipStep = { text: string; case_refs: string[] };
+
+type Tip = { summary: string; steps: TipStep[]; cautions: string[] };
+
 export type TriageResult = {
-    schema_version: '1.0';
+    schema_version: '1.1';
     dictionary_version: string;
     tags: { tag: string; urgency: string; complexity: string };
-    suggested_solution: string | null;
+    tip: Tip | null;
+    customer_reply: string | null;
     evidence_message_ids: string[];
     evidence_memory_ids: string[];
     missing_information: string[];

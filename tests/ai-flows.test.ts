@@ -61,10 +61,15 @@ function validTriage(job: Job): Row {
     const code = (dimension: string) => dictionaries.find((entry) => entry.dimension === dimension)?.code;
 
     return {
-        schema_version: '1.0',
+        schema_version: '1.1',
         dictionary_version: job.payload.dictionary_version,
         tags: { tag: code('tag'), urgency: code('urgency'), complexity: code('complexity') },
-        suggested_solution: 'Перезапустите роутер',
+        tip: {
+            summary: 'Сбой подключения → роутер.',
+            steps: [{ text: 'Перезапустить роутер.', case_refs: [recalled.id] }],
+            cautions: [],
+        },
+        customer_reply: 'Перезапустите, пожалуйста, роутер.',
         evidence_message_ids: [job.payload.message_id],
         evidence_memory_ids: [recalled.id],
         missing_information: [],
@@ -112,10 +117,47 @@ it('accepts a triage wrapped in a single-key envelope without a repair call', as
 
     expect(ticket.ai_status).toBe('done');
     expect(ticket.tag).toBe((triage.tags as Row).tag);
-    expect(ticket.suggestion).toMatchObject({ suggested_solution: 'Перезапустите роутер' });
+    expect(ticket.suggestion).toMatchObject({ customer_reply: 'Перезапустите, пожалуйста, роутер.' });
     const steps = await context.db.query('SELECT step_key FROM ai_calls ORDER BY step_key');
 
     expect(steps.rows.map((row) => row.step_key)).toEqual(['triage-0']);
+});
+
+it('trims a long tip, drops foreign case refs, scrubs case ids from the reply and flags dropped cautions', async () => {
+    await context.create();
+    const job = await claim('triage');
+    const cautioned = { ...recalled, cautions: ['Не сбрасывать к заводским'] };
+    const valid = validTriage(job);
+    const step = (index: number) => ({ text: `Шаг ${index}`, case_refs: [recalled.id, 'case-forged'] });
+
+    const triage = {
+        ...valid,
+        tip: { summary: 'Сбой подключения.', steps: [1, 2, 3, 4, 5, 6, 7].map(step), cautions: [] },
+        customer_reply: `Перезапустите роутер (${recalled.id}).`,
+        missing_information: ['Модель', 'Модель', 'Адрес', 'Время', 'Ошибка', 'Тариф'],
+    };
+
+    const provider = scripted([
+        toolCall('call-1', 'search_resolved_cases', { query: 'подключение' }),
+        text(JSON.stringify(triage)),
+    ]);
+
+    const cautionedRecall = { search: () => Promise.resolve([cautioned]), expand: () => Promise.resolve([cautioned]) };
+
+    await new Workflows(context.db, context.c, new Gateway(context.db, context.c, provider), cautionedRecall).triage(
+        job,
+    );
+
+    const ticket = await context.ticket();
+    const suggestion = ticket.suggestion as Row & { tip: { steps: { case_refs: string[] }[] } };
+
+    expect(ticket.ai_status).toBe('done');
+    expect(suggestion.tip.steps).toHaveLength(5);
+    expect(suggestion.tip.steps[0]?.case_refs).toEqual([recalled.id]);
+    expect(suggestion.customer_reply).toBe('Перезапустите роутер.');
+    expect(suggestion.missing_information).toEqual(['Модель', 'Адрес', 'Время', 'Ошибка']);
+    expect(suggestion.needs_review).toBe(true);
+    expect(ticket.review_required).toBe(true);
 });
 
 it('falls back to a review-required suggestion when the model call fails', async () => {

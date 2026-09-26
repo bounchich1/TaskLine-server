@@ -78,7 +78,7 @@ it('applies triage once without overwriting a manual field', async () => {
 
     expect(result.urgency).toBe('high');
     expect(result.ai_status).toBe('done');
-    expect(result.suggestion?.suggested_solution).toBeNull();
+    expect(result.suggestion?.tip).toBeNull();
     await workflow.triage(job);
     expect((await one(context.db, 'SELECT count(*)::int AS n FROM ai_calls'))!.n).toBe(1);
 

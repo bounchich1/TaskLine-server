@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
-import { ifMatchVersion, idempotencyKey, paramsId, staffOf } from '../../shared/http/request.js';
+import { ifMatchVersion, idempotencyKey, paramsId, routeParam, staffOf } from '../../shared/http/request.js';
 import { access } from '../../shared/http/route-access.js';
 import type { Row } from '../../shared/types/entities.js';
 
@@ -22,6 +22,8 @@ const messagePageQuery = z
         limit: z.coerce.number().int().min(1).max(100).default(50),
     })
     .strict();
+
+const memoryIdParam = z.uuid();
 
 export const ticketRoutes: FastifyPluginAsync<TicketRouteOptions> = async (app, options) => {
     addQueryRoutes(app, options.queries);
@@ -46,6 +48,14 @@ function addQueryRoutes(app: FastifyInstance, queries: TicketQueries): void {
             limit: page.limit,
         });
     });
+
+    app.get('/v1/tickets/:id/sources/:memoryId', access('tickets.view'), async (request) =>
+        queries.openSource({
+            ticketId: paramsId(request),
+            memoryId: memoryIdParam.parse(routeParam(request, 'memoryId')),
+            actorId: staffOf(request).employee.id,
+        }),
+    );
 }
 
 function addCommandRoutes(app: FastifyInstance, commands: TicketCommands): void {
