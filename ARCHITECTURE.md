@@ -43,6 +43,7 @@ architectural decision and happens there.
 | notifications | staff                                             |
 | admin         | templates, dictionaries                           |
 | ai            | dictionaries                                      |
+| demo-access   | –                                                 |
 
 `app/` may import any module (through its `index.ts`). `shared/` imports only `shared/`.
 

@@ -1,0 +1,17 @@
+name: max-support-demo
+
+services:
+  caddy:
+    profiles: [off]
+
+  api:
+    networks: [default, edge]
+
+  mini-app:
+    networks: [default, edge]
+
+networks:
+  edge:
+    name: max-support-edge
+    external: true
+    driver_opts: !reset {}

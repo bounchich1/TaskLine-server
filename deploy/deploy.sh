@@ -11,8 +11,8 @@ usage() {
 component=$1
 tag=$2
 case "$component" in
-  server) key=SERVER_TAG services="api worker gateway" ;;
-  mini-app) key=MINI_APP_TAG services="mini-app" ;;
+  server) key=SERVER_TAG image_key=SERVER_IMAGE services="api worker gateway" ;;
+  mini-app) key=MINI_APP_TAG image_key=MINI_APP_IMAGE services="mini-app" ;;
   *) usage ;;
 esac
 printf '%s' "$tag" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$' || usage
@@ -33,7 +33,10 @@ rollback() {
 }
 
 set_tag "$tag"
-docker compose pull --quiet $services || rollback "image pull failed"
+image=$(sed -n "s/^$image_key=//p" .env)
+if ! docker image inspect "$image:$tag" >/dev/null 2>&1; then
+  docker compose pull --quiet $services || rollback "image pull failed"
+fi
 if [ "$component" = server ]; then
   docker compose run --rm api node dist/cli.js migrate || rollback "migration failed"
 fi

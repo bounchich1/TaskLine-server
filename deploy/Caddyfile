@@ -1,10 +1,12 @@
 {$DOMAIN} {
 	@api path /v1/* /download/* /webhooks/* /health/*
 	handle @api {
-		reverse_proxy api:3000
+		reverse_proxy {$COMPOSE_PROJECT}-api-1:3000
 	}
 	handle {
 		encode zstd gzip
-		reverse_proxy mini-app:8080
+		reverse_proxy {$COMPOSE_PROJECT}-mini-app-1:8080
 	}
 }
+
+import sites/*.caddy

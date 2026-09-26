@@ -36,10 +36,14 @@ services:
     ports: ['80:80', '443:443', '443:443/udp']
     environment:
       DOMAIN: ${DOMAIN}
+      COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME:-max-support}
+      DEMO_DOMAIN: ${DEMO_DOMAIN:-http://demo.localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./sites:/etc/caddy/sites:ro
       - caddy-data:/data
       - caddy-config:/config
+    networks: [default, edge]
     depends_on: [api, mini-app]
 
   mini-app:
@@ -150,6 +154,10 @@ services:
 
 networks:
   default:
+    driver_opts:
+      com.docker.network.driver.mtu: '1400'
+  edge:
+    name: max-support-edge
     driver_opts:
       com.docker.network.driver.mtu: '1400'
 

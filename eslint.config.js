@@ -27,6 +27,7 @@ const MODULE_DEPENDENCIES = {
     notifications: ['staff'],
     admin: ['templates', 'dictionaries'],
     ai: ['dictionaries'],
+    'demo-access': [],
 };
 
 const publicApi = (/** @type {string} */ type, /** @type {string[] | undefined} */ names) => ({

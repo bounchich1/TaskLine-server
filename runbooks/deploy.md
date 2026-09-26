@@ -68,6 +68,8 @@ Staff login accepts launches signed by either token, so moving the mini-app URL 
 to the other never locks staff out. With `MAX_STAFF_WEBHOOK_SECRET` empty the staff webhook
 is off; with it set, a live server refuses to start without `MAX_STAFF_BOT_TOKEN`.
 
+The single-bot demo stand for hackathon judges is described in [demo.md](demo.md).
+
 To add the staff bot to an existing install: create the bot and set its mini-app URL, put
 `MAX_STAFF_BOT_TOKEN=` and `MAX_STAFF_WEBHOOK_SECRET=` (`openssl rand -hex 32`) into `.env`,
 deploy a server image that has the staff bot, run `subscribe staff`, then clear the mini-app
@@ -142,9 +144,9 @@ By hand on the host:
 ./deploy.sh mini-app v0.3.0
 ```
 
-`deploy.sh` writes the tag into `.env`, pulls the image, runs `migrate` (server only), restarts
-that component and waits for its health checks. If any step fails it puts the previous tag
-back and restarts that. Every deploy is appended to `deploy.log`.
+`deploy.sh` writes the tag into `.env`, pulls the image unless it was built on the host, runs
+`migrate` (server only), restarts that component and waits for its health checks. If any step
+fails it puts the previous tag back and restarts that. Every deploy is appended to `deploy.log`.
 
 - When a release changes the API contract, deploy the server first, then the mini-app.
 - Staff get a new mini-app version the next time they open it: `index.html` is served with

@@ -1,0 +1,10 @@
+{$DEMO_DOMAIN:http://demo.localhost} {
+	@api path /v1/* /download/* /webhooks/* /health/*
+	handle @api {
+		reverse_proxy max-support-demo-api-1:3000
+	}
+	handle {
+		encode zstd gzip
+		reverse_proxy max-support-demo-mini-app-1:8080
+	}
+}

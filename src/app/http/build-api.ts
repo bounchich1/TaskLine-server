@@ -7,6 +7,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { MaxClient } from '../../integrations/max/index.js';
 import { Admin, adminRoutes, opsRoutes } from '../../modules/admin/index.js';
 import { deliveryRoutes, DeliveryWorker } from '../../modules/delivery/index.js';
+import { addDemoAccessHook, DemoRoles } from '../../modules/demo-access/index.js';
 import { dictionariesRoutes } from '../../modules/dictionaries/index.js';
 import { Files, filesRoutes } from '../../modules/files/index.js';
 import { devInboundRoutes, Inbox, webhookRoutes } from '../../modules/inbox/index.js';
@@ -37,6 +38,13 @@ export async function buildApi(db: Database, config: Config): Promise<FastifyIns
     app.setErrorHandler(handleError);
     addOriginHook(app, config);
     addSessionHook(app, db, config);
+
+    if (config.DEMO_ROLE_CODES) {
+        const roles = new DemoRoles(db, config, new MaxClient(config));
+
+        addDemoAccessHook(app, { roles, secret: config.MAX_WEBHOOK_SECRET });
+    }
+
     await registerRoutes(app, db, config);
 
     return app;

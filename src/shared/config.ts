@@ -61,6 +61,7 @@ const schema = z.object({
     CLAMAV_PORT: z.coerce.number().int().default(3310),
     BOOTSTRAP_MAX_USER_ID: z.string().default(''),
     BOOTSTRAP_NAME: z.string().default('Администратор'),
+    DEMO_ROLE_CODES: z.string().default(''),
     DEV_AUTH_ENABLED: bool,
 });
 
