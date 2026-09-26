@@ -22,22 +22,36 @@ export async function callOpenAi(config: Config, request: ModelRequest, timeoutM
         signal: AbortSignal.timeout(timeoutMs),
     });
 
+    const status = { status: response.status };
+
     if (response.status >= 400 && response.status < 500) {
         await response.body?.cancel();
-        throw new AppError('provider_rejected', 503);
+        throw providerError('provider_rejected', status);
     }
 
     if (!response.ok) {
         await response.body?.cancel();
-        throw new Error('provider_unknown');
+        throw new Error('provider_unknown', { cause: status });
     }
 
-    const result = object(strictJson(await boundedText(response, MAX_RESPONSE_BYTES), false, MAX_RESPONSE_BYTES));
+    const text = await boundedText(response, MAX_RESPONSE_BYTES);
 
     return {
-        ...parseCompletion(result),
+        ...parseReply(text),
         providerRef: response.headers.get('x-request-id') ?? undefined,
     };
+}
+
+function parseReply(text: string): Omit<ModelReply, 'providerRef'> {
+    try {
+        return parseCompletion(object(strictJson(text, false, MAX_RESPONSE_BYTES)));
+    } catch (error) {
+        if (error instanceof AppError) {
+            throw error;
+        }
+
+        throw providerError('provider_bad_reply', error);
+    }
 }
 
 function completionBody(config: Config, request: ModelRequest): Row {
@@ -69,7 +83,12 @@ function parseCompletion(result: Row): Omit<ModelReply, 'providerRef'> {
     const choice = object((result.choices as unknown[] | undefined)?.[0]);
     const message = object(choice.message);
 
-    ensure(['stop', 'tool_calls'].includes(String(choice.finish_reason)), 'provider_rejected', 503);
+    const finishReason = String(choice.finish_reason);
+
+    if (!['stop', 'tool_calls'].includes(finishReason)) {
+        throw providerError('provider_rejected', { finish_reason: finishReason });
+    }
+
     const rawCalls = Array.isArray(message.tool_calls) ? (message.tool_calls as unknown[]) : [];
 
     const toolCalls = rawCalls.map((raw) => {
@@ -84,4 +103,8 @@ function parseCompletion(result: Row): Omit<ModelReply, 'providerRef'> {
         toolCalls,
         usage: object(result.usage ?? {}),
     };
+}
+
+function providerError(code: string, cause: unknown): AppError {
+    return Object.assign(new AppError(code, 503), { cause });
 }

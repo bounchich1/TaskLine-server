@@ -92,10 +92,16 @@ AI stays off until `AI_ENABLED=true`, `AI_API_KEY` and `AI_MODEL` are set in `.e
 
 Each model call must finish within `AI_TRIAGE_TIMEOUT_SECONDS` (default 45, at most 90). A
 reasoning model with `AI_THINKING_BUDGET` set can take 30–40 s per call, so use 90 there. A call
-that times out is left `uncertain` together with its permit (the provider may still be working
-on it); the ticket falls back to manual classification, and the permit stays taken until an
-operator releases it: `docker compose run --rm api node dist/cli.js permit-resolve <slot> "<evidence>"`.
+that times out, hits a provider 5xx or loses the connection is left `uncertain` together with its
+permit (the provider may still be working on it); the ticket falls back to manual classification,
+and the permit stays taken until an operator releases it:
+`docker compose run --rm api node dist/cli.js permit-resolve <slot> "<evidence>"`. A reply the
+provider did finish but that cannot be used (4xx, cut-off or unparseable) frees its permit.
 Occupied permits are listed at `/health` of the gateway and in Управление → Состояние системы.
+Every failed call is logged by the gateway as `Model call failed` with `job_id`, `step`,
+`reason`/`detail` (`TimeoutError`, `provider_unknown` + `status`, `fetch failed` + `cause`, …) and
+`elapsed_ms`: `docker compose logs gateway | grep "Model call failed"`. Container logs are lost
+when the container is recreated, so check them before redeploying.
 
 agentmemory (`memory` + `memory-engine`) starts with the stack and is reachable only inside the
 compose network at `http://memory-engine:3111`, authenticated with `AGENTMEMORY_SECRET`. Before

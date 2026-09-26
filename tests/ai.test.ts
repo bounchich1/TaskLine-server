@@ -1,5 +1,9 @@
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+
 import { beforeEach, afterEach, it, expect } from 'vitest';
 
+import { callOpenAi } from '../src/modules/ai/gateway/openai-provider.js';
 import { Gateway, Memory, Workflows, type MemoryTransport } from '../src/modules/ai/index.js';
 import { hash } from '../src/shared/crypto.js';
 import { one } from '../src/shared/db.js';
@@ -106,6 +110,47 @@ it('retains uncertain permits and refuses duplicate provider dispatch', async ()
 
     expect(calls).toBe(1);
     expect((await one(context.db, "SELECT count(*)::int AS n FROM ai_permits WHERE state='uncertain'"))!.n).toBe(1);
+});
+
+it('frees the permit when the provider answered unusably but keeps it on an unknown outcome', async () => {
+    await context.create();
+    const job = await claim('triage');
+    let answer = { status: 200, body: 'not json' };
+
+    const server = createServer((_request, response) => {
+        response.writeHead(answer.status, { 'Content-Type': 'application/json' });
+        response.end(answer.body);
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address() as AddressInfo;
+
+    const config = {
+        ...context.c,
+        AI_API_URL: `http://127.0.0.1:${port}/v1/chat/completions`,
+        AI_API_KEY: 'test-key',
+        AI_MODEL: 'test-model',
+    };
+
+    const gateway = new Gateway(context.db, context.c, (request, timeoutMs) => callOpenAi(config, request, timeoutMs));
+    const request = { messages: [{ role: 'user' as const, content: 'test' }] };
+    const states = async () => (await context.db.query('SELECT state FROM ai_permits WHERE state<>$1', ['free'])).rows;
+
+    try {
+        await expect(gateway.complete(job, 'garbled', request)).rejects.toMatchObject({ code: 'provider_bad_reply' });
+        expect(await states()).toEqual([]);
+
+        expect((await one(context.db, "SELECT state,reason FROM ai_calls WHERE step_key='garbled'"))!).toMatchObject({
+            state: 'failed',
+            reason: 'provider_rejected',
+        });
+
+        answer = { status: 502, body: '{}' };
+        await expect(gateway.complete(job, 'outage', request)).rejects.toThrow('provider_unknown');
+        expect(await states()).toEqual([{ state: 'uncertain' }]);
+    } finally {
+        server.close();
+    }
 });
 
 it('requires a real memory tool call, verifies persistence and removes reopened cases from recall', async () => {

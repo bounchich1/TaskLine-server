@@ -15,6 +15,8 @@ import type { Model, ModelProvider, ModelReply, ModelRequest } from './model.js'
 import { callOpenAi } from './openai-provider.js';
 import { settleFailure, settleSuccess } from './settle.js';
 
+const PROVIDER_ANSWERED = ['provider_rejected', 'provider_bad_reply'];
+
 export class Gateway implements Model {
     private readonly ctx: Ctx;
 
@@ -56,7 +58,7 @@ export class Gateway implements Model {
 
             return response;
         } catch (error) {
-            const known = completed || (error instanceof AppError && error.code === 'provider_rejected');
+            const known = completed || (error instanceof AppError && PROVIDER_ANSWERED.includes(error.code));
 
             await settleFailure(this.db, { callId, permit: admission, known });
             throw error;
