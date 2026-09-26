@@ -116,14 +116,14 @@ export async function fixture(existing?: Database, config = testConfig()) {
 
     const staff = await requireOne<Employee>(
         db,
-        `INSERT INTO employees(org_id,max_user_id,name,role) VALUES($1,'1','Анна','support')
+        `INSERT INTO employees(org_id,max_user_id,name,role,activated_at) VALUES($1,'1','Анна','support',now())
      RETURNING *`,
         [config.ORG_ID],
     );
 
     const admin = await requireOne<Employee>(
         db,
-        `INSERT INTO employees(org_id,max_user_id,name,role) VALUES($1,'2','Руководитель','admin')
+        `INSERT INTO employees(org_id,max_user_id,name,role,activated_at) VALUES($1,'2','Руководитель','admin',now())
      RETURNING *`,
         [config.ORG_ID],
     );

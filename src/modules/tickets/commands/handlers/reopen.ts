@@ -1,17 +1,18 @@
+import { can } from '../../../../shared/access.js';
 import type { Ctx } from '../../../../shared/context.js';
 import { one, type Sql } from '../../../../shared/db.js';
 import { ensure } from '../../../../shared/errors.js';
+import { findActiveEmployee } from '../../../../shared/staff.js';
 import { formatTicketNumber } from '../../../../shared/ticket-number.js';
 import type { Ticket } from '../../../../shared/types/entities.js';
 import { invalidateLearning } from '../../../learning/index.js';
 import { addMessage } from '../../../messages/index.js';
 import { cancelCycleDeliveries, queueBotMessage } from '../../../outbox/index.js';
-import { requireOwner, type TicketCommand, type TicketCommandHandler } from '../command-context.js';
+import type { TicketCommand, TicketCommandHandler } from '../command-context.js';
 
 export const reopen: TicketCommandHandler = async (tx, ctx, command) => {
     const { actor, client, ticket, body } = command;
 
-    requireOwner(command);
     ensure(['awaiting_rating', 'closed'].includes(ticket.status), 'already_open');
     ensure(typeof body.reason === 'string' && body.reason.trim().length > 0, 'reason_required', 422);
     await ensureConversationSlotFree(tx, command);
@@ -63,15 +64,8 @@ async function ensureConversationSlotFree(tx: Sql, { client, ticket }: TicketCom
 async function resolveAssignee(tx: Sql, ctx: Ctx, { actor, body }: TicketCommand): Promise<string> {
     const assigneeId = typeof body.employee_id === 'string' ? body.employee_id : actor.id;
 
-    if (actor.role === 'support') {
-        ensure(assigneeId === actor.id, 'forbidden', 403);
-    }
-
-    ensure(
-        await one(tx, 'SELECT id FROM employees WHERE org_id=$1 AND id=$2 AND NOT blocked', [ctx.org, assigneeId]),
-        'invalid_employee',
-        422,
-    );
+    ensure(assigneeId === actor.id || can(actor, 'tickets.reopen_any'), 'forbidden', 403);
+    ensure(await findActiveEmployee(tx, ctx.org, assigneeId), 'invalid_employee', 422);
 
     return assigneeId;
 }

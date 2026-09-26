@@ -47,18 +47,8 @@ describe('delivery and admin safeguards', () => {
         expect((await one(context.db, "SELECT state FROM deliveries WHERE kind='staff'"))!.state).toBe('unknown');
     });
 
-    it('protects last administrator and reserved dictionary defaults', async () => {
+    it('protects reserved dictionary defaults', async () => {
         const admin = new Admin(context.db, context.c.ORG_ID);
-
-        await expect(
-            admin.employee({
-                actor: context.admin,
-                employeeId: context.admin.id,
-                body: { max_user_id: '2', name: 'Admin', role: 'support', blocked: false },
-                expectedVersion: context.admin.version,
-                idempotencyKey: randomUUID(),
-            }),
-        ).rejects.toMatchObject({ code: 'last_admin' });
 
         await expect(
             admin.dictionary({

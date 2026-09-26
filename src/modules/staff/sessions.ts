@@ -1,13 +1,14 @@
 import type { Config } from '../../shared/config.js';
 import { hash, token } from '../../shared/crypto.js';
-import { one, type Database, type Sql } from '../../shared/db.js';
+import { one, requireOne, type Database, type Sql } from '../../shared/db.js';
 import { ensure } from '../../shared/errors.js';
+import { audit, emit } from '../../shared/events.js';
+import { sessionProfile } from '../../shared/staff.js';
 import type { Employee } from '../../shared/types/entities.js';
 import type { Session } from '../../shared/types/session.js';
 
-import { capabilities } from './capabilities.js';
-
 const MAX_LOGINS_PER_LAUNCH = 5;
+const LOGIN_EMPLOYEE_SQL = 'SELECT * FROM employees WHERE org_id=$1 AND max_user_id=$2 AND NOT blocked';
 
 export async function authenticate(db: Sql, org: string, rawToken: string | undefined): Promise<Session> {
     ensure(rawToken && rawToken.length <= 128, 'unauthorized', 401, 'Сессия истекла. Откройте приложение заново.');
@@ -29,13 +30,7 @@ export async function authenticate(db: Sql, org: string, rawToken: string | unde
 
 export async function issueSession(db: Database, config: Config, userId: string, launchHash: string) {
     return db.tx(async (tx) => {
-        const employee = await one<Employee>(
-            tx,
-            'SELECT * FROM employees WHERE org_id=$1 AND max_user_id=$2 AND NOT blocked FOR UPDATE',
-            [config.ORG_ID, userId],
-        );
-
-        ensure(employee, 'access_denied', 403, 'Доступ к службе поддержки не предоставлен.');
+        const employee = await lockLoginEmployee(tx, config.ORG_ID, userId);
 
         const recent = await one(
             tx,
@@ -60,20 +55,42 @@ export async function issueSession(db: Database, config: Config, userId: string,
             [hash(secret), config.ORG_ID, employee.id, employee.version, hash(csrf), launchHash],
         );
 
-        await tx.query("INSERT INTO audit(org_id,actor_id,action,object_id) VALUES($1,$2,'auth.login',$3)", [
-            config.ORG_ID,
-            employee.id,
-            employee.id,
-        ]);
+        await audit(tx, config.ORG_ID, { actor: employee.id, action: 'auth.login', objectId: employee.id });
 
         return {
             token: secret,
             csrf,
-            employee,
+            ...sessionProfile(employee),
             organization: { name: config.ORG_NAME, timezone: config.ORG_TIMEZONE },
-            capabilities: capabilities(employee),
         };
     });
+}
+
+async function lockLoginEmployee(tx: Sql, org: string, userId: string): Promise<Employee> {
+    const pending = await one(tx, `${LOGIN_EMPLOYEE_SQL} AND activated_at IS NULL`, [org, userId]);
+
+    if (pending) {
+        await tx.query('SELECT id FROM organizations WHERE id=$1 FOR UPDATE', [org]);
+    }
+
+    const employee = await one<Employee>(tx, `${LOGIN_EMPLOYEE_SQL} FOR UPDATE`, [org, userId]);
+
+    ensure(employee, 'access_denied', 403, 'Доступ к службе поддержки не предоставлен.');
+
+    return employee.activated_at === null ? activate(tx, org, employee) : employee;
+}
+
+async function activate(tx: Sql, org: string, employee: Employee): Promise<Employee> {
+    const activated = await requireOne<Employee>(
+        tx,
+        'UPDATE employees SET activated_at=now() WHERE id=$1 AND activated_at IS NULL RETURNING *',
+        [employee.id],
+    );
+
+    await audit(tx, org, { actor: employee.id, action: 'employee.activated', objectId: employee.id });
+    await emit(tx, org, { type: 'admin.changed', ticketId: null, payload: { route: 'employee.activated' } });
+
+    return activated;
 }
 
 export async function revokeSession(db: Sql, sessionHash: string): Promise<void> {
@@ -99,8 +116,7 @@ export async function rotateSession(db: Database, sessionHash: string): Promise<
 
 export async function describeSession(db: Sql, org: string, employee: Employee) {
     return {
-        employee,
-        capabilities: capabilities(employee),
+        ...sessionProfile(employee),
         organization: await one(db, 'SELECT name,timezone FROM organizations WHERE id=$1', [org]),
     };
 }

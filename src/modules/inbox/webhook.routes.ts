@@ -5,7 +5,7 @@ import { normalizeUpdate } from '../../integrations/max/index.js';
 import type { Config } from '../../shared/config.js';
 import { equal, hash } from '../../shared/crypto.js';
 import { ensure } from '../../shared/errors.js';
-import { requireOps } from '../../shared/http/request.js';
+import { access } from '../../shared/http/route-access.js';
 import type { ClientInput } from '../../shared/types/client-input.js';
 
 import type { Inbox } from './inbox.js';
@@ -38,8 +38,7 @@ function parseUpdate(raw: string): ClientInput {
 }
 
 export const devInboundRoutes: FastifyPluginAsync<{ inbox: Inbox }> = async (app, { inbox }) => {
-    app.post('/v1/dev/inbound', async (request) => {
-        requireOps(request);
+    app.post('/v1/dev/inbound', access('operations.view'), async (request) => {
         const input = devInboundBody.parse(request.body);
 
         await inbox.ingest({

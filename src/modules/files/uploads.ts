@@ -1,8 +1,8 @@
 import type { Readable } from 'node:stream';
 
+import { canOnTicket } from '../../shared/access.js';
 import { one } from '../../shared/db.js';
 import { ensure } from '../../shared/errors.js';
-import { canActOnTicket } from '../../shared/staff.js';
 import type { Employee, Ticket } from '../../shared/types/entities.js';
 
 import type { Attachment, FileDeps } from './attachment.js';
@@ -21,7 +21,7 @@ export async function prepareUpload(
         ]);
 
         ensure(ticket, 'not_found', 404);
-        ensure(ticket.status === 'in_progress' && canActOnTicket(employee, ticket), 'forbidden', 403);
+        ensure(ticket.status === 'in_progress' && canOnTicket(employee, ticket, 'reply'), 'forbidden', 403);
 
         return one(
             tx,

@@ -41,11 +41,3 @@ export function staffOf(request: FastifyRequest): Session {
 
     return request.staff;
 }
-
-export function requireAdmin(request: FastifyRequest): void {
-    ensure(staffOf(request).employee.role === 'admin', 'forbidden', 403);
-}
-
-export function requireOps(request: FastifyRequest): void {
-    ensure(staffOf(request).employee.role !== 'support', 'forbidden', 403);
-}

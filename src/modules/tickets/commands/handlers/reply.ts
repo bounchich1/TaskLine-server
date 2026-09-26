@@ -4,7 +4,7 @@ import { ensure } from '../../../../shared/errors.js';
 import type { Employee, Ticket } from '../../../../shared/types/entities.js';
 import { addMessage } from '../../../messages/index.js';
 import { queueStaffReply } from '../../../outbox/index.js';
-import { requireOwner, type TicketCommandHandler } from '../command-context.js';
+import type { TicketCommandHandler } from '../command-context.js';
 
 const MAX_REPLY_LENGTH = 4000;
 const MAX_REPLY_ATTACHMENTS = 10;
@@ -12,7 +12,6 @@ const MAX_REPLY_ATTACHMENTS = 10;
 export const reply: TicketCommandHandler = async (tx, ctx, command) => {
     const { actor, client, ticket, body } = command;
 
-    requireOwner(command);
     ensure(ticket.status === 'in_progress', 'ticket_closed');
     const text = ((body.text as string | undefined) ?? '').trim();
     const ids = (body.attachment_ids ?? []) as string[];

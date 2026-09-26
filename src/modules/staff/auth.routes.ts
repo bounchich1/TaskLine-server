@@ -8,6 +8,7 @@ import { hash } from '../../shared/crypto.js';
 import type { Database } from '../../shared/db.js';
 import { AppError, ensure } from '../../shared/errors.js';
 import { staffOf } from '../../shared/http/request.js';
+import { access } from '../../shared/http/route-access.js';
 
 import { verifyLaunch, type VerifiedLaunch } from './launch-verification.js';
 import { describeSession, issueSession, revokeSession, rotateSession } from './sessions.js';
@@ -33,7 +34,7 @@ export const authRoutes: FastifyPluginAsync<AuthRouteOptions> = async (app, opti
 function addMaxLogin(app: FastifyInstance, { db, config }: AuthRouteOptions): void {
     const rateLimit = { max: 20, timeWindow: '1 minute' };
 
-    app.post('/v1/auth/max', { config: { rateLimit } }, async (request, reply) => {
+    app.post('/v1/auth/max', { config: { rateLimit, access: 'public' } }, async (request, reply) => {
         const body = maxLoginBody.parse(request.body);
         const launch = verifyLaunchOrReject(body.init_data, [config.MAX_STAFF_BOT_TOKEN, config.MAX_BOT_TOKEN]);
         const issued = await issueSession(db, config, launch.userId, launch.digest);
@@ -63,7 +64,7 @@ function verifyLaunchOrReject(initData: string, botTokens: string[]): VerifiedLa
 }
 
 function addDevLogin(app: FastifyInstance, { db, config }: AuthRouteOptions): void {
-    app.post('/v1/auth/dev', async (request, reply) => {
+    app.post('/v1/auth/dev', access('public'), async (request, reply) => {
         ensure(
             config.NODE_ENV !== 'production' && config.DEV_AUTH_ENABLED && LOOPBACK_ADDRESSES.includes(request.ip),
             'not_found',
@@ -85,16 +86,18 @@ function addDevLogin(app: FastifyInstance, { db, config }: AuthRouteOptions): vo
 }
 
 function addSessionRoutes(app: FastifyInstance, { db, config }: AuthRouteOptions): void {
-    app.get('/v1/me', async (request) => describeSession(db, config.ORG_ID, staffOf(request).employee));
+    app.get('/v1/me', access('session'), async (request) =>
+        describeSession(db, config.ORG_ID, staffOf(request).employee),
+    );
 
-    app.post('/v1/auth/logout', async (request, reply) => {
+    app.post('/v1/auth/logout', access('session'), async (request, reply) => {
         await revokeSession(db, staffOf(request).hash);
         reply.clearCookie(SESSION_COOKIE, { path: '/' });
 
         return { ok: true };
     });
 
-    app.post('/v1/auth/refresh', async (request, reply) => {
+    app.post('/v1/auth/refresh', access('session'), async (request, reply) => {
         const rotated = await rotateSession(db, staffOf(request).hash);
 
         reply.setCookie(SESSION_COOKIE, rotated.token, {

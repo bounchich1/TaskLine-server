@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
 import { ifMatchVersion, idempotencyKey, paramsId, staffOf } from '../../shared/http/request.js';
+import { access } from '../../shared/http/route-access.js';
 import type { Row } from '../../shared/types/entities.js';
 
 import { COMMAND_SCHEMAS } from './commands/command-schemas.js';
@@ -28,11 +29,15 @@ export const ticketRoutes: FastifyPluginAsync<TicketRouteOptions> = async (app, 
 };
 
 function addQueryRoutes(app: FastifyInstance, queries: TicketQueries): void {
-    app.get('/v1/tickets', async (request) => queries.list(filtersSchema.parse(request.query)));
-    app.get('/v1/tickets/counts', async (request) => queries.list(filtersSchema.parse(request.query), true));
-    app.get('/v1/tickets/:id', async (request) => queries.ticket(paramsId(request)));
+    app.get('/v1/tickets', access('tickets.view'), async (request) => queries.list(filtersSchema.parse(request.query)));
 
-    app.get('/v1/tickets/:id/messages', async (request) => {
+    app.get('/v1/tickets/counts', access('tickets.view'), async (request) =>
+        queries.list(filtersSchema.parse(request.query), true),
+    );
+
+    app.get('/v1/tickets/:id', access('tickets.view'), async (request) => queries.ticket(paramsId(request)));
+
+    app.get('/v1/tickets/:id/messages', access('tickets.view'), async (request) => {
         const page = messagePageQuery.parse(request.query);
 
         return queries.messages(paramsId(request), {
@@ -48,6 +53,7 @@ function addCommandRoutes(app: FastifyInstance, commands: TicketCommands): void 
         app.route({
             method: name === 'classification' ? 'PATCH' : 'POST',
             url: `/v1/tickets/:id/${name}`,
+            ...access('tickets.work'),
             handler: async (request, reply) => {
                 const ticketId = paramsId(request);
                 const body = schema.parse(request.body ?? {}) as Row;

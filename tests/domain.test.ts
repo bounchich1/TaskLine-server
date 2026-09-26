@@ -126,7 +126,8 @@ describe('staff transitions and rating cycles', () => {
 
         const other = (await one<Employee>(
             context.db,
-            "INSERT INTO employees(org_id,max_user_id,name,role) VALUES($1,'3','Другой','support') RETURNING *",
+            `INSERT INTO employees(org_id,max_user_id,name,role,activated_at)
+       VALUES($1,'3','Другой','support',now()) RETURNING *`,
             [context.c.ORG_ID],
         ))!;
 

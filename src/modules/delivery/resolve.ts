@@ -1,8 +1,9 @@
+import { can, canOnTicket } from '../../shared/access.js';
 import type { Ctx } from '../../shared/context.js';
 import { one, requireOne, type Sql } from '../../shared/db.js';
 import { ensure } from '../../shared/errors.js';
 import { audit, emit } from '../../shared/events.js';
-import { canActOnTicket } from '../../shared/staff.js';
+import { findActiveEmployee } from '../../shared/staff.js';
 import type { Employee, Ticket } from '../../shared/types/entities.js';
 
 import type { Delivery } from './delivery.js';
@@ -66,13 +67,10 @@ async function lockForResolve(tx: Sql, ctx: Ctx, { employee, messageId }: Resolv
 
     ensure(ticket, 'not_found', 404);
 
-    const actor = await one<Employee>(tx, 'SELECT * FROM employees WHERE id=$1 AND org_id=$2 AND NOT blocked', [
-        employee.id,
-        ctx.org,
-    ]);
+    const actor = await findActiveEmployee(tx, ctx.org, employee.id);
 
     ensure(actor?.version === employee.version, 'forbidden', 403);
-    ensure(canActOnTicket(actor, ticket), 'forbidden', 403);
+    ensure(canOnTicket(actor, ticket, 'reply'), 'forbidden', 403);
     const delivery = await requireOne<Delivery>(tx, 'SELECT * FROM deliveries WHERE id=$1 FOR UPDATE', [ref.id]);
 
     return { delivery, ticket, actor };
@@ -83,7 +81,7 @@ function assertResolvable({ delivery, ticket, actor }: ResolveTarget, { action, 
 
     if (delivery.state === 'unknown') {
         ensure(
-            actor.role !== 'support' && typeof evidence === 'string' && evidence.trim().length >= 10,
+            can(actor, 'deliveries.resolve_unknown') && typeof evidence === 'string' && evidence.trim().length >= 10,
             'operator_evidence_required',
             409,
             'Неизвестный результат: требуется проверка руководителем и подтверждение риска дубликата.',

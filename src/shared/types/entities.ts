@@ -1,3 +1,5 @@
+import type { Role } from '../access.js';
+
 import type { TriageResult } from './ai.js';
 
 export type Row = Record<string, unknown>;
@@ -7,8 +9,9 @@ export type Employee = Row & {
     org_id: string;
     max_user_id: string;
     name: string;
-    role: 'support' | 'supervisor' | 'admin';
+    role: Role;
     blocked: boolean;
+    activated_at: string | null;
     version: number;
 };
 

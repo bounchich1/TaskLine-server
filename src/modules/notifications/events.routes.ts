@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Config } from '../../shared/config.js';
 import { one, type Database } from '../../shared/db.js';
 import { ensure } from '../../shared/errors.js';
+import { access } from '../../shared/http/route-access.js';
 
 import { UiEventStream } from './event-stream.js';
 import { writeEventStreamHead } from './sse.js';
@@ -17,7 +18,7 @@ async function latestCursor(db: Database, org: string): Promise<string> {
 }
 
 export const eventsRoutes: FastifyPluginAsync<{ db: Database; config: Config }> = async (app, { db, config }) => {
-    app.get('/v1/events', async (request, reply) => {
+    app.get('/v1/events', access('tickets.view'), async (request, reply) => {
         const query = eventsQuery.parse(request.query);
         const lastEventId = request.headers['last-event-id'];
 

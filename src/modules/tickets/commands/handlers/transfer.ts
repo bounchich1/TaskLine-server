@@ -2,12 +2,11 @@ import { ensure } from '../../../../shared/errors.js';
 import { emit } from '../../../../shared/events.js';
 import { findActiveEmployee } from '../../../../shared/staff.js';
 import { addMessage } from '../../../messages/index.js';
-import { requireOwner, type TicketCommandHandler } from '../command-context.js';
+import type { TicketCommandHandler } from '../command-context.js';
 
 export const transfer: TicketCommandHandler = async (tx, ctx, command) => {
     const { actor, ticket, body } = command;
 
-    requireOwner(command);
     ensure(ticket.status === 'in_progress', 'ticket_closed');
     const target = await findActiveEmployee(tx, ctx.org, body.employee_id);
 

@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { ensure } from '../../shared/errors.js';
 import { idempotencyKey, paramsId, routeParam, staffOf } from '../../shared/http/request.js';
+import { access } from '../../shared/http/route-access.js';
 
 import { attachmentDisposition } from './downloads.js';
 import type { Files } from './files.js';
@@ -25,7 +26,7 @@ export const filesRoutes: FastifyPluginAsync<{ files: Files }> = async (app, { f
 };
 
 function addUploadRoutes(app: FastifyInstance, files: Files): void {
-    app.post('/v1/uploads', async (request) => {
+    app.post('/v1/uploads', access('tickets.work'), async (request) => {
         idempotencyKey(request);
         const body = prepareBody.parse(request.body);
 
@@ -36,7 +37,7 @@ function addUploadRoutes(app: FastifyInstance, files: Files): void {
         });
     });
 
-    app.put('/v1/uploads/:id/content', { bodyLimit: UPLOAD_BODY_LIMIT }, async (request) => {
+    app.put('/v1/uploads/:id/content', { bodyLimit: UPLOAD_BODY_LIMIT, ...access('tickets.work') }, async (request) => {
         const file = await request.file();
 
         ensure(file, 'file_required', 422);
@@ -48,11 +49,11 @@ function addUploadRoutes(app: FastifyInstance, files: Files): void {
         });
     });
 
-    app.post('/v1/uploads/:id/complete', async (request) =>
+    app.post('/v1/uploads/:id/complete', access('tickets.work'), async (request) =>
         files.draftStatus(staffOf(request).employee, paramsId(request)),
     );
 
-    app.delete('/v1/uploads/:id', async (request) => {
+    app.delete('/v1/uploads/:id', access('tickets.work'), async (request) => {
         await files.cancelDraft(staffOf(request).employee, paramsId(request));
 
         return { ok: true };
@@ -60,7 +61,7 @@ function addUploadRoutes(app: FastifyInstance, files: Files): void {
 }
 
 function addDownloadRoutes(app: FastifyInstance, files: Files): void {
-    app.get('/v1/attachments/:id/download', async (request, reply) => {
+    app.get('/v1/attachments/:id/download', access('tickets.view'), async (request, reply) => {
         const attachment = await files.sentAttachment(paramsId(request));
 
         reply
@@ -71,7 +72,7 @@ function addDownloadRoutes(app: FastifyInstance, files: Files): void {
         return reply.send(await files.read(String(attachment.object_key)));
     });
 
-    app.post('/v1/attachments/:id/download-grant', async (request) =>
+    app.post('/v1/attachments/:id/download-grant', access('tickets.view'), async (request) =>
         files.grantDownload(staffOf(request), paramsId(request)),
     );
 

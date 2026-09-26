@@ -1,3 +1,4 @@
+import { canOnTicket, type TicketAction } from '../../../shared/access.js';
 import { claimCommandKey } from '../../../shared/command-keys.js';
 import type { Config } from '../../../shared/config.js';
 import { createCtx, type Ctx } from '../../../shared/context.js';
@@ -17,13 +18,19 @@ import { reply } from './handlers/reply.js';
 import { transfer } from './handlers/transfer.js';
 import { lockCommandTarget } from './lock-target.js';
 
-const COMMANDS = new Map<string, { handle: TicketCommandHandler; event: string }>([
-    ['assign', { handle: assign, event: 'ticket.assigned' }],
-    ['classification', { handle: classify, event: 'ticket.classified' }],
-    ['transfer', { handle: transfer, event: 'ticket.updated' }],
-    ['messages', { handle: reply, event: 'message.from_agent' }],
-    ['close', { handle: close, event: 'ticket.closed' }],
-    ['reopen', { handle: reopen, event: 'ticket.reopened' }],
+interface CommandDefinition {
+    action: TicketAction;
+    handle: TicketCommandHandler;
+    event: string;
+}
+
+const COMMANDS = new Map<string, CommandDefinition>([
+    ['assign', { action: 'take', handle: assign, event: 'ticket.assigned' }],
+    ['classification', { action: 'classify', handle: classify, event: 'ticket.classified' }],
+    ['transfer', { action: 'transfer', handle: transfer, event: 'ticket.updated' }],
+    ['messages', { action: 'reply', handle: reply, event: 'message.from_agent' }],
+    ['close', { action: 'close', handle: close, event: 'ticket.closed' }],
+    ['reopen', { action: 'reopen', handle: reopen, event: 'ticket.reopened' }],
 ]);
 
 export interface TicketCommandRequest {
@@ -66,6 +73,7 @@ export class TicketCommands {
             const definition = COMMANDS.get(name);
 
             ensure(definition, 'unknown_command', 404);
+            ensure(canOnTicket(actor, ticket, definition.action), 'forbidden', 403, 'Недостаточно прав для действия.');
             const command = { actor, client, ticket, body };
 
             await definition.handle(tx, this.ctx, command);

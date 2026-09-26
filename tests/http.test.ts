@@ -87,7 +87,18 @@ it('refreshes, describes and ends a staff session', async () => {
     const current = { authorization: `Bearer ${rotated.token}`, origin: context.c.APP_ORIGIN };
     const me = await app.inject({ url: '/v1/me', headers: current });
 
-    expect(me.json()).toMatchObject({ employee: { name: 'Анна' }, capabilities: {} });
+    expect(me.json()).toEqual({
+        employee: {
+            id: context.staff.id,
+            name: 'Анна',
+            role: 'support',
+            max_user_id: '1',
+            status: 'active',
+            version: 1,
+        },
+        permissions: ['tickets.view', 'tickets.work'],
+        organization: { name: expect.any(String) as string, timezone: expect.any(String) as string },
+    });
 
     const logout = await app.inject({
         method: 'POST',

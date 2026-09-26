@@ -3,12 +3,11 @@ import { ensure } from '../../../../shared/errors.js';
 import { enqueue } from '../../../../shared/events.js';
 import type { Client, Closure, Ticket } from '../../../../shared/types/entities.js';
 import { queueBotMessage } from '../../../outbox/index.js';
-import { requireOwner, type TicketCommandHandler } from '../command-context.js';
+import type { TicketCommandHandler } from '../command-context.js';
 
 export const close: TicketCommandHandler = async (tx, ctx, command) => {
     const { actor, client, ticket, body } = command;
 
-    requireOwner(command);
     ensure(ticket.status === 'in_progress', 'ticket_closed');
     await ensureNothingInFlight(tx, { client, ticket });
 

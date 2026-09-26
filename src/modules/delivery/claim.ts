@@ -1,6 +1,7 @@
+import { canOnTicket } from '../../shared/access.js';
 import type { Ctx } from '../../shared/context.js';
 import { one, requireOne, type Sql } from '../../shared/db.js';
-import { canActOnTicket, findActiveEmployee } from '../../shared/staff.js';
+import { findActiveEmployee } from '../../shared/staff.js';
 import type { Client, Ticket } from '../../shared/types/entities.js';
 
 import type { Delivery } from './delivery.js';
@@ -74,7 +75,7 @@ async function isStillAuthorized(tx: Sql, ctx: Ctx, head: Delivery, client: Clie
             ticket.status === 'in_progress' &&
             client.consent_state === 'granted' &&
             employee.version === head.staff_version &&
-            canActOnTicket(employee, ticket);
+            canOnTicket(employee, ticket, 'reply');
     }
 
     if (head.cycle_id && valid) {

@@ -1,3 +1,4 @@
+import type { Permission } from '../../shared/access.js';
 import type { Database } from '../../shared/db.js';
 import { ensure } from '../../shared/errors.js';
 import type { Employee } from '../../shared/types/entities.js';
@@ -7,7 +8,7 @@ import { runAdminMutation } from './admin-mutation.js';
 import { listAllEmployees, listTemplates, readSettings, recentAudit, retryFailedJob } from './admin-queries.js';
 import { adminDiagnostics } from './diagnostics.js';
 import { dictionaryBody, publishDictionaryEntry } from './dictionaries.js';
-import { createEmployee, employeeBody, updateEmployee } from './employees.js';
+import { createEmployee, employeeChangesBody, newEmployeeBody, updateEmployee } from './employees.js';
 import { assertValidTimezone, settingsBody, templateBody, updateSettings, updateTemplate } from './organization.js';
 
 export interface AdminRequest {
@@ -25,13 +26,22 @@ export class Admin {
 
     async employee(request: AdminRequest & { employeeId?: string }) {
         const { employeeId, expectedVersion } = request;
-        const body = employeeBody.parse(request.body);
-        const route = `admin.employee:${employeeId ?? body.max_user_id}`;
+        const permission: Permission = 'employees.manage';
 
-        return runAdminMutation(this.db, this.org, { ...request, route, body }, (tx) =>
-            employeeId
-                ? updateEmployee(tx, this.org, { id: employeeId, body, expectedVersion })
-                : createEmployee(tx, this.org, body),
+        if (!employeeId) {
+            const body = newEmployeeBody.parse(request.body);
+            const route = `admin.employee:${body.max_user_id}`;
+
+            return runAdminMutation(this.db, this.org, { ...request, permission, route, body }, (tx, actor) =>
+                createEmployee(tx, this.org, actor, body),
+            );
+        }
+
+        const changes = employeeChangesBody.parse(request.body);
+        const mutation = { ...request, permission, route: `admin.employee:${employeeId}`, objectId: employeeId };
+
+        return runAdminMutation(this.db, this.org, { ...mutation, body: changes }, (tx, actor) =>
+            updateEmployee(tx, this.org, actor, { id: employeeId, changes, expectedVersion }),
         );
     }
 
@@ -39,8 +49,11 @@ export class Admin {
         const body = dictionaryBody.parse(request.body);
         const route = `admin.dictionary:${body.dimension}:${body.code}`;
 
-        return runAdminMutation(this.db, this.org, { ...request, route, body }, (tx) =>
-            publishDictionaryEntry(tx, this.org, { body, expectedVersion: request.expectedVersion }),
+        return runAdminMutation(
+            this.db,
+            this.org,
+            { ...request, permission: 'organization.configure', route, body },
+            (tx) => publishDictionaryEntry(tx, this.org, { body, expectedVersion: request.expectedVersion }),
         );
     }
 
@@ -51,7 +64,9 @@ export class Admin {
         validateTemplate(body.body);
         ensure(code in DEFAULT_TEMPLATES, 'unknown_template', 422);
 
-        return runAdminMutation(this.db, this.org, { ...request, route: `admin.template:${code}`, body }, (tx) =>
+        const mutation = { ...request, permission: 'organization.configure' as const, route: `admin.template:${code}` };
+
+        return runAdminMutation(this.db, this.org, { ...mutation, body }, (tx) =>
             updateTemplate(tx, this.org, { code, body: body.body, expectedVersion }),
         );
     }
@@ -61,7 +76,9 @@ export class Admin {
 
         assertValidTimezone(settings.timezone);
 
-        return runAdminMutation(this.db, this.org, { ...request, route: 'admin.settings', body: settings }, (tx) =>
+        const mutation = { ...request, permission: 'organization.configure' as const, route: 'admin.settings' };
+
+        return runAdminMutation(this.db, this.org, { ...mutation, body: settings }, (tx) =>
             updateSettings(tx, this.org, { settings, expectedVersion: request.expectedVersion }),
         );
     }
@@ -86,7 +103,7 @@ export class Admin {
         return adminDiagnostics(this.db, this.org);
     }
 
-    async retryJob(jobId: string): Promise<void> {
-        await retryFailedJob(this.db, this.org, jobId);
+    async retryJob(actor: Employee, jobId: string): Promise<void> {
+        await retryFailedJob(this.db, this.org, { actor, jobId });
     }
 }
