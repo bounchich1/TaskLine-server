@@ -27,8 +27,26 @@ export interface TriageExpectations {
   memoryIds: string[];
 }
 
+function unwrapEnvelope(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return value;
+  }
+
+  const fields = Object.values(value);
+
+  if (fields.length !== 1) {
+    return value;
+  }
+
+  return typeof fields[0] === 'string' ? strictJson(fields[0]) : fields[0];
+}
+
+function parseModelJson(raw: string): unknown {
+  return unwrapEnvelope(strictJson(raw));
+}
+
 export function parseTriage(raw: string, expected: TriageExpectations): TriageResult {
-  const result = strictJson(raw);
+  const result = parseModelJson(raw);
 
   ensure(validateTriage(result), 'invalid_ai_schema', 422);
   const value = result as TriageResult;
@@ -60,7 +78,7 @@ export function parseTriage(raw: string, expected: TriageExpectations): TriageRe
 }
 
 export function parseResolution(raw: string, evidenceIds: string[]): Resolution {
-  const result = strictJson(raw);
+  const result = parseModelJson(raw);
 
   ensure(validateResolution(result), 'invalid_memory_schema', 422);
   const value = result as Resolution;

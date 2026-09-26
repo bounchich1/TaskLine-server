@@ -96,6 +96,28 @@ it('runs triage through both recall tools and one schema repair', async () => {
     expect(steps.rows.map((row) => row.step_key)).toEqual(['triage-0', 'triage-1', 'triage-2', 'triage-repair']);
 });
 
+it('accepts a triage wrapped in a single-key envelope without a repair call', async () => {
+    await context.create();
+    const job = await claim('triage');
+    const triage: Row = { ...validTriage(job), evidence_memory_ids: [] };
+
+    const gateway = new Gateway(
+        context.db,
+        context.c,
+        scripted([text(JSON.stringify({ answer: JSON.stringify(triage) }))]),
+    );
+
+    await new Workflows(context.db, context.c, gateway, recall).triage(job);
+    const ticket = await context.ticket();
+
+    expect(ticket.ai_status).toBe('done');
+    expect(ticket.tag).toBe((triage.tags as Row).tag);
+    expect(ticket.suggestion).toMatchObject({ suggested_solution: 'Перезапустите роутер' });
+    const steps = await context.db.query('SELECT step_key FROM ai_calls ORDER BY step_key');
+
+    expect(steps.rows.map((row) => row.step_key)).toEqual(['triage-0']);
+});
+
 it('falls back to a review-required suggestion when the model call fails', async () => {
     await context.create();
     const job = await claim('triage');

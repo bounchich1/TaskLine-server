@@ -4,6 +4,17 @@ import type { Database, Sql } from '../../shared/db.js';
 
 const DEFAULT_DICTIONARY: [string, string, string, number][] = [
     ['tag', 'undefined', 'Не определён', 0],
+    ['tag', 'no_connection', 'Нет интернета', 11],
+    ['tag', 'unstable_connection', 'Обрывы, потери пакетов, пинг', 10],
+    ['tag', 'slow_speed', 'Низкая скорость', 9],
+    ['tag', 'wifi_router', 'Wi-Fi и роутер', 8],
+    ['tag', 'equipment', 'Оборудование и кабель', 7],
+    ['tag', 'billing', 'Оплата и баланс', 6],
+    ['tag', 'tariff', 'Тарифы и услуги', 5],
+    ['tag', 'connection_request', 'Подключение и переезд', 4],
+    ['tag', 'account', 'Личный кабинет', 3],
+    ['tag', 'complaint', 'Жалоба на обслуживание', 2],
+    ['tag', 'other', 'Другое', 1],
     ['urgency', 'low', 'Низкая', 0],
     ['urgency', 'medium', 'Средняя', 1],
     ['urgency', 'high', 'Высокая', 2],
