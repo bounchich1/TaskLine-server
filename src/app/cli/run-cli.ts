@@ -8,6 +8,7 @@ import { mediaHostsCommand } from './commands/media-hosts.js';
 import { memoryReconcileCommand } from './commands/memory-reconcile.js';
 import { migrateCommand } from './commands/migrate.js';
 import { permitResolveCommand } from './commands/permit-resolve.js';
+import { seedTestDataCommand } from './commands/seed-test-data.js';
 import { storageInitCommand } from './commands/storage-init.js';
 import { subscribeCommand } from './commands/subscribe.js';
 
@@ -20,11 +21,12 @@ const COMMANDS = new Map<string, CliCommand>([
     ['memory-reconcile', memoryReconcileCommand],
     ['permit-resolve', permitResolveCommand],
     ['ai-cap', aiCapCommand],
+    ['seed-test-data', seedTestDataCommand],
 ]);
 
 const USAGE =
     'Commands: migrate, bootstrap, subscribe [staff], storage-init, media-hosts, memory-reconcile <id>, ' +
-    'permit-resolve <slot> <evidence>, ai-cap <10..15>';
+    'permit-resolve <slot> <evidence>, ai-cap <10..15>, seed-test-data [file]';
 
 export async function runCli(argv: string[]): Promise<void> {
     const config = readConfig();

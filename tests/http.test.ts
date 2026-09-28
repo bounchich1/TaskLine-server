@@ -39,7 +39,10 @@ it('serves health checks, the OpenAPI document and CORS preflight', async () => 
         version: 'dev',
     });
 
-    expect((await app.inject({ url: '/openapi.json' })).json()).toMatchObject({ openapi: '3.1.0' });
+    const openapi = await app.inject({ url: '/openapi.yaml' });
+
+    expect(openapi.headers['content-type']).toBe('application/yaml; charset=utf-8');
+    expect(openapi.body).toMatch(/^openapi: 3\.1\.0$/m);
 
     const preflight = await app.inject({
         method: 'OPTIONS',

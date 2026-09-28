@@ -19,16 +19,7 @@ export async function recordInput(tx: Sql, ctx: Ctx, input: ClientInput): Promis
         return;
     }
 
-    await tx.query('INSERT INTO clients(org_id,max_user_id,chat_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [
-        ctx.org,
-        input.userId,
-        input.chatId,
-    ]);
-
-    const client = await requireOne<Client>(tx, 'SELECT * FROM clients WHERE org_id=$1 AND max_user_id=$2 FOR UPDATE', [
-        ctx.org,
-        input.userId,
-    ]);
+    const client = await lockClient(tx, ctx, { userId: input.userId, chatId: input.chatId });
 
     if (client.chat_id !== input.chatId) {
         await tx.query(
@@ -62,6 +53,19 @@ export async function recordInput(tx: Sql, ctx: Ctx, input: ClientInput): Promis
             encrypt(input, ctx.config.ENCRYPTION_KEY),
         ],
     );
+}
+
+export async function lockClient(tx: Sql, ctx: Ctx, { userId, chatId }: { userId: string; chatId: string }) {
+    await tx.query('INSERT INTO clients(org_id,max_user_id,chat_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [
+        ctx.org,
+        userId,
+        chatId,
+    ]);
+
+    return requireOne<Client>(tx, 'SELECT * FROM clients WHERE org_id=$1 AND max_user_id=$2 FOR UPDATE', [
+        ctx.org,
+        userId,
+    ]);
 }
 
 async function alreadyReceived(tx: Sql, ctx: Ctx, sourceKey: string): Promise<boolean> {

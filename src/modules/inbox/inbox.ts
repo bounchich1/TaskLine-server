@@ -2,11 +2,13 @@ import type { Config } from '../../shared/config.js';
 import { createCtx, type Ctx } from '../../shared/context.js';
 import { decrypt } from '../../shared/crypto.js';
 import { one, type Database } from '../../shared/db.js';
+import { ensure } from '../../shared/errors.js';
 import type { ClientInput } from '../../shared/types/client-input.js';
 import type { Client } from '../../shared/types/entities.js';
+import { grantConsent } from '../consent/index.js';
 
 import { routeClientInput } from './dialog-router.js';
-import { recordInput } from './record-input.js';
+import { lockClient, recordInput } from './record-input.js';
 
 interface Receipt {
     [column: string]: unknown;
@@ -27,6 +29,20 @@ export class Inbox {
 
     async ingest(input: ClientInput): Promise<void> {
         await this.db.tx((tx) => recordInput(tx, this.ctx, input));
+    }
+
+    async ingestConsented(input: ClientInput): Promise<void> {
+        const { userId, chatId } = input;
+
+        ensure(input.kind === 'message' && userId && chatId, 'unsupported_test_input', 422);
+
+        await this.db.tx(async (tx) => {
+            const client = await lockClient(tx, this.ctx, { userId, chatId });
+
+            await grantConsent(tx, this.ctx, client, `test-data:${userId}`);
+        });
+
+        await this.ingest(input);
     }
 
     async processClient(clientId: string): Promise<boolean> {

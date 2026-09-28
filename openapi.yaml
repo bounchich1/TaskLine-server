@@ -1,0 +1,1542 @@
+openapi: 3.1.0
+info:
+  title: TaskLine — API службы поддержки в MAX
+  version: 1.0.0
+  description: |
+    API сервера TaskLine. Им пользуется мини-приложение сотрудников поддержки внутри MAX;
+    клиенты общаются с ботом, а сообщения бота приходят на `/webhooks/max`.
+
+    **Вход.** Сотрудник открывает мини-приложение из MAX, приложение отправляет подписанные
+    MAX данные запуска (`init_data`) в `POST /v1/auth/max` и получает `token` и `csrf`.
+    Сессия живёт до 8 часов и завершается после 30 минут бездействия.
+
+    **Заголовки запросов `/v1/*`:**
+    - `Authorization: Bearer <token>` — во всех запросах, кроме входа (или cookie `support_session`);
+    - для всех методов, кроме GET: `Origin` равен адресу мини-приложения (`APP_ORIGIN`),
+      `X-CSRF-Token: <csrf>` и `Idempotency-Key` (8–128 символов; повтор с тем же ключом
+      возвращает сохранённый результат);
+    - для изменения обращения или настройки: `If-Match: <version>` — текущая версия объекта;
+      при несовпадении ответ `409 version_conflict`.
+
+    **Роли.** `support` — работает со своими обращениями; `supervisor` — ещё и с чужими,
+    видит состояние системы; `admin` — ещё сотрудники, справочники, шаблоны, настройки, аудит.
+    Недостаточно прав — `403 forbidden`.
+
+    Ошибки имеют единый формат `Error`; `message` — текст на русском для показа пользователю.
+servers:
+  - url: https://demo.juicymelons.top
+    description: Демо-стенд для проверки
+  - url: http://localhost:8080
+    description: Локальный запуск через Docker Compose
+tags:
+  - name: health
+    description: Состояние сервиса
+  - name: auth
+    description: Вход сотрудников
+  - name: tickets
+    description: Обращения клиентов
+  - name: files
+    description: Вложения
+  - name: reference
+    description: Справочники, сотрудники, уведомления, события
+  - name: admin
+    description: Администрирование и эксплуатация
+  - name: max
+    description: Вебхук бота MAX
+security:
+  - bearerAuth: []
+  - sessionCookie: []
+paths:
+  /health/live:
+    get:
+      operationId: getHealthLive
+      tags: [health]
+      summary: Процесс API запущен
+      security: []
+      responses:
+        '200':
+          description: Сервис жив
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+  /health/ready:
+    get:
+      operationId: getHealthReady
+      tags: [health]
+      summary: API готов обслуживать запросы (схема БД актуальна)
+      security: []
+      responses:
+        '200':
+          description: Готов
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+        '503':
+          $ref: '#/components/responses/Error'
+  /openapi.yaml:
+    get:
+      operationId: getOpenapiYaml
+      tags: [health]
+      summary: Этот документ
+      security: []
+      responses:
+        '200':
+          description: Спецификация OpenAPI
+          content:
+            application/yaml:
+              schema: { type: string }
+
+  /v1/auth/max:
+    post:
+      operationId: postAuthMax
+      tags: [auth]
+      summary: Вход по данным запуска мини-приложения MAX
+      description: >-
+        Проверяет подпись `init_data` токеном бота. Сотрудник должен быть добавлен
+        администратором или получить роль командой `/code` в чате бота на демо-стенде.
+        Не более 20 попыток в минуту с одного адреса.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [init_data]
+              properties:
+                init_data:
+                  type: string
+                  maxLength: 16384
+                  description: Строка `window.WebApp.initData` из MAX Bridge
+      responses:
+        '200':
+          description: Сессия создана
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /v1/auth/dev:
+    post:
+      operationId: postAuthDev
+      tags: [auth]
+      summary: Вход без MAX для локальной разработки
+      description: >-
+        Доступен только при `NODE_ENV≠production`, `DEV_AUTH_ENABLED=true` и запросе с адреса
+        127.0.0.1/::1 (например, изнутри контейнера `api`). В остальных случаях — 404.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [user_id]
+              properties:
+                user_id: { type: string, pattern: '^\d+$', description: MAX ID сотрудника }
+      responses:
+        '200':
+          description: Сессия создана
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /v1/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Текущий сотрудник, его права и организация
+      responses:
+        '200':
+          description: Профиль
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+        '401':
+          $ref: '#/components/responses/Error'
+  /v1/auth/refresh:
+    post:
+      operationId: postAuthRefresh
+      tags: [auth]
+      summary: Выпустить новый токен и CSRF для текущей сессии
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+      responses:
+        '200':
+          description: Новые значения
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, csrf]
+                properties:
+                  token: { type: string }
+                  csrf: { type: string }
+        '401':
+          $ref: '#/components/responses/Error'
+  /v1/auth/logout:
+    post:
+      operationId: postAuthLogout
+      tags: [auth]
+      summary: Завершить сессию
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /v1/tickets:
+    get:
+      operationId: getTickets
+      tags: [tickets]
+      summary: Очередь обращений с фильтрами и постраничной выдачей
+      description: Требуется право `tickets.view`.
+      parameters:
+        - { name: tab, in: query, schema: { type: string, enum: [open, closed], default: open } }
+        - {
+            name: q,
+            in: query,
+            description: 'Номер обращения или текст для поиска',
+            schema: { type: string, maxLength: 300 },
+          }
+        - { name: tag, in: query, schema: { type: string, maxLength: 64 } }
+        - { name: urgency, in: query, schema: { type: string, maxLength: 64 } }
+        - { name: complexity, in: query, schema: { type: string, maxLength: 64 } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/TicketStatus' } }
+        - { name: assignee, in: query, schema: { type: string, format: uuid } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [urgency, complexity, newest, oldest, rating], default: urgency }
+        - { name: cursor, in: query, description: '`next_cursor` предыдущей страницы', schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 30 } }
+      responses:
+        '200':
+          description: Страница обращений
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TicketPage' }
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+  /v1/tickets/counts:
+    get:
+      operationId: getTicketsCounts
+      tags: [tickets]
+      summary: Число открытых и закрытых обращений по тем же фильтрам
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 300 } }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: urgency, in: query, schema: { type: string } }
+        - { name: complexity, in: query, schema: { type: string } }
+        - { name: assignee, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Счётчики
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TicketCounts' }
+        '401':
+          $ref: '#/components/responses/Error'
+  /v1/tickets/{id}:
+    get:
+      operationId: getTicketsById
+      tags: [tickets]
+      summary: Карточка обращения с подсказкой ИИ, закрытиями и вложениями
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Обращение
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TicketDetail' }
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /v1/tickets/{id}/messages:
+    get:
+      operationId: getTicketsByIdMessages
+      tags: [tickets]
+      summary: Переписка по обращению (страницами по `seq`)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - { name: before, in: query, description: Сообщения с seq меньше, schema: { type: integer, minimum: 1 } }
+        - { name: after, in: query, description: Сообщения с seq больше, schema: { type: integer, minimum: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200':
+          description: Сообщения по возрастанию seq
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessagePage' }
+        '404':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: postTicketsByIdMessages
+      tags: [tickets]
+      summary: Ответить клиенту
+      description: >-
+        Сообщение ставится в очередь доставки в MAX (`delivery_state` у сообщения).
+        Отвечать может исполнитель обращения; на чужих — право `tickets.reply_any`.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                text: { type: string, maxLength: 4000, default: '' }
+                attachment_ids:
+                  type: array
+                  maxItems: 10
+                  items: { type: string, format: uuid }
+                  description: Загруженные через `/v1/uploads` файлы
+      responses:
+        '202':
+          description: Ответ принят, обращение после команды
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ticket' }
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/tickets/{id}/sources/{memoryId}:
+    get:
+      operationId: getTicketsByIdSourcesByMemoryId
+      tags: [tickets]
+      summary: Прошлое обращение, на которое ссылается подсказка ИИ
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - { name: memoryId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Выдержка из прошлого обращения
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SourceExcerpt' }
+        '404':
+          $ref: '#/components/responses/Error'
+  /v1/tickets/{id}/assign:
+    post:
+      operationId: postTicketsByIdAssign
+      tags: [tickets]
+      summary: Взять обращение в работу
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '200':
+          $ref: '#/components/responses/Ticket'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/tickets/{id}/transfer:
+    post:
+      operationId: postTicketsByIdTransfer
+      tags: [tickets]
+      summary: Передать обращение коллеге с комментарием
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [employee_id, comment]
+              properties:
+                employee_id: { type: string, format: uuid }
+                comment: { type: string, minLength: 1, maxLength: 2000 }
+      responses:
+        '200':
+          $ref: '#/components/responses/Ticket'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/tickets/{id}/classification:
+    patch:
+      operationId: patchTicketsByIdClassification
+      tags: [tickets]
+      summary: Изменить тег, срочность или сложность
+      description: >-
+        `revisions` — текущие `tag_revision` / `urgency_revision` / `complexity_revision`
+        меняемых полей; если поле уже изменил кто-то другой — 409.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [revisions]
+              minProperties: 2
+              properties:
+                tag: { type: string, maxLength: 64 }
+                urgency: { type: string, maxLength: 64 }
+                complexity: { type: string, maxLength: 64 }
+                revisions:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    tag: { type: integer }
+                    urgency: { type: integer }
+                    complexity: { type: integer }
+      responses:
+        '200':
+          $ref: '#/components/responses/Ticket'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/tickets/{id}/close:
+    post:
+      operationId: postTicketsByIdClose
+      tags: [tickets]
+      summary: Закрыть обращение (клиенту уходит запрос оценки)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                note: { type: string, maxLength: 2000 }
+      responses:
+        '200':
+          $ref: '#/components/responses/Ticket'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/tickets/{id}/reopen:
+    post:
+      operationId: postTicketsByIdReopen
+      tags: [tickets]
+      summary: Переоткрыть закрытое обращение
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1, maxLength: 2000 }
+                employee_id: { type: string, format: uuid, description: Новый исполнитель }
+      responses:
+        '200':
+          $ref: '#/components/responses/Ticket'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/messages/{id}/retry:
+    post:
+      operationId: postMessagesByIdRetry
+      tags: [tickets]
+      summary: Повторить доставку ответа, статус которой неизвестен
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeliveryResolution' }
+      responses:
+        '200':
+          description: Результат
+          content:
+            application/json:
+              schema: { type: object }
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/messages/{id}/cancel:
+    post:
+      operationId: postMessagesByIdCancel
+      tags: [tickets]
+      summary: Отменить доставку ответа, статус которой неизвестен
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeliveryResolution' }
+      responses:
+        '200':
+          description: Результат
+          content:
+            application/json:
+              schema: { type: object }
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+
+  /v1/uploads:
+    post:
+      operationId: postUploads
+      tags: [files]
+      summary: Начать загрузку файла к ответу
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [ticket_id, filename, kind]
+              properties:
+                ticket_id: { type: string, format: uuid }
+                filename: { type: string, minLength: 1, maxLength: 200 }
+                kind: { type: string, enum: [image, video, file] }
+      responses:
+        '200':
+          description: Черновик вложения
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status]
+                properties:
+                  id: { type: string, format: uuid }
+                  status: { type: string }
+        '403':
+          $ref: '#/components/responses/Error'
+  /v1/uploads/{id}/content:
+    put:
+      operationId: putUploadsByIdContent
+      tags: [files]
+      summary: Передать содержимое файла (multipart, одно поле, до 100 МБ)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200':
+          $ref: '#/components/responses/Attachment'
+        '413':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/uploads/{id}/complete:
+    post:
+      operationId: postUploadsByIdComplete
+      tags: [files]
+      summary: Состояние проверки загруженного файла антивирусом
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          $ref: '#/components/responses/Attachment'
+        '401':
+          $ref: '#/components/responses/Error'
+  /v1/uploads/{id}:
+    delete:
+      operationId: deleteUploadsById
+      tags: [files]
+      summary: Удалить неотправленный черновик вложения
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Error'
+  /v1/attachments/{id}/download:
+    get:
+      operationId: getAttachmentsByIdDownload
+      tags: [files]
+      summary: Скачать вложение обращения
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Содержимое файла
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '404':
+          $ref: '#/components/responses/Error'
+  /v1/attachments/{id}/download-grant:
+    post:
+      operationId: postAttachmentsByIdDownloadGrant
+      tags: [files]
+      summary: Одноразовая ссылка для скачивания вне приложения (MAX openLink)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Ссылка
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url, filename, expires_at]
+                properties:
+                  url: { type: string, format: uri }
+                  filename: { type: string }
+                  expires_at: { type: string, format: date-time }
+        '401':
+          $ref: '#/components/responses/Error'
+  /download/{grant}:
+    get:
+      operationId: getDownloadByGrant
+      tags: [files]
+      summary: Скачать файл по одноразовой ссылке
+      security: []
+      parameters:
+        - { name: grant, in: path, required: true, schema: { type: string, minLength: 32, maxLength: 128 } }
+      responses:
+        '200':
+          description: Содержимое файла
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '404':
+          $ref: '#/components/responses/Error'
+
+  /v1/dictionaries:
+    get:
+      operationId: getDictionaries
+      tags: [reference]
+      summary: Справочники тегов, срочности и сложности
+      responses:
+        '200':
+          description: Все значения, включая неактивные
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/DictionaryEntry' }
+        '401':
+          $ref: '#/components/responses/Error'
+  /v1/employees:
+    get:
+      operationId: getEmployees
+      tags: [reference]
+      summary: Сотрудники организации (для передачи обращений)
+      responses:
+        '200':
+          description: Список
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Colleague' }
+        '401':
+          $ref: '#/components/responses/Error'
+  /v1/notifications:
+    get:
+      operationId: getNotifications
+      tags: [reference]
+      summary: Уведомления текущего сотрудника
+      responses:
+        '200':
+          description: Список
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Notification' }
+        '401':
+          $ref: '#/components/responses/Error'
+  /v1/notifications/{id}/read:
+    post:
+      operationId: postNotificationsByIdRead
+      tags: [reference]
+      summary: Отметить уведомление прочитанным
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Error'
+  /v1/events:
+    get:
+      operationId: getEvents
+      tags: [reference]
+      summary: Поток изменений для живого обновления интерфейса (Server-Sent Events)
+      parameters:
+        - { name: cursor, in: query, schema: { type: string, pattern: '^\d+$' } }
+        - { name: Last-Event-ID, in: header, schema: { type: string } }
+      responses:
+        '200':
+          description: >-
+            Поток `text/event-stream`. События: `ticket.*`, `message.*`, `attachment.changed`,
+            `admin.changed`, `notification.created`; `resync` — перечитать всё.
+          content:
+            text/event-stream:
+              schema: { type: string }
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /v1/admin/employees:
+    get:
+      operationId: getAdminEmployees
+      tags: [admin]
+      summary: Сотрудники с MAX ID и статусом (право `employees.manage`)
+      responses:
+        '200':
+          description: Список
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/AdminEmployee' }
+        '403':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: postAdminEmployees
+      tags: [admin]
+      summary: Пригласить сотрудника (статус pending до первого входа)
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatchNew'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [max_user_id, name, role]
+              properties:
+                max_user_id: { type: string, pattern: '^\d{1,20}$' }
+                name: { type: string, minLength: 1, maxLength: 120 }
+                role: { $ref: '#/components/schemas/Role' }
+      responses:
+        '200':
+          description: Созданный сотрудник
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminEmployee' }
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/admin/employees/{id}:
+    patch:
+      operationId: patchAdminEmployeesById
+      tags: [admin]
+      summary: Изменить сотрудника, роль или заблокировать
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              minProperties: 1
+              properties:
+                max_user_id: { type: string, pattern: '^\d{1,20}$' }
+                name: { type: string, minLength: 1, maxLength: 120 }
+                role: { $ref: '#/components/schemas/Role' }
+                blocked: { type: boolean }
+      responses:
+        '200':
+          description: Сотрудник после изменения
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminEmployee' }
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/admin/roles:
+    get:
+      operationId: getAdminRoles
+      tags: [admin]
+      summary: Роли и их права
+      responses:
+        '200':
+          description: Роли
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [code, permissions]
+                      properties:
+                        code: { $ref: '#/components/schemas/Role' }
+                        permissions:
+                          type: array
+                          items: { $ref: '#/components/schemas/Permission' }
+        '401':
+          $ref: '#/components/responses/Error'
+  /v1/admin/dictionaries:
+    put:
+      operationId: putAdminDictionaries
+      tags: [admin]
+      summary: Добавить или изменить значение справочника (право `organization.configure`)
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatchNew'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [dimension, code, label, rank, active]
+              properties:
+                dimension: { type: string, enum: [tag, urgency, complexity] }
+                code: { type: string, pattern: '^[a-z][a-z0-9_]{0,63}$' }
+                label: { type: string, minLength: 1, maxLength: 120 }
+                rank: { type: integer, minimum: 0, maximum: 100 }
+                active: { type: boolean }
+      responses:
+        '200':
+          description: Значение справочника
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DictionaryEntry' }
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/admin/templates:
+    get:
+      operationId: getAdminTemplates
+      tags: [admin]
+      summary: Шаблоны сообщений бота
+      responses:
+        '200':
+          description: Список
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Template' }
+        '401':
+          $ref: '#/components/responses/Error'
+  /v1/admin/templates/{code}:
+    put:
+      operationId: putAdminTemplatesByCode
+      tags: [admin]
+      summary: Изменить текст шаблона
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [body]
+              properties:
+                body: { type: string, maxLength: 3000 }
+      responses:
+        '200':
+          description: Шаблон
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Template' }
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/admin/settings:
+    get:
+      operationId: getAdminSettings
+      tags: [admin]
+      summary: Название организации и часовой пояс
+      responses:
+        '200':
+          description: Настройки
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Settings' }
+        '401':
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: putAdminSettings
+      tags: [admin]
+      summary: Изменить настройки организации
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name, timezone]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+                timezone: { type: string, minLength: 1, maxLength: 80, examples: [Asia/Krasnoyarsk] }
+      responses:
+        '200':
+          description: Настройки
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Settings' }
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/admin/diagnostics:
+    get:
+      operationId: getAdminDiagnostics
+      tags: [admin]
+      summary: Состояние фоновых задач, доставок, памяти ИИ (право `operations.view`)
+      responses:
+        '200':
+          description: Диагностика
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [jobs, deliveries, memory, permits]
+                properties:
+                  jobs: { type: array, items: { type: object } }
+                  deliveries: { type: array, items: { type: object } }
+                  memory: { type: array, items: { type: object } }
+                  permits: { type: array, items: { type: object } }
+        '403':
+          $ref: '#/components/responses/Error'
+  /v1/admin/jobs/{id}/retry:
+    post:
+      operationId: postAdminJobsByIdRetry
+      tags: [admin]
+      summary: Перезапустить упавшую фоновую задачу (право `operations.retry`)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '403':
+          $ref: '#/components/responses/Error'
+  /v1/admin/audit:
+    get:
+      operationId: getAdminAudit
+      tags: [admin]
+      summary: Последние 100 записей журнала аудита (право `audit.view`)
+      responses:
+        '200':
+          description: Журнал
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/AuditEntry' }
+        '403':
+          $ref: '#/components/responses/Error'
+
+  /v1/dev/inbound:
+    post:
+      operationId: postDevInbound
+      tags: [max]
+      summary: Сообщение от имени клиента без MAX (только режим разработки)
+      description: Регистрируется только при `DEV_AUTH_ENABLED=true` и `NODE_ENV≠production`.
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [user_id, text, message_id]
+              properties:
+                user_id: { type: string, pattern: '^\d+$' }
+                text: { type: string, maxLength: 16000 }
+                message_id: { type: string, maxLength: 100 }
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Error'
+  /webhooks/max:
+    post:
+      operationId: postWebhooksMax
+      tags: [max]
+      summary: Обновления бота от MAX
+      description: >-
+        Принимает Update платформы MAX (`message_created`, `message_edited`, `message_removed`,
+        `message_callback`, `bot_started`). Сообщение `/code <КОД>` на стенде с `DEMO_ROLE_CODES`
+        выдаёт отправителю роль сотрудника и не становится обращением.
+      security:
+        - maxWebhookSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /webhooks/max-staff:
+    post:
+      operationId: postWebhooksMaxStaff
+      tags: [max]
+      summary: Обновления бота для сотрудников (кнопка запуска мини-приложения)
+      description: Регистрируется, когда задан `MAX_STAFF_WEBHOOK_SECRET` (отдельный бот сотрудников).
+      security:
+        - maxWebhookSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: '`token` из ответа `/v1/auth/max`'
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: support_session
+    maxWebhookSecret:
+      type: apiKey
+      in: header
+      name: X-Max-Bot-Api-Secret
+      description: Значение `MAX_WEBHOOK_SECRET`, заданное при подписке на вебхук
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Origin:
+      name: Origin
+      in: header
+      required: true
+      description: Адрес мини-приложения (`APP_ORIGIN`), например `https://demo.juicymelons.top`
+      schema: { type: string, format: uri }
+    Csrf:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      description: '`csrf` из ответа входа'
+      schema: { type: string }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Уникальный ключ операции; повтор возвращает сохранённый результат
+      schema: { type: string, minLength: 8, maxLength: 128 }
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: Текущее значение `version` изменяемого объекта
+      schema: { type: string, pattern: '^"?\d+"?$' }
+    IfMatchNew:
+      name: If-Match
+      in: header
+      required: true
+      description: Для нового объекта — `0`, для существующего — его `version`
+      schema: { type: string, pattern: '^"?\d+"?$' }
+  responses:
+    Error:
+      description: Ошибка
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Ok:
+      description: Выполнено
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ok]
+            properties:
+              ok: { type: boolean, const: true }
+    Ticket:
+      description: Обращение после команды
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Ticket' }
+    Attachment:
+      description: Вложение
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Attachment' }
+  schemas:
+    Error:
+      type: object
+      required: [code, message, request_id, retryable]
+      properties:
+        code: { type: string, examples: [version_conflict, forbidden, unauthorized, csrf_failed, origin_denied] }
+        message: { type: string }
+        request_id: { type: string }
+        retryable: { type: boolean }
+    Health:
+      type: object
+      required: [status, version]
+      properties:
+        status: { type: string, enum: [ok, ready] }
+        version: { type: string }
+    Role:
+      type: string
+      enum: [support, supervisor, admin]
+    Permission:
+      type: string
+      enum:
+        - tickets.view
+        - tickets.work
+        - tickets.classify_any
+        - tickets.reply_any
+        - tickets.transfer_any
+        - tickets.close_any
+        - tickets.reopen_any
+        - deliveries.resolve_unknown
+        - operations.view
+        - operations.retry
+        - employees.manage
+        - organization.configure
+        - audit.view
+    EmployeeStatus:
+      type: string
+      enum: [pending, active, blocked]
+    Organization:
+      type: object
+      required: [name, timezone]
+      properties:
+        name: { type: string }
+        timezone: { type: string }
+    SessionEmployee:
+      type: object
+      required: [id, name, role, max_user_id, status, version]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+        max_user_id: { type: string }
+        status: { $ref: '#/components/schemas/EmployeeStatus' }
+        version: { type: integer }
+    Profile:
+      type: object
+      required: [employee, permissions, organization]
+      properties:
+        employee: { $ref: '#/components/schemas/SessionEmployee' }
+        permissions:
+          type: array
+          items: { $ref: '#/components/schemas/Permission' }
+        organization: { $ref: '#/components/schemas/Organization' }
+    Session:
+      allOf:
+        - $ref: '#/components/schemas/Profile'
+        - type: object
+          required: [token, csrf]
+          properties:
+            token: { type: string, description: 'Токен для `Authorization: Bearer`' }
+            csrf: { type: string, description: Значение для `X-CSRF-Token` }
+            start_param: { type: [string, 'null'], description: Параметр запуска (id обращения из уведомления) }
+    TicketStatus:
+      type: string
+      enum: [open, in_progress, awaiting_rating, closed]
+    Suggestion:
+      type: object
+      description: Подсказка ИИ (схема 1.1 — `tip`, `customer_reply`; 1.0 — `suggested_solution`)
+      required: [tags, needs_review, missing_information, evidence_memory_ids, confidence]
+      properties:
+        schema_version: { type: string, enum: ['1.0', '1.1'] }
+        tags:
+          type: object
+          properties:
+            tag: { type: string }
+            urgency: { type: string }
+            complexity: { type: string }
+        needs_review: { type: boolean }
+        missing_information: { type: array, items: { type: string } }
+        evidence_memory_ids: { type: array, items: { type: string } }
+        confidence: { type: number }
+        tip:
+          type: [object, 'null']
+          properties:
+            summary: { type: string }
+            steps:
+              type: array
+              items:
+                type: object
+                properties:
+                  text: { type: string }
+                  case_refs: { type: array, items: { type: string } }
+            cautions: { type: array, items: { type: string } }
+        customer_reply: { type: [string, 'null'] }
+        suggested_solution: { type: [string, 'null'] }
+    Ticket:
+      type: object
+      required:
+        - id
+        - number
+        - description
+        - status
+        - assignee_id
+        - version
+        - created_at
+        - tag
+        - urgency
+        - complexity
+        - ai_status
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: string, description: Номер с ведущими нулями, examples: ['000042'] }
+        ticket_number: { type: integer }
+        description: { type: string, description: Первое сообщение клиента }
+        status: { $ref: '#/components/schemas/TicketStatus' }
+        assignee_id: { type: [string, 'null'], format: uuid }
+        assignee_name: { type: [string, 'null'] }
+        version: { type: integer, description: Передаётся в `If-Match` }
+        created_at: { type: string, format: date-time }
+        taken_at: { type: [string, 'null'], format: date-time }
+        closed_at: { type: [string, 'null'], format: date-time }
+        tag: { type: string }
+        urgency: { type: string }
+        complexity: { type: string }
+        tag_label: { type: string }
+        urgency_label: { type: string }
+        complexity_label: { type: string }
+        tag_revision: { type: integer }
+        urgency_revision: { type: integer }
+        complexity_revision: { type: integer }
+        ai_status: { type: string, description: Состояние разбора обращения ИИ, examples: [pending, done, failed] }
+        review_required: { type: boolean }
+        suggestion:
+          oneOf:
+            - $ref: '#/components/schemas/Suggestion'
+            - type: 'null'
+        suggestion_stale: { type: boolean }
+        rating: { type: [integer, 'null'], minimum: 1, maximum: 5 }
+        rated_at: { type: [string, 'null'], format: date-time }
+    TicketDetail:
+      allOf:
+        - $ref: '#/components/schemas/Ticket'
+        - type: object
+          required: [closures, attachments, suggestion_sources]
+          properties:
+            closures:
+              type: array
+              items: { $ref: '#/components/schemas/Closure' }
+            attachments:
+              type: array
+              items: { $ref: '#/components/schemas/Attachment' }
+            suggestion_sources:
+              type: array
+              items: { $ref: '#/components/schemas/SuggestionSource' }
+    TicketCounts:
+      type: object
+      required: [open, closed]
+      properties:
+        open: { type: integer }
+        closed: { type: integer }
+        snapshot_at: { type: string, format: date-time }
+    TicketPage:
+      type: object
+      required: [items, counts, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Ticket' }
+        counts: { $ref: '#/components/schemas/TicketCounts' }
+        next_cursor: { type: [string, 'null'] }
+        cursor: { type: string, description: Позиция потока событий на момент выдачи }
+    Closure:
+      type: object
+      required: [id, cycle_no, closed_at]
+      properties:
+        id: { type: string, format: uuid }
+        cycle_no: { type: integer }
+        closed_at: { type: string, format: date-time }
+        rating: { type: [integer, 'null'] }
+        rated_at: { type: [string, 'null'], format: date-time }
+        finished_reason: { type: [string, 'null'] }
+        learning_status: { type: string }
+        invalidated: { type: boolean }
+        coverage: { type: [object, 'null'] }
+    Attachment:
+      type: object
+      required: [id, filename, status]
+      properties:
+        id: { type: string, format: uuid }
+        message_id: { type: [string, 'null'], format: uuid }
+        filename: { type: string }
+        kind: { type: string, enum: [image, video, file] }
+        status: { type: string, examples: [uploading, quarantined, clean, infected, rejected, unavailable] }
+        mime: { type: [string, 'null'] }
+        bytes: { type: [string, 'null'] }
+        extraction_status: { type: [string, 'null'] }
+    SuggestionSource:
+      type: object
+      required: [memory_id, state]
+      properties:
+        memory_id: { type: string, format: uuid }
+        state: { type: string, enum: [ok, reopened, outdated, gone] }
+        ticket_id: { type: [string, 'null'], format: uuid }
+        number: { type: [string, 'null'] }
+        problem: { type: [string, 'null'] }
+        closed_at: { type: [string, 'null'], format: date-time }
+    Message:
+      type: object
+      required: [id, seq, author_type, text, created_at, delivery_state, deleted, revision]
+      properties:
+        id: { type: string, format: uuid }
+        seq: { type: integer }
+        author_type: { type: string, enum: [client, staff, bot, system] }
+        author_name: { type: [string, 'null'] }
+        text: { type: string }
+        created_at: { type: string, format: date-time }
+        delivery_state: { type: string, examples: [received, sending, delivered, unknown, failed, canceled] }
+        deleted: { type: boolean }
+        revision: { type: integer }
+    MessagePage:
+      type: object
+      required: [items, has_more, next_before]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Message' }
+        has_more: { type: boolean }
+        next_before: { type: [integer, 'null'] }
+    SourceExcerpt:
+      type: object
+      required: [source, messages, attachments, highlight, truncated]
+      properties:
+        source:
+          type: object
+          properties:
+            memory_id: { type: string, format: uuid }
+            state: { type: string }
+            ticket_id: { type: string, format: uuid }
+            number: { type: string }
+            cycle_no: { type: integer }
+            closed_at: { type: string, format: date-time }
+            problem: { type: [string, 'null'] }
+            solution: { type: [string, 'null'] }
+        messages:
+          type: array
+          items: { $ref: '#/components/schemas/Message' }
+        attachments:
+          type: array
+          items: { $ref: '#/components/schemas/Attachment' }
+        highlight: { type: array, items: { type: string } }
+        truncated: { type: boolean }
+    DeliveryResolution:
+      type: object
+      additionalProperties: false
+      properties:
+        evidence: { type: string, maxLength: 2000, description: Чем подтверждено решение }
+    DictionaryEntry:
+      type: object
+      required: [dimension, code, label, rank, active, version]
+      properties:
+        dimension: { type: string, enum: [tag, urgency, complexity] }
+        code: { type: string }
+        label: { type: string }
+        rank: { type: integer }
+        active: { type: boolean }
+        version: { type: integer }
+    Colleague:
+      type: object
+      required: [id, name, role, status, version]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+        status: { $ref: '#/components/schemas/EmployeeStatus' }
+        version: { type: integer }
+    AdminEmployee:
+      type: object
+      required: [id, max_user_id, name, role, blocked, status, version, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        max_user_id: { type: string }
+        name: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+        blocked: { type: boolean }
+        status: { $ref: '#/components/schemas/EmployeeStatus' }
+        activated_at: { type: [string, 'null'], format: date-time }
+        version: { type: integer }
+        created_at: { type: string, format: date-time }
+    Notification:
+      type: object
+      required: [id, type, ticket_id, read_at, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, examples: [ticket.created, ticket.transferred] }
+        ticket_id: { type: string, format: uuid }
+        read_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+    Template:
+      type: object
+      required: [code, body, version]
+      properties:
+        code: { type: string, examples: [consent_request, ticket_created, ticket_closed] }
+        body: { type: string }
+        version: { type: integer }
+    Settings:
+      type: object
+      required: [name, timezone, version]
+      properties:
+        name: { type: string }
+        timezone: { type: string }
+        version: { type: integer }
+    AuditEntry:
+      type: object
+      required: [id, action, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        actor_id: { type: [string, 'null'], format: uuid }
+        action: { type: string, examples: [auth.login, ticket.assign, employee.demo_role] }
+        object_id: { type: [string, 'null'] }
+        detail: { type: object }
+        created_at: { type: string, format: date-time }

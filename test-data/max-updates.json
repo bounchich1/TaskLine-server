@@ -1,0 +1,149 @@
+[
+  {
+    "update_type": "message_created",
+    "timestamp": 1790586000000,
+    "message": {
+      "sender": {
+        "user_id": 9100000001,
+        "first_name": "Анна",
+        "last_name": "Смирнова",
+        "is_bot": false
+      },
+      "recipient": {
+        "chat_id": 9200000001,
+        "chat_type": "dialog"
+      },
+      "timestamp": 1790586000000,
+      "body": {
+        "mid": "test-9100000001-1",
+        "text": "Здравствуйте! Со вчерашнего вечера нет интернета, на роутере мигает красным индикатор WAN. Перезагружала — не помогло. Договор 4815-162."
+      }
+    }
+  },
+  {
+    "update_type": "message_created",
+    "timestamp": 1790586420000,
+    "message": {
+      "sender": {
+        "user_id": 9100000001,
+        "first_name": "Анна",
+        "last_name": "Смирнова",
+        "is_bot": false
+      },
+      "recipient": {
+        "chat_id": 9200000001,
+        "chat_type": "dialog"
+      },
+      "timestamp": 1790586420000,
+      "body": {
+        "mid": "test-9100000001-2",
+        "text": "Кабель в подъезде осмотрела — повреждений не видно."
+      }
+    }
+  },
+  {
+    "update_type": "message_created",
+    "timestamp": 1790586840000,
+    "message": {
+      "sender": {
+        "user_id": 9100000002,
+        "first_name": "Дмитрий",
+        "last_name": "Козлов",
+        "is_bot": false
+      },
+      "recipient": {
+        "chat_id": 9200000002,
+        "chat_type": "dialog"
+      },
+      "timestamp": 1790586840000,
+      "body": {
+        "mid": "test-9100000002-1",
+        "text": "Тариф 500 Мбит/с, а вечером speedtest показывает 40–60. Днём всё нормально. Можно что-то сделать?"
+      }
+    }
+  },
+  {
+    "update_type": "message_created",
+    "timestamp": 1790587260000,
+    "message": {
+      "sender": {
+        "user_id": 9100000003,
+        "first_name": "Ольга",
+        "last_name": "Морозова",
+        "is_bot": false
+      },
+      "recipient": {
+        "chat_id": 9200000003,
+        "chat_type": "dialog"
+      },
+      "timestamp": 1790587260000,
+      "body": {
+        "mid": "test-9100000003-1",
+        "text": "Оплатила 900 ₽ через приложение банка два дня назад, а баланс до сих пор минусовой и интернет отключили."
+      }
+    }
+  },
+  {
+    "update_type": "message_created",
+    "timestamp": 1790587680000,
+    "message": {
+      "sender": {
+        "user_id": 9100000004,
+        "first_name": "Игорь",
+        "last_name": "Волков",
+        "is_bot": false
+      },
+      "recipient": {
+        "chat_id": 9200000004,
+        "chat_type": "dialog"
+      },
+      "timestamp": 1790587680000,
+      "body": {
+        "mid": "test-9100000004-1",
+        "text": "Каждые 10–15 минут связь пропадает на пару секунд, пинг в играх скачет до 300 мс."
+      }
+    }
+  },
+  {
+    "update_type": "message_created",
+    "timestamp": 1790588100000,
+    "message": {
+      "sender": {
+        "user_id": 9100000005,
+        "first_name": "Елена",
+        "last_name": "Павлова",
+        "is_bot": false
+      },
+      "recipient": {
+        "chat_id": 9200000005,
+        "chat_type": "dialog"
+      },
+      "timestamp": 1790588100000,
+      "body": {
+        "mid": "test-9100000005-1",
+        "text": "В конце месяца переезжаю на ул. Ленина, 12. Как перенести подключение на новый адрес?"
+      }
+    }
+  },
+  {
+    "update_type": "message_created",
+    "timestamp": 1790588520000,
+    "message": {
+      "sender": {
+        "user_id": 9100000006,
+        "first_name": "Сергей",
+        "last_name": "Новиков",
+        "is_bot": false
+      },
+      "recipient": {
+        "chat_id": 9200000006,
+        "chat_type": "dialog"
+      },
+      "timestamp": 1790588520000,
+      "body": {
+        "mid": "test-9100000006-1",
+        "text": "Не могу войти в личный кабинет: пишет «неверный пароль», а SMS для восстановления не приходит."
+      }
+    }
+  }
+]
