@@ -1,0 +1,596 @@
+# DATA-API 1.0 — обязательные проверки API решения TaskLine.
+# Токенов, паролей и кодов ролей здесь нет: коды ролей организаторы получают отдельно.
+#
+# Как получить доступ роли на демо-стенде:
+#   1. Написать боту в MAX `/code <КОД_РОЛИ>` — бот выдаст роль этому аккаунту MAX
+#      (support, supervisor или admin; повторная команда с другим кодом меняет роль).
+#   2. Открыть мини-приложение кнопкой в чате бота. Приложение отправляет подписанные MAX
+#      данные запуска в POST /v1/auth/max и получает `token` и `csrf`.
+#   3. В веб-версии MAX (web.max.ru) их можно взять в DevTools → Network → запрос `max`
+#      (ответ `/v1/auth/max`), либо выполнить проверку `login` ниже, подставив `init_data`
+#      (строка запуска действует 5 минут). Сессия живёт 8 часов, до 30 минут простоя.
+#
+# Все запросы, кроме GET, требуют заголовки Origin, X-CSRF-Token и Idempotency-Key,
+# команды над обращением — ещё If-Match с текущей версией. Подробно — openapi.yaml.
+
+schemaVersion: '1.0'
+
+solution:
+  name: 'TaskLine — служба поддержки клиентов в MAX с ИИ-подсказками'
+  teamId: 'TaskLine'
+  repositories:
+    - https://github.com/bounchich1/TaskLine-server
+    - https://github.com/bounchich1/TaskLine-mini-app
+
+api:
+  baseUrl: 'https://demo.juicymelons.top'
+  localBaseUrl: 'http://localhost:8080'
+  openapi: './openapi.yaml'
+  openapiUrl: 'https://demo.juicymelons.top/openapi.yaml'
+  defaultHeaders:
+    Accept: 'application/json'
+
+variables:
+  BASE_URL: 'https://demo.juicymelons.top'
+  SUPPORT_TOKEN: 'токен роли support (передаётся проверяющим / из ответа входа)'
+  SUPPORT_CSRF: 'csrf роли support'
+  SUPERVISOR_TOKEN: 'токен роли supervisor'
+  SUPERVISOR_CSRF: 'csrf роли supervisor'
+  ADMIN_TOKEN: 'токен роли admin'
+  ADMIN_CSRF: 'csrf роли admin'
+  MAX_INIT_DATA: 'window.WebApp.initData из мини-приложения, открытого не более 5 минут назад'
+  uuid: 'новый UUID на каждый запрос (Idempotency-Key)'
+
+roles:
+  - role: public
+    description: Без входа
+  - role: support
+    description: Сотрудник поддержки — очередь, свои обращения, ответы клиентам
+    obtain: '/code <КОД_SUPPORT> в чате бота, затем открыть мини-приложение'
+    auth:
+      type: bearer
+      header: Authorization
+      token: '${SUPPORT_TOKEN}'
+      csrfHeader: X-CSRF-Token
+      csrf: '${SUPPORT_CSRF}'
+    permissions: [tickets.view, tickets.work]
+  - role: supervisor
+    description: Руководитель — плюс чужие обращения и состояние системы
+    obtain: '/code <КОД_SUPERVISOR> в чате бота, затем открыть мини-приложение'
+    auth:
+      type: bearer
+      header: Authorization
+      token: '${SUPERVISOR_TOKEN}'
+      csrfHeader: X-CSRF-Token
+      csrf: '${SUPERVISOR_CSRF}'
+    permissions:
+      [
+        tickets.view,
+        tickets.work,
+        tickets.classify_any,
+        tickets.reply_any,
+        tickets.transfer_any,
+        tickets.close_any,
+        tickets.reopen_any,
+        deliveries.resolve_unknown,
+        operations.view,
+        operations.retry,
+      ]
+  - role: admin
+    description: Администратор — плюс сотрудники, справочники, шаблоны, настройки, аудит
+    obtain: '/code <КОД_ADMIN> в чате бота, затем открыть мини-приложение'
+    auth:
+      type: bearer
+      header: Authorization
+      token: '${ADMIN_TOKEN}'
+      csrfHeader: X-CSRF-Token
+      csrf: '${ADMIN_CSRF}'
+    permissions: 'все права supervisor + employees.manage, organization.configure, audit.view'
+
+testData:
+  - path: './test-data/max-updates.json'
+    format: 'JSON-массив обновлений MAX (message_created) от 6 синтетических клиентов, 7 сообщений'
+    load: 'docker compose run --rm api node dist/cli.js seed-test-data'
+    note: >-
+      Локально загружается автоматически сервисом `seed`. На демо-стенде обращения создаёт сам
+      проверяющий: любое сообщение боту от имени клиента (после согласия на обработку данных)
+      становится обращением в очереди.
+
+checks:
+  - id: health-live
+    name: Сервис запущен
+    operationId: getHealthLive
+    method: GET
+    path: /health/live
+    role: public
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'status'
+        - 'version'
+      values: { status: ok }
+
+  - id: health-ready
+    name: Сервис готов (схема БД актуальна)
+    operationId: getHealthReady
+    method: GET
+    path: /health/ready
+    role: public
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'status'
+        - 'version'
+      values: { status: ready }
+
+  - id: openapi
+    name: Спецификация OpenAPI доступна
+    operationId: getOpenapiYaml
+    method: GET
+    path: /openapi.yaml
+    role: public
+    expected:
+      statusCodes: [200]
+      contentType: application/yaml
+
+  - id: auth-required
+    name: Без входа данные не отдаются
+    operationId: getTickets
+    method: GET
+    path: /v1/tickets
+    role: public
+    expected:
+      statusCodes: [401]
+      contentType: application/json
+      requiredFields:
+        - 'code'
+        - 'message'
+        - 'request_id'
+        - 'retryable'
+      values: { code: unauthorized }
+
+  - id: login
+    name: Вход по данным запуска MAX
+    description: Необязательная — только если передан свежий MAX_INIT_DATA
+    operationId: postAuthMax
+    method: POST
+    path: /v1/auth/max
+    role: public
+    optional: true
+    request:
+      headers:
+        Origin: '${BASE_URL}'
+        Content-Type: application/json
+      body:
+        init_data: '${MAX_INIT_DATA}'
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'token'
+        - 'csrf'
+        - 'employee.id'
+        - 'employee.role'
+        - 'permissions[]'
+        - 'organization.name'
+    extract:
+      token: '$.token'
+      csrf: '$.csrf'
+
+  - id: me
+    name: Профиль, роль и права сотрудника
+    operationId: getMe
+    method: GET
+    path: /v1/me
+    role: support
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'employee.id'
+        - 'employee.name'
+        - 'employee.role'
+        - 'employee.status'
+        - 'permissions[]'
+        - 'organization.name'
+      values: { employee.role: support }
+
+  - id: dictionaries
+    name: Справочники тегов, срочности и сложности
+    operationId: getDictionaries
+    method: GET
+    path: /v1/dictionaries
+    role: support
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'items[].dimension'
+        - 'items[].code'
+        - 'items[].label'
+        - 'items[].active'
+
+  - id: colleagues
+    name: Сотрудники для передачи обращения
+    operationId: getEmployees
+    method: GET
+    path: /v1/employees
+    role: support
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'items[].id'
+        - 'items[].name'
+        - 'items[].role'
+
+  - id: ticket-queue
+    name: Очередь новых обращений по срочности
+    operationId: getTickets
+    method: GET
+    path: /v1/tickets
+    role: support
+    request:
+      query: { tab: open, status: open, sort: urgency, limit: 30 }
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'items[]'
+        - 'counts.open'
+        - 'counts.closed'
+        - 'next_cursor'
+      bodySchema:
+        type: object
+        properties:
+          items: { type: array, minItems: 1 }
+    extract:
+      ticketId: '$.items[0].id'
+
+  - id: ticket-counts
+    name: Счётчики открытых и закрытых
+    operationId: getTicketsCounts
+    method: GET
+    path: /v1/tickets/counts
+    role: support
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'open'
+        - 'closed'
+
+  - id: ticket-search
+    name: Поиск по тексту обращений
+    operationId: getTickets
+    method: GET
+    path: /v1/tickets
+    role: support
+    request:
+      query: { tab: open, q: интернет }
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'items[]'
+        - 'counts.open'
+
+  - id: ticket-detail
+    name: Карточка обращения с подсказкой ИИ
+    operationId: getTicketsById
+    method: GET
+    path: /v1/tickets/${ticketId}
+    role: support
+    dependsOn: [ticket-queue]
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'id'
+        - 'number'
+        - 'description'
+        - 'status'
+        - 'version'
+        - 'tag'
+        - 'urgency'
+        - 'complexity'
+        - 'ai_status'
+        - 'closures[]'
+        - 'attachments[]'
+        - 'suggestion_sources[]'
+      values: { status: open }
+    extract:
+      ticketVersion: '$.version'
+
+  - id: ticket-messages
+    name: Переписка по обращению
+    operationId: getTicketsByIdMessages
+    method: GET
+    path: /v1/tickets/${ticketId}/messages
+    role: support
+    dependsOn: [ticket-queue]
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'items[].id'
+        - 'items[].seq'
+        - 'items[].author_type'
+        - 'items[].text'
+        - 'has_more'
+
+  - id: ticket-assign
+    name: Взять обращение в работу
+    operationId: postTicketsByIdAssign
+    method: POST
+    path: /v1/tickets/${ticketId}/assign
+    role: support
+    dependsOn: [ticket-detail]
+    repeatable: false
+    request:
+      headers:
+        Origin: '${BASE_URL}'
+        X-CSRF-Token: '${SUPPORT_CSRF}'
+        Idempotency-Key: '${uuid}'
+        If-Match: '${ticketVersion}'
+        Content-Type: application/json
+      body: {}
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'id'
+        - 'status'
+        - 'assignee_id'
+        - 'version'
+        - 'urgency_revision'
+      values: { status: in_progress }
+    extract:
+      ticketVersion: '$.version'
+      urgencyRevision: '$.urgency_revision'
+
+  - id: ticket-version-conflict
+    name: Устаревшая версия отклоняется
+    operationId: postTicketsByIdClose
+    method: POST
+    path: /v1/tickets/${ticketId}/close
+    role: support
+    dependsOn: [ticket-assign]
+    request:
+      headers:
+        Origin: '${BASE_URL}'
+        X-CSRF-Token: '${SUPPORT_CSRF}'
+        Idempotency-Key: '${uuid}'
+        If-Match: '0'
+        Content-Type: application/json
+      body: {}
+    expected:
+      statusCodes: [409]
+      contentType: application/json
+      requiredFields:
+        - 'code'
+        - 'message'
+
+  - id: ticket-classify
+    name: Уточнить срочность обращения
+    operationId: patchTicketsByIdClassification
+    method: PATCH
+    path: /v1/tickets/${ticketId}/classification
+    role: support
+    dependsOn: [ticket-assign]
+    repeatable: false
+    request:
+      headers:
+        Origin: '${BASE_URL}'
+        X-CSRF-Token: '${SUPPORT_CSRF}'
+        Idempotency-Key: '${uuid}'
+        If-Match: '${ticketVersion}'
+        Content-Type: application/json
+      body:
+        urgency: high
+        revisions: { urgency: '${urgencyRevision}' }
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'id'
+        - 'urgency'
+        - 'urgency_label'
+        - 'version'
+      values: { urgency: high }
+    extract:
+      ticketVersion: '$.version'
+
+  - id: ticket-reply
+    name: Ответить клиенту (уходит в чат MAX)
+    operationId: postTicketsByIdMessages
+    method: POST
+    path: /v1/tickets/${ticketId}/messages
+    role: support
+    dependsOn: [ticket-classify]
+    repeatable: false
+    request:
+      headers:
+        Origin: '${BASE_URL}'
+        X-CSRF-Token: '${SUPPORT_CSRF}'
+        Idempotency-Key: '${uuid}'
+        If-Match: '${ticketVersion}'
+        Content-Type: application/json
+      body:
+        text: 'Здравствуйте! Проверили линию, перезагрузите роутер — связь должна восстановиться.'
+    expected:
+      statusCodes: [202]
+      contentType: application/json
+      requiredFields:
+        - 'id'
+        - 'status'
+        - 'version'
+    extract:
+      ticketVersion: '$.version'
+
+  - id: ticket-close
+    name: Закрыть обращение (клиенту уходит запрос оценки)
+    operationId: postTicketsByIdClose
+    method: POST
+    path: /v1/tickets/${ticketId}/close
+    role: support
+    dependsOn: [ticket-reply]
+    repeatable: false
+    request:
+      headers:
+        Origin: '${BASE_URL}'
+        X-CSRF-Token: '${SUPPORT_CSRF}'
+        Idempotency-Key: '${uuid}'
+        If-Match: '${ticketVersion}'
+        Content-Type: application/json
+      body: {}
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'id'
+        - 'status'
+        - 'closed_at'
+        - 'version'
+      values: { status: awaiting_rating }
+
+  - id: notifications
+    name: Уведомления сотрудника
+    operationId: getNotifications
+    method: GET
+    path: /v1/notifications
+    role: support
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'items[]'
+
+  - id: support-no-admin
+    name: Сотруднику недоступно администрирование
+    operationId: getAdminEmployees
+    method: GET
+    path: /v1/admin/employees
+    role: support
+    expected:
+      statusCodes: [403]
+      contentType: application/json
+      requiredFields:
+        - 'code'
+        - 'message'
+      values: { code: forbidden }
+
+  - id: supervisor-queue
+    name: Руководитель видит все закрытые обращения
+    operationId: getTickets
+    method: GET
+    path: /v1/tickets
+    role: supervisor
+    request:
+      query: { tab: closed, sort: newest }
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'items[]'
+        - 'counts.closed'
+
+  - id: supervisor-diagnostics
+    name: Состояние фоновых задач и доставок
+    operationId: getAdminDiagnostics
+    method: GET
+    path: /v1/admin/diagnostics
+    role: supervisor
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'jobs[]'
+        - 'deliveries[]'
+        - 'memory[]'
+        - 'permits[]'
+
+  - id: supervisor-no-audit
+    name: Руководителю недоступен аудит
+    operationId: getAdminAudit
+    method: GET
+    path: /v1/admin/audit
+    role: supervisor
+    expected:
+      statusCodes: [403]
+      contentType: application/json
+      values: { code: forbidden }
+
+  - id: admin-employees
+    name: Сотрудники с MAX ID и статусом
+    operationId: getAdminEmployees
+    method: GET
+    path: /v1/admin/employees
+    role: admin
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'items[].id'
+        - 'items[].max_user_id'
+        - 'items[].name'
+        - 'items[].role'
+        - 'items[].status'
+        - 'items[].version'
+
+  - id: admin-roles
+    name: Роли и права
+    operationId: getAdminRoles
+    method: GET
+    path: /v1/admin/roles
+    role: admin
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'items[].code'
+        - 'items[].permissions[]'
+
+  - id: admin-templates
+    name: Шаблоны сообщений бота
+    operationId: getAdminTemplates
+    method: GET
+    path: /v1/admin/templates
+    role: admin
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'items[].code'
+        - 'items[].body'
+        - 'items[].version'
+
+  - id: admin-settings
+    name: Настройки организации
+    operationId: getAdminSettings
+    method: GET
+    path: /v1/admin/settings
+    role: admin
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'name'
+        - 'timezone'
+        - 'version'
+
+  - id: admin-audit
+    name: Журнал аудита
+    operationId: getAdminAudit
+    method: GET
+    path: /v1/admin/audit
+    role: admin
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields:
+        - 'items[].id'
+        - 'items[].action'
+        - 'items[].created_at'

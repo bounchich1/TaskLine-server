@@ -1,0 +1,10 @@
+{
+  "update_type": "message_created",
+  "timestamp": 1790590000000,
+  "message": {
+    "sender": { "user_id": 1001, "first_name": "Проверяющий", "is_bot": false },
+    "recipient": { "chat_id": 2001, "chat_type": "dialog" },
+    "timestamp": 1790590000000,
+    "body": { "mid": "local-role-code-1", "text": "/code LOCAL-ADMIN-CODE" }
+  }
+}
