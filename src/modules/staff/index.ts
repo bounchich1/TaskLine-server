@@ -1,4 +1,5 @@
 export { authRoutes } from './auth.routes.js';
+export { findActiveAdmin } from './employee-directory.js';
 export { employeesRoutes } from './employees.routes.js';
 export { verifyLaunch } from './launch-verification.js';
 export { authenticate } from './sessions.js';

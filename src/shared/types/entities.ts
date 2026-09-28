@@ -24,6 +24,7 @@ export type Client = Row & {
     consent_version: string | null;
     consent_revision: number;
     next_ingress: string;
+    synthetic: boolean;
 };
 
 export type Ticket = Row & {

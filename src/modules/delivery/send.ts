@@ -30,6 +30,10 @@ type CallbackAnswerBody = Row & {
 };
 
 export async function sendDelivery(deps: SendDeps, { delivery, client }: ClaimedDelivery): Promise<SendOutcome> {
+    if (client.synthetic) {
+        return delivered(`synthetic-${delivery.id}`);
+    }
+
     try {
         if (delivery.kind === 'callback_answer') {
             const answer = delivery.body as CallbackAnswerBody;

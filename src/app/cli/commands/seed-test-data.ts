@@ -1,11 +1,11 @@
 import { readFile } from 'node:fs/promises';
 
-import { normalizeUpdate } from '../../../integrations/max/index.js';
-import { Inbox } from '../../../modules/inbox/index.js';
 import { ensure } from '../../../shared/errors.js';
+import { TestDataLoader, type ResolvedCase } from '../../bootstrap/test-data.js';
 import type { CliCommand } from '../cli-command.js';
 
-const DEFAULT_FILE = 'test-data/max-updates.json';
+const OPEN_FILE = 'test-data/max-updates.json';
+const RESOLVED_FILE = 'test-data/resolved-cases.json';
 
 export const seedTestDataCommand: CliCommand = async ({ db, config, args }) => {
     ensure(
@@ -15,14 +15,20 @@ export const seedTestDataCommand: CliCommand = async ({ db, config, args }) => {
         'Test data is loaded only into development and demo stands.',
     );
 
-    const updates: unknown = JSON.parse(await readFile(args.at(0) ?? DEFAULT_FILE, 'utf8'));
+    const loader = new TestDataLoader(db, config, (line) => {
+        console.log(line);
+    });
 
-    ensure(Array.isArray(updates), 'invalid_test_data', 422, 'Test data must be a JSON array of MAX updates.');
-    const inbox = new Inbox(db, config);
+    const solved = await loader.loadResolved((await readArray(RESOLVED_FILE)) as ResolvedCase[]);
+    const open = await loader.loadOpen(await readArray(args.at(0) ?? OPEN_FILE));
 
-    for (const update of updates) {
-        await inbox.ingestConsented(normalizeUpdate(JSON.stringify(update)));
-    }
-
-    return `Loaded ${updates.length} test client messages.`;
+    return `Loaded ${solved} solved cases and ${open} open tickets.`;
 };
+
+async function readArray(path: string): Promise<unknown[]> {
+    const data: unknown = JSON.parse(await readFile(path, 'utf8'));
+
+    ensure(Array.isArray(data), 'invalid_test_data', 422, `${path} must be a JSON array.`);
+
+    return data as unknown[];
+}

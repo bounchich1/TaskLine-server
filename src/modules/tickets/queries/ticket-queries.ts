@@ -55,6 +55,16 @@ export class TicketQueries {
         return { ...ticket, closures, attachments, suggestion_sources: sources };
     }
 
+    async latestOfClient(clientId: string): Promise<string | undefined> {
+        const row = await one<{ id: string }>(
+            this.db,
+            'SELECT id FROM tickets WHERE org_id=$1 AND client_id=$2 ORDER BY created_at DESC LIMIT 1',
+            [this.org, clientId],
+        );
+
+        return row?.id;
+    }
+
     async openSource(request: SourceRequest) {
         return sourceExcerpt(this.db, this.org, request);
     }

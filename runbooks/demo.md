@@ -85,6 +85,22 @@ the bot, so a judge can write to the bot and answer their own ticket from the ap
    the organizers `https://demo.<DOMAIN>/` as the mini-app URL. After they bind it, open the app
    from the bot and try all three codes from one account.
 
+## Demo tickets
+
+Judges start with a filled queue: six solved cases in the knowledge base and six open tickets
+triaged by the real model. Load them once an administrator has signed in to the demo app (the
+solved cases are answered and closed on that administrator's behalf):
+
+```sh
+cd /opt/max-support-demo/deploy
+docker compose run --rm api node dist/cli.js seed-test-data
+```
+
+The command closes the solved cases, waits until each one is `learned`, then adds the open tickets
+one at a time and waits for their triage, printing the AI status, tags and cited cases of each.
+Test clients are marked `synthetic`: nothing is sent to them in MAX, their deliveries are simulated.
+A repeated run adds nothing.
+
 ## Releases
 
 Build each image once on the host and roll it to both stacks:
@@ -113,7 +129,7 @@ cd /opt/max-support-demo/deploy
 docker compose down -v
 ```
 
-Then repeat step 4.
+Then repeat step 4, sign in to the app as the administrator and load the demo tickets again.
 
 ## Removal
 

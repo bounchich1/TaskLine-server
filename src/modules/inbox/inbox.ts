@@ -31,18 +31,24 @@ export class Inbox {
         await this.db.tx((tx) => recordInput(tx, this.ctx, input));
     }
 
-    async ingestConsented(input: ClientInput): Promise<void> {
+    async ingestConsented(input: ClientInput): Promise<string> {
         const { userId, chatId } = input;
 
         ensure(input.kind === 'message' && userId && chatId, 'unsupported_test_input', 422);
 
-        await this.db.tx(async (tx) => {
+        const clientId = await this.db.tx(async (tx) => {
             const client = await lockClient(tx, this.ctx, { userId, chatId });
 
-            await grantConsent(tx, this.ctx, client, `test-data:${userId}`);
+            ensure(client.synthetic || Number(client.next_ingress) === 0, 'real_client', 409);
+            await tx.query('UPDATE clients SET synthetic=true WHERE id=$1', [client.id]);
+            await grantConsent(tx, this.ctx, { ...client, synthetic: true }, `test-data:${userId}`);
+
+            return client.id;
         });
 
         await this.ingest(input);
+
+        return clientId;
     }
 
     async processClient(clientId: string): Promise<boolean> {

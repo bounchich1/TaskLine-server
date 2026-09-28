@@ -17,7 +17,7 @@ schemaVersion: '1.0'
 
 solution:
   name: 'TaskLine — служба поддержки клиентов в MAX с ИИ-подсказками'
-  teamId: 'TaskLine'
+  teamId: 'ponysquad4000'
   repositories:
     - https://github.com/bounchich1/TaskLine-server
     - https://github.com/bounchich1/TaskLine-mini-app
@@ -88,13 +88,15 @@ roles:
     permissions: 'все права supervisor + employees.manage, organization.configure, audit.view'
 
 testData:
+  - path: './test-data/resolved-cases.json'
+    format: 'JSON-массив решённых обращений: клиент, вопрос, ответ сотрудника, подтверждение, оценка'
   - path: './test-data/max-updates.json'
-    format: 'JSON-массив обновлений MAX (message_created) от 6 синтетических клиентов, 7 сообщений'
-    load: 'docker compose run --rm api node dist/cli.js seed-test-data'
+    format: 'JSON-массив обновлений MAX (message_created): 6 синтетических клиентов, 7 сообщений'
+  - load: 'docker compose run --rm api node dist/cli.js seed-test-data'
     note: >-
-      Локально загружается автоматически сервисом `seed`. На демо-стенде обращения создаёт сам
-      проверяющий: любое сообщение боту от имени клиента (после согласия на обработку данных)
-      становится обращением в очереди.
+      На демо-стенде загружено: 6 закрытых обращений в базе знаний ИИ и 6 открытых обращений
+      (статус open) с подсказками ИИ — их использует проверка ticket-queue. Клиенты синтетические:
+      ответы им не уходят в MAX, доставка имитируется. Локально загружается сервисом `seed`.
 
 checks:
   - id: health-live
