@@ -113,7 +113,10 @@ services:
   worker:
     <<: *server
     command: ['node', 'dist/main.js', 'worker']
-    depends_on: *server-deps
+    depends_on:
+      <<: *server-deps
+      gateway:
+        condition: service_healthy
 
   gateway:
     <<: *server
