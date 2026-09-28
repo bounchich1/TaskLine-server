@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 
-import { Gateway, Workflows } from '../src/modules/ai/index.js';
+import { JobRunner } from '../src/app/workers/job-runner.js';
+import { Gateway, Workflows, type ModelRequest } from '../src/modules/ai/index.js';
 import { one } from '../src/shared/db.js';
-import type { Job } from '../src/shared/types/entities.js';
+import type { Job, Row } from '../src/shared/types/entities.js';
 
 import { fixture } from './helpers.js';
 
@@ -26,7 +27,7 @@ async function claim(kind: string) {
     ))!;
 }
 
-it('repairs one rejected memorize call and fills the constant schema version', async () => {
+async function closedConversation(): Promise<{ client: string; staff: string }> {
     await context.create();
     await context.command('assign');
     await context.command('messages', { text: 'Перезапустите соединение' });
@@ -35,12 +36,79 @@ it('repairs one rejected memorize call and fills the constant schema version', a
     await context.input('Спасибо, теперь всё работает');
     await context.command('close');
     const entries = (await context.db.query('SELECT id,author_type FROM messages ORDER BY seq')).rows;
-    const client = String(entries.filter((message) => message.author_type === 'client').at(-1)!.id);
-    const staff = String(entries.find((message) => message.author_type === 'staff')!.id);
 
-    const resolution = {
+    return {
+        client: String(entries.filter((message) => message.author_type === 'client').at(-1)!.id),
+        staff: String(entries.find((message) => message.author_type === 'staff')!.id),
+    };
+}
+
+function memorizing(attempts: Row[], requests: ModelRequest[]): Gateway {
+    return new Gateway(context.db, context.c, (request) => {
+        if (!request.forceTool) {
+            return Promise.resolve({ content: JSON.stringify(request.mock), toolCalls: [], usage: {} });
+        }
+
+        requests.push(structuredClone(request));
+        const call = { id: 'tool-1', name: 'memorize_ticket_resolution', arguments: JSON.stringify(attempts.shift()) };
+
+        return Promise.resolve({ content: null, toolCalls: [call], usage: {} });
+    });
+}
+
+async function memorySteps(): Promise<string[]> {
+    const steps = await context.db.query(
+        "SELECT step_key FROM ai_calls WHERE step_key LIKE 'memorize%' ORDER BY step_key",
+    );
+
+    return steps.rows.map((row) => String(row.step_key));
+}
+
+it('accepts a loose memorize call without a repair: fills constants, infers the outcome, drops extras', async () => {
+    const { client, staff } = await closedConversation();
+
+    const loose = {
         problem_summary: 'Сбой подключения',
         solution_summary: 'Перезапустить соединение',
+        steps: [{ action: 'Перезапуск соединения', evidence_message_ids: [staff, staff], note: 'x' }],
+        observed_result: 'Клиент подтвердил восстановление',
+        evidence_message_ids: [client, staff, client],
+        cautions: [''],
+        category: 'network',
+    };
+
+    const workflow = new Workflows(context.db, context.c, memorizing([loose], []), noRecall);
+    const job = await claim('learning');
+
+    expect(await workflow.learning(job)).toBe(false);
+    expect(await workflow.learning(job)).toBe(true);
+    const record = (await one(context.db, 'SELECT content,eligible FROM memory_records'))!;
+
+    expect(record.content).toEqual({
+        schema_version: '1.0',
+        problem_summary: 'Сбой подключения',
+        solution_summary: 'Перезапустить соединение',
+        outcome: 'resolved',
+        steps: [{ action: 'Перезапуск соединения', evidence_message_ids: [staff] }],
+        observed_result: 'Клиент подтвердил восстановление',
+        evidence_message_ids: [client, staff],
+        applicability: [],
+        cautions: [],
+        uncertainties: [],
+    });
+
+    expect(record.eligible).toBe(true);
+    expect(await memorySteps()).toEqual(['memorize']);
+});
+
+it('repairs one rejected memorize call, telling the model which fields failed', async () => {
+    const { client, staff } = await closedConversation();
+
+    const resolution = {
+        schema_version: '1.0',
+        problem_summary: 'Сбой подключения',
+        solution_summary: 'Перезапустить соединение',
+        outcome: 'resolved',
         steps: [{ action: 'Перезапуск соединения', evidence_message_ids: [staff] }],
         observed_result: 'Клиент подтвердил восстановление',
         evidence_message_ids: [client, staff],
@@ -49,31 +117,31 @@ it('repairs one rejected memorize call and fills the constant schema version', a
         uncertainties: [],
     };
 
-    const attempts = [resolution, { ...resolution, outcome: 'resolved' }];
-
-    const gateway = new Gateway(context.db, context.c, (request) => {
-        if (!request.forceTool) {
-            return Promise.resolve({ content: JSON.stringify(request.mock), toolCalls: [], usage: {} });
-        }
-
-        const call = { id: 'tool-1', name: 'memorize_ticket_resolution', arguments: JSON.stringify(attempts.shift()) };
-
-        return Promise.resolve({ content: null, toolCalls: [call], usage: {} });
-    });
-
+    const requests: ModelRequest[] = [];
+    const attempts = [{ ...resolution, steps: [{ action: 'Перезапуск', evidence_message_ids: [] }] }, resolution];
+    const workflow = new Workflows(context.db, context.c, memorizing(attempts, requests), noRecall);
     const job = await claim('learning');
-    const workflow = new Workflows(context.db, context.c, gateway, noRecall);
 
     expect(await workflow.learning(job)).toBe(false);
     expect(await workflow.learning(job)).toBe(true);
-    const record = (await one(context.db, 'SELECT content,eligible FROM memory_records'))!;
+    expect(await memorySteps()).toEqual(['memorize', 'memorize-repair']);
+    const feedback = JSON.parse(String(requests[1]?.messages.at(-1)?.content)) as Row;
 
-    expect(record.content).toMatchObject({ schema_version: '1.0', outcome: 'resolved' });
-    expect(record.eligible).toBe(true);
+    expect(feedback).toMatchObject({ error: 'invalid_memory_schema' });
+    expect(feedback.detail).toContain('/steps/0/evidence_message_ids');
+    expect((await one(context.db, 'SELECT eligible FROM memory_records'))!.eligible).toBe(true);
+});
 
-    const steps = await context.db.query(
-        "SELECT step_key FROM ai_calls WHERE step_key LIKE 'memorize%' ORDER BY step_key",
-    );
+it('keeps the schema errors of a failed learning job for diagnostics', async () => {
+    const { staff } = await closedConversation();
+    const broken = { problem_summary: 'Сбой', steps: [{ action: 'Перезапуск', evidence_message_ids: [staff] }] };
+    const runner = new JobRunner(context.db, context.c, memorizing([broken, broken], []));
+    const job = (await one<Job>(context.db, "SELECT * FROM jobs WHERE kind='learning'"))!;
 
-    expect(steps.rows.map((row) => row.step_key)).toEqual(['memorize', 'memorize-repair']);
+    await runner.run(job.id);
+    await runner.run(job.id);
+    const stored = (await one<Job>(context.db, 'SELECT * FROM jobs WHERE id=$1', [job.id]))!;
+
+    expect(stored).toMatchObject({ state: 'failed', reason: 'invalid_memory_schema' });
+    expect(String(stored.payload.error_detail)).toContain('evidence_message_ids');
 });

@@ -28,6 +28,7 @@ export interface JobFailure {
     state: 'canceled' | 'unknown' | 'failed' | 'pending';
     retries: number;
     delaySeconds: number;
+    detail: string | null;
 }
 
 export function classifyJobFailure(error: unknown, previousRetries: number): JobFailure {
@@ -45,6 +46,7 @@ export function classifyJobFailure(error: unknown, previousRetries: number): Job
         state: failureState(code, { deferred, retries, rejected }),
         retries,
         delaySeconds,
+        detail: rejected ? error.message : null,
     };
 }
 
@@ -72,13 +74,14 @@ export async function recordJobFailure(
     ctx: Ctx,
     { job, failure }: { job: Job; failure: JobFailure },
 ): Promise<void> {
-    const { code, state, retries, delaySeconds } = failure;
+    const { code, state, retries, delaySeconds, detail } = failure;
 
     const updated = await tx.query(
-        `UPDATE jobs SET state=$3,reason=$4,payload=jsonb_set(payload,'{retry_count}',$5::jsonb),
+        `UPDATE jobs SET state=$3,reason=$4,
+     payload=jsonb_set(payload,'{retry_count}',$5::jsonb)||jsonb_build_object('error_detail',$7::text),
      due_at=now()+($6*interval '1 second')
      WHERE id=$1 AND generation=$2 AND state='running' RETURNING id`,
-        [job.id, job.generation, state, code, JSON.stringify(retries), delaySeconds],
+        [job.id, job.generation, state, code, JSON.stringify(retries), delaySeconds, detail],
     );
 
     if (!updated.rows.length) {

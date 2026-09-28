@@ -2,12 +2,13 @@ import { readFileSync } from 'node:fs';
 
 import { Ajv2020, type AnySchema } from 'ajv/dist/2020.js';
 
-import { ensure } from '../../../shared/errors.js';
+import { AppError, ensure } from '../../../shared/errors.js';
 import { strictJson } from '../../../shared/json.js';
 import { serverFile } from '../../../shared/paths.js';
 import type { Resolution, TriageResult } from '../../../shared/types/ai.js';
 import type { Row } from '../../../shared/types/entities.js';
 
+import { normalizeResolution } from './normalize-resolution.js';
 import { normalizeTriage } from './normalize-triage.js';
 
 
@@ -89,18 +90,24 @@ function flagDroppedCautions(value: TriageResult, cautioned: string[]): TriageRe
   return dropped ? { ...value, needs_review: true } : value;
 }
 
-function withSchemaVersion(value: unknown): unknown {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || 'schema_version' in value) {
-    return value;
-  }
+function schemaErrors(): string {
+  return (validateResolution.errors ?? [])
+    .slice(0, 8)
+    .map((error) => {
+      const field = String(error.params.additionalProperty ?? error.params.missingProperty ?? '');
 
-  return { schema_version: '1.0', ...value };
+      return `${error.instancePath || '/'} ${error.message ?? 'is invalid'}${field ? ` (${field})` : ''}`;
+    })
+    .join('; ');
 }
 
 export function parseResolution(raw: string, evidenceIds: string[]): Resolution {
-  const result = withSchemaVersion(parseModelJson(raw));
+  const result = normalizeResolution(parseModelJson(raw));
 
-  ensure(validateResolution(result), 'invalid_memory_schema', 422);
+  if (!validateResolution(result)) {
+    throw new AppError('invalid_memory_schema', 422, schemaErrors());
+  }
+
   const value = result as Resolution;
 
   const cited = [
@@ -108,10 +115,13 @@ export function parseResolution(raw: string, evidenceIds: string[]): Resolution 
     ...value.steps.flatMap((step) => step.evidence_message_ids),
   ];
 
+  const foreign = cited.filter((id) => !evidenceIds.includes(id));
+
   ensure(
-    cited.every((id) => evidenceIds.includes(id)),
+    foreign.length === 0,
     'forged_memory_evidence',
     422,
+    `Unknown message IDs: ${foreign.slice(0, 5).join(', ')}`,
   );
 
   if (value.outcome === 'resolved') {
@@ -119,6 +129,7 @@ export function parseResolution(raw: string, evidenceIds: string[]): Resolution 
       value.steps.length > 0 && !!value.observed_result && !!value.solution_summary,
       'unsupported_resolution',
       422,
+      'A resolved outcome needs steps, observed_result and solution_summary.',
     );
   }
 

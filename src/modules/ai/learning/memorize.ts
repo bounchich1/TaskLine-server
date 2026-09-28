@@ -78,7 +78,11 @@ async function resolveWithRepair(
                     { id: call.id, type: 'function', function: { name: call.name, arguments: call.arguments } },
                 ],
             },
-            { role: 'tool', tool_call_id: call.id, content: JSON.stringify({ error: error.code, note: REPAIR_NOTE }) },
+            {
+                role: 'tool',
+                tool_call_id: call.id,
+                content: JSON.stringify({ error: error.code, detail: error.message, note: REPAIR_NOTE }),
+            },
         );
 
         const repaired = await callMemorizeTool(model, memorization.job, 'memorize-repair', request);

@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 import { describe, it, expect } from 'vitest';
 
@@ -215,5 +216,22 @@ describe('security and coverage', () => {
         expect(confirmedResolution(resolution, entries)).toBe(true);
         entries[1].text = 'Всё ещё не работает';
         expect(confirmedResolution(resolution, entries)).toBe(false);
+    });
+
+    it('recognizes the client confirmation of every solved demo case', () => {
+        const cases = JSON.parse(readFileSync('test-data/resolved-cases.json', 'utf8')) as { confirmation: string }[];
+        const resolution = { outcome: 'resolved', steps: [{ action: 'fix', evidence_message_ids: ['s'] }] };
+
+        const confirmed = (text: string) =>
+            confirmedResolution(
+                { ...resolution, evidence_message_ids: ['s', 'c'] } as Resolution,
+                [
+                    { id: 's', role: 'staff', delivery: 'delivered', seq: 1, text: 'fix' },
+                    { id: 'c', role: 'client', delivery: 'received', seq: 2, text },
+                ] as SnapshotEntry[],
+            );
+
+        expect(cases.map((item) => confirmed(item.confirmation))).toEqual(cases.map(() => true));
+        expect(confirmed('Перезагрузка не помогло, интернет так и не появился')).toBe(false);
     });
 });

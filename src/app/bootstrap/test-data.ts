@@ -107,8 +107,11 @@ export class TestDataLoader {
             await this.ingest(caseInput(item.client, '2', item.confirmation));
             await this.finish(actor, ids, caseInput(item.client, '3', String(item.rating)));
         } else if (this.learning && typeof learning === 'string' && RELEARN.has(learning)) {
+            const cycle = String(closures.length + 1);
+
             await this.command(actor, { ...ids, name: 'reopen', body: { reason: RELEARN_REASON } });
-            await this.finish(actor, ids, caseInput(item.client, `3-${closures.length + 1}`, String(item.rating)));
+            await this.ingest(caseInput(item.client, `2-${cycle}`, item.confirmation));
+            await this.finish(actor, ids, caseInput(item.client, `3-${cycle}`, String(item.rating)));
         }
 
         this.log(`№${ticketLabel(number)}: solved case ${status === 'open' ? 'loaded' : 'present'}`);

@@ -40,7 +40,7 @@ export class JobRunner {
 
             await this.db.query(
                 `UPDATE jobs SET state=$3,due_at=now(),completed_at=CASE WHEN $3='done' THEN now() ELSE NULL END,
-         payload=payload-'retry_count',reason=NULL WHERE id=$1 AND generation=$2 AND state='running'`,
+         payload=payload-'retry_count'-'error_detail',reason=NULL WHERE id=$1 AND generation=$2 AND state='running'`,
                 [job.id, job.generation, done ? 'done' : 'pending'],
             );
         } catch (error) {
