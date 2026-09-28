@@ -131,7 +131,7 @@ services:
   mini-app:
     image: max-support-mini-app:local
     build:
-      context: ${MINI_APP_SOURCE:-https://github.com/bounchich1/TaskLine-mini-app.git#4702ece7a57d397aa6bc15484ab15807da77baf3}
+      context: ${MINI_APP_SOURCE:-https://github.com/bounchich1/TaskLine-mini-app.git#e56d555809358fbae1f4b14591a52400335bf4ed}
       args:
         APP_VERSION: local
     restart: unless-stopped
