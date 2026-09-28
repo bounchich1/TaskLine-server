@@ -18,6 +18,7 @@ const LEARNING_TIMEOUT_MS = 900_000;
 const CHAT_OFFSET = 100_000_000;
 const RETRY_CODES = new Set(['delivery_pending', 'input_pending', 'ticket_version_conflict']);
 const LEARNING_DONE = new Set(['learned', 'needs_review', 'failed', 'suppressed', 'invalidated']);
+const DELIVERY_PENDING = new Set(['queued', 'retry_wait', 'sending']);
 
 interface Sender {
     user_id: number;
@@ -95,6 +96,7 @@ export class TestDataLoader {
         const { ticket_number: number, status } = await this.queries.ticket(ticketId);
 
         if (status === 'open') {
+            await this.awaitTriage(ticketId);
             await this.command(actor, { clientId, ticketId, name: 'assign', body: {} });
 
             await this.command(actor, {
@@ -106,10 +108,11 @@ export class TestDataLoader {
 
             await this.ingest(confirmation);
             await this.command(actor, { clientId, ticketId, name: 'close', body: {} });
+            await this.awaitDeliveries(clientId, ticketId);
             await this.ingest(rating);
         }
 
-        this.log(`№${number}: solved case ${status === 'open' ? 'loaded' : 'already present'}`);
+        this.log(`№${ticketLabel(number)}: solved case ${status === 'open' ? 'loaded' : 'already present'}`);
 
         return ticketId;
     }
@@ -134,6 +137,19 @@ export class TestDataLoader {
         while (more) {
             more = await this.deliveries.deliver(clientId);
         }
+    }
+
+    private async awaitDeliveries(clientId: string, ticketId: string): Promise<void> {
+        await eventually(
+            async () => {
+                await this.drive(clientId);
+                const { items } = await this.queries.messages(ticketId, { limit: 100 });
+
+                return items.some((message) => DELIVERY_PENDING.has(String(message.delivery_state))) ? undefined : true;
+            },
+            STEP_TIMEOUT_MS,
+            'deliveries',
+        );
     }
 
     private async ticketOf(clientId: string): Promise<string> {
@@ -199,7 +215,7 @@ export class TestDataLoader {
                     const learning = closures.at(-1)?.learning_status;
                     const status = typeof learning === 'string' ? learning : '';
 
-                    return LEARNING_DONE.has(status) ? `№${number}: learning ${status}` : undefined;
+                    return LEARNING_DONE.has(status) ? `№${ticketLabel(number)}: learning ${status}` : undefined;
                 },
                 LEARNING_TIMEOUT_MS,
                 'learning',
@@ -252,6 +268,10 @@ function caseInputs({ client, problem, confirmation, rating }: ResolvedCase): Cl
             }),
         ),
     );
+}
+
+function ticketLabel(number: number): string {
+    return String(number).padStart(6, '0');
 }
 
 function describeTriage(ticket: Row): string {

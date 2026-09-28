@@ -72,7 +72,7 @@ it('loads solved and open test tickets for synthetic clients without contacting 
        (SELECT count(*)::int FROM deliveries WHERE org_id=$1 AND state='delivered' AND provider_ref LIKE 'synthetic-%')>0
          AS simulated,
        (SELECT count(*)::int FROM deliveries WHERE org_id=$1
-         AND (state IN('failed','unknown') OR (state='delivered' AND provider_ref NOT LIKE 'synthetic-%'))) AS real
+         AND (state IN('failed','unknown','canceled') OR (state='delivered' AND provider_ref NOT LIKE 'synthetic-%'))) AS real
      FROM tickets t JOIN clients c ON c.id=t.client_id WHERE t.org_id=$1`,
             [stand.c.ORG_ID],
         );
