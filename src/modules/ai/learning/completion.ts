@@ -27,6 +27,7 @@ export async function acknowledgeReceipt(
     const response = await model.complete(job, 'learning-completion', {
         messages: [
             { role: 'system', content: LEARNING_SKILL },
+            { role: 'user', content: 'Return the learning completion JSON for the memorization receipt.' },
             {
                 role: 'assistant',
                 content: null,

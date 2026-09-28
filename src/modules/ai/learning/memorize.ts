@@ -1,14 +1,14 @@
 import type { Ctx } from '../../../shared/context.js';
 import { encrypt, hash } from '../../../shared/crypto.js';
 import { one, requireOne, type Database, type Sql } from '../../../shared/db.js';
-import { ensure } from '../../../shared/errors.js';
+import { AppError, ensure } from '../../../shared/errors.js';
 import { audit, emit, enqueue } from '../../../shared/events.js';
 import type { Resolution } from '../../../shared/types/ai.js';
 import type { Job, Row, Ticket } from '../../../shared/types/entities.js';
 import { parseResolution, resolutionSchema } from '../contracts/contracts.js';
 import { redact } from '../contracts/redact.js';
 import { eligibleJob } from '../gateway/job-eligibility.js';
-import { functionTool, type Model, type ModelReply } from '../gateway/model.js';
+import { functionTool, type Model, type ModelReply, type ModelRequest } from '../gateway/model.js';
 import { LEARNING_SKILL } from '../skills.js';
 
 import { insertCheckpoint } from './checkpoints.js';
@@ -16,6 +16,11 @@ import { confirmedResolution } from './confirmed-resolution.js';
 import type { Snapshot } from './snapshot.js';
 
 const MEMORIZE_TOOL = 'memorize_ticket_resolution';
+const REPAIRABLE = new Set(['invalid_memory_schema', 'forged_memory_evidence', 'unsupported_resolution']);
+
+const REPAIR_NOTE =
+    'Rejected. Call memorize_ticket_resolution again with schema_version "1.0" and an outcome, citing only ' +
+    'message IDs from the input; solution_summary is null unless the outcome is resolved. This is the only repair.';
 
 export interface Memorization {
     job: Job;
@@ -32,8 +37,8 @@ export async function memorize(
 ): Promise<void> {
     const { snapshot } = memorization;
     const allIds = snapshot.entries.map((entry) => entry.id);
-    const call = await askForResolution(model, ctx, memorization);
-    let resolution = parseResolution(call.arguments, allIds);
+    const { call, resolution: parsed } = await resolveWithRepair(model, ctx, memorization);
+    let resolution = parsed;
     const sanitized = redact(JSON.stringify(resolution));
     const containsSecrets = sanitized !== JSON.stringify(resolution);
 
@@ -49,11 +54,48 @@ export async function memorize(
     });
 }
 
-async function askForResolution(
+async function resolveWithRepair(
     model: Model,
     ctx: Ctx,
-    { job, snapshot, evidence, chunkCount }: Memorization,
-): Promise<ToolCall> {
+    memorization: Memorization,
+): Promise<{ call: ToolCall; resolution: Resolution }> {
+    const allIds = memorization.snapshot.entries.map((entry) => entry.id);
+    const request = resolutionRequest(ctx, memorization);
+    const call = await callMemorizeTool(model, memorization.job, 'memorize', request);
+
+    try {
+        return { call, resolution: parseResolution(call.arguments, allIds) };
+    } catch (error) {
+        if (!(error instanceof AppError && REPAIRABLE.has(error.code))) {
+            throw error;
+        }
+
+        request.messages.push(
+            {
+                role: 'assistant',
+                content: null,
+                tool_calls: [
+                    { id: call.id, type: 'function', function: { name: call.name, arguments: call.arguments } },
+                ],
+            },
+            { role: 'tool', tool_call_id: call.id, content: JSON.stringify({ error: error.code, note: REPAIR_NOTE }) },
+        );
+
+        const repaired = await callMemorizeTool(model, memorization.job, 'memorize-repair', request);
+
+        return { call: repaired, resolution: parseResolution(repaired.arguments, allIds) };
+    }
+}
+
+async function callMemorizeTool(model: Model, job: Job, step: string, request: ModelRequest): Promise<ToolCall> {
+    const answer = await model.complete(job, step, request);
+
+    ensure(answer.toolCalls.length === 1 && answer.toolCalls[0].name === MEMORIZE_TOOL, 'memory_tool_required', 422);
+
+    return answer.toolCalls[0];
+}
+
+function resolutionRequest(ctx: Ctx, { snapshot, evidence, chunkCount }: Memorization): ModelRequest {
     const allIds = snapshot.entries.map((entry) => entry.id);
     const budget = ctx.config.AI_INPUT_CHARS;
 
@@ -70,7 +112,7 @@ async function askForResolution(
 
     ensure(JSON.stringify(input).length <= budget, 'learning_budget_exceeded');
 
-    const answer = await model.complete(job, 'memorize', {
+    return {
         messages: [
             { role: 'system', content: LEARNING_SKILL },
             { role: 'user', content: JSON.stringify(input) },
@@ -78,11 +120,7 @@ async function askForResolution(
         tools: [functionTool(MEMORIZE_TOOL, 'Store a resolution with host-injected provenance.', resolutionSchema)],
         forceTool: MEMORIZE_TOOL,
         mock: insufficientEvidence(allIds, snapshot.missing),
-    });
-
-    ensure(answer.toolCalls.length === 1 && answer.toolCalls[0].name === MEMORIZE_TOOL, 'memory_tool_required', 422);
-
-    return answer.toolCalls[0];
+    };
 }
 
 function insufficientEvidence(allIds: string[], missing: string[]): Resolution {

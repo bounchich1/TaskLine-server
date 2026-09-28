@@ -89,8 +89,16 @@ function flagDroppedCautions(value: TriageResult, cautioned: string[]): TriageRe
   return dropped ? { ...value, needs_review: true } : value;
 }
 
+function withSchemaVersion(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || 'schema_version' in value) {
+    return value;
+  }
+
+  return { schema_version: '1.0', ...value };
+}
+
 export function parseResolution(raw: string, evidenceIds: string[]): Resolution {
-  const result = parseModelJson(raw);
+  const result = withSchemaVersion(parseModelJson(raw));
 
   ensure(validateResolution(result), 'invalid_memory_schema', 422);
   const value = result as Resolution;

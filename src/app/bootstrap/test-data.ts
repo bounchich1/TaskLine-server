@@ -19,6 +19,8 @@ const CHAT_OFFSET = 100_000_000;
 const RETRY_CODES = new Set(['delivery_pending', 'input_pending', 'ticket_version_conflict']);
 const LEARNING_DONE = new Set(['learned', 'needs_review', 'failed', 'suppressed', 'invalidated']);
 const DELIVERY_PENDING = new Set(['queued', 'retry_wait', 'sending']);
+const RELEARN = new Set(['failed', 'needs_review', 'suppressed']);
+const RELEARN_REASON = 'Повторное обучение базы знаний';
 
 interface Sender {
     user_id: number;
@@ -41,6 +43,7 @@ export class TestDataLoader {
     private readonly deliveries: DeliveryWorker;
     private readonly queries: TicketQueries;
     private readonly commands: TicketCommands;
+    private readonly learning: boolean;
 
     constructor(
         private readonly db: Database,
@@ -51,6 +54,7 @@ export class TestDataLoader {
         this.deliveries = new DeliveryWorker(db, config, new MaxClient(config));
         this.queries = new TicketQueries(db, config.ORG_ID);
         this.commands = new TicketCommands(db, config);
+        this.learning = config.AI_ENABLED && config.MEMORY_ENABLED;
     }
 
     async loadResolved(cases: ResolvedCase[]): Promise<number> {
@@ -62,15 +66,15 @@ export class TestDataLoader {
             return 0;
         }
 
-        const tickets: string[] = [];
-
-        for (const item of cases) {
-            tickets.push(await this.resolve(actor, item));
+        if (!this.learning) {
+            this.log('Learning not awaited: AI memory is disabled.');
         }
 
-        await this.awaitLearning(tickets);
+        for (const item of cases) {
+            await this.resolve(actor, item);
+        }
 
-        return tickets.length;
+        return cases.length;
     }
 
     async loadOpen(updates: unknown[]): Promise<number> {
@@ -89,32 +93,32 @@ export class TestDataLoader {
         return senders.length;
     }
 
-    private async resolve(actor: Employee, item: ResolvedCase): Promise<string> {
-        const [problem, confirmation, rating] = caseInputs(item);
-        const clientId = await this.ingest(problem);
+    private async resolve(actor: Employee, item: ResolvedCase): Promise<void> {
+        const clientId = await this.ingest(caseInput(item.client, '1', item.problem));
         const ticketId = await this.ticketOf(clientId);
-        const { ticket_number: number, status } = await this.queries.ticket(ticketId);
+        const { ticket_number: number, status, closures } = await this.queries.ticket(ticketId);
+        const ids = { clientId, ticketId };
+        const learning = closures.at(-1)?.learning_status;
 
         if (status === 'open') {
             await this.awaitTriage(ticketId);
-            await this.command(actor, { clientId, ticketId, name: 'assign', body: {} });
-
-            await this.command(actor, {
-                clientId,
-                ticketId,
-                name: 'messages',
-                body: { text: item.reply, attachment_ids: [] },
-            });
-
-            await this.ingest(confirmation);
-            await this.command(actor, { clientId, ticketId, name: 'close', body: {} });
-            await this.awaitDeliveries(clientId, ticketId);
-            await this.ingest(rating);
+            await this.command(actor, { ...ids, name: 'assign', body: {} });
+            await this.command(actor, { ...ids, name: 'messages', body: { text: item.reply, attachment_ids: [] } });
+            await this.ingest(caseInput(item.client, '2', item.confirmation));
+            await this.finish(actor, ids, caseInput(item.client, '3', String(item.rating)));
+        } else if (this.learning && typeof learning === 'string' && RELEARN.has(learning)) {
+            await this.command(actor, { ...ids, name: 'reopen', body: { reason: RELEARN_REASON } });
+            await this.finish(actor, ids, caseInput(item.client, `3-${closures.length + 1}`, String(item.rating)));
         }
 
-        this.log(`№${ticketLabel(number)}: solved case ${status === 'open' ? 'loaded' : 'already present'}`);
+        this.log(`№${ticketLabel(number)}: solved case ${status === 'open' ? 'loaded' : 'present'}`);
+        await this.awaitLearning(ticketId);
+    }
 
-        return ticketId;
+    private async finish(actor: Employee, ids: { clientId: string; ticketId: string }, rating: ClientInput) {
+        await this.command(actor, { ...ids, name: 'close', body: {} });
+        await this.awaitDeliveries(ids.clientId, ids.ticketId);
+        await this.ingest(rating);
     }
 
     private async ingest(input: ClientInput): Promise<string> {
@@ -201,28 +205,24 @@ export class TestDataLoader {
         this.log(describeTriage(ticket));
     }
 
-    private async awaitLearning(ticketIds: string[]): Promise<void> {
-        if (!this.config.AI_ENABLED || !this.config.MEMORY_ENABLED) {
-            this.log('Learning not awaited: AI memory is disabled.');
-
+    private async awaitLearning(ticketId: string): Promise<void> {
+        if (!this.learning) {
             return;
         }
 
-        for (const ticketId of ticketIds) {
-            const line = await eventually(
-                async () => {
-                    const { ticket_number: number, closures } = await this.queries.ticket(ticketId);
-                    const learning = closures.at(-1)?.learning_status;
-                    const status = typeof learning === 'string' ? learning : '';
+        const line = await eventually(
+            async () => {
+                const { ticket_number: number, closures } = await this.queries.ticket(ticketId);
+                const learning = closures.at(-1)?.learning_status;
+                const status = typeof learning === 'string' ? learning : '';
 
-                    return LEARNING_DONE.has(status) ? `№${ticketLabel(number)}: learning ${status}` : undefined;
-                },
-                LEARNING_TIMEOUT_MS,
-                'learning',
-            );
+                return LEARNING_DONE.has(status) ? `№${ticketLabel(number)}: learning ${status}` : undefined;
+            },
+            LEARNING_TIMEOUT_MS,
+            'learning',
+        );
 
-            this.log(line);
-        }
+        this.log(line);
     }
 }
 
@@ -255,18 +255,16 @@ function bySender(updates: unknown[]): ClientInput[][] {
     return [...senders.values()];
 }
 
-function caseInputs({ client, problem, confirmation, rating }: ResolvedCase): ClientInput[] {
-    return [problem, confirmation, String(rating)].map((text, index) =>
-        normalizeUpdate(
-            JSON.stringify({
-                update_type: 'message_created',
-                message: {
-                    sender: { ...client, is_bot: false },
-                    recipient: { chat_id: client.user_id + CHAT_OFFSET, chat_type: 'dialog' },
-                    body: { mid: `resolved-${client.user_id}-${index + 1}`, text },
-                },
-            }),
-        ),
+function caseInput(client: Sender, step: string, text: string): ClientInput {
+    return normalizeUpdate(
+        JSON.stringify({
+            update_type: 'message_created',
+            message: {
+                sender: { ...client, is_bot: false },
+                recipient: { chat_id: client.user_id + CHAT_OFFSET, chat_type: 'dialog' },
+                body: { mid: `resolved-${client.user_id}-${step}`, text },
+            },
+        }),
     );
 }
 
