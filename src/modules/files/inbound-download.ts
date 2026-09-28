@@ -11,6 +11,7 @@ import type { InputAttachment } from '../../shared/types/client-input.js';
 
 import type { Attachment, FileDeps } from './attachment.js';
 import { sizeLimitFor } from './content-policy.js';
+import { markDownloadFailed } from './download-status.js';
 import { storeStream } from './store-stream.js';
 
 export async function downloadInbound(deps: FileDeps, id: string): Promise<void> {
@@ -30,7 +31,9 @@ export async function downloadInbound(deps: FileDeps, id: string): Promise<void>
     const source = decrypt<InputAttachment>(String(file.source_ref), ctx.config.ENCRYPTION_KEY);
 
     if (!source.url) {
-        await db.query("UPDATE attachments SET status='unavailable' WHERE id=$1", [id]);
+        await db.tx(async (tx) => {
+            await markDownloadFailed(tx, ctx.org, id);
+        });
 
         return;
     }

@@ -41,7 +41,7 @@ architectural decision and happens there.
 | inbox         | consent, tickets, messages, outbox                |
 | delivery      | files                                             |
 | notifications | staff                                             |
-| admin         | templates, dictionaries                           |
+| admin         | templates, dictionaries, files                    |
 | ai            | dictionaries                                      |
 | demo-access   | –                                                 |
 

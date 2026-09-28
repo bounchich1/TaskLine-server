@@ -3,10 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 
 import { JobRunner } from '../src/app/workers/job-runner.js';
+import { retryFailedJob } from '../src/modules/admin/admin-queries.js';
 import type { Model } from '../src/modules/ai/index.js';
-import { one } from '../src/shared/db.js';
+import { one, requireOne } from '../src/shared/db.js';
 import { AppError } from '../src/shared/errors.js';
-import type { Row } from '../src/shared/types/entities.js';
+import type { Client, Row } from '../src/shared/types/entities.js';
 
 import { fixture } from './helpers.js';
 
@@ -102,6 +103,47 @@ it('fails triage for review after repeated worker errors', async () => {
     const ticket = await context.ticket();
 
     expect(ticket).toMatchObject({ ai_status: 'failed', review_required: true });
+});
+
+it('marks a client file unavailable when its download fails for good, and reopens it on retry', async () => {
+    const ticket = await context.create();
+
+    const { max_user_id: userId, chat_id: chatId } = await requireOne<Client>(
+        context.db,
+        'SELECT * FROM clients WHERE id=$1',
+        [ticket.client_id],
+    );
+
+    const key = `m-${randomUUID()}`;
+
+    await context.domain.ingest({
+        kind: 'message',
+        userId,
+        chatId,
+        messageId: key,
+        sourceKey: key,
+        text: '',
+        attachments: [{ kind: 'image', filename: 'image', url: 'https://media.example.test/a/1' }],
+    });
+
+    await context.domain.processClient(ticket.client_id);
+    const job = await jobOf('file');
+    const attachmentStatus = async () => (await one(context.db, 'SELECT status FROM attachments'))?.status;
+
+    await new JobRunner(context.db, context.c).run(String(job.id));
+    const stored = await one(context.db, 'SELECT state,reason FROM jobs WHERE id=$1', [job.id]);
+
+    expect(stored).toMatchObject({ state: 'failed', reason: 'media_host_denied' });
+    expect(await attachmentStatus()).toBe('unavailable');
+    const event = await one(context.db, "SELECT ticket_id,payload FROM ui_events WHERE type='attachment.changed'");
+
+    expect(event).toMatchObject({
+        ticket_id: ticket.id,
+        payload: { attachment_id: job.ref_id, status: 'unavailable' },
+    });
+
+    await retryFailedJob(context.db, context.c.ORG_ID, { actor: context.admin, jobId: String(job.id) });
+    expect(await attachmentStatus()).toBe('pending');
 });
 
 it('cancels a job that is no longer eligible', async () => {

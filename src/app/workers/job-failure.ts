@@ -1,3 +1,4 @@
+import { markDownloadFailed } from '../../modules/files/index.js';
 import type { Ctx } from '../../shared/context.js';
 import type { Sql } from '../../shared/db.js';
 import { AppError } from '../../shared/errors.js';
@@ -89,6 +90,10 @@ export async function recordJobFailure(
             job.ref_id,
             LEARNING_STATUS[state],
         ]);
+    }
+
+    if (job.kind === 'file' && state === 'failed') {
+        await markDownloadFailed(tx, ctx.org, job.ref_id);
     }
 
     if (job.kind === 'triage' && state === 'failed') {

@@ -3,6 +3,7 @@ import { ensure } from '../../shared/errors.js';
 import { audit } from '../../shared/events.js';
 import { EMPLOYEE_STATUS_SQL } from '../../shared/staff.js';
 import type { Employee } from '../../shared/types/entities.js';
+import { reopenDownload } from '../files/index.js';
 
 export async function listAllEmployees(db: Sql, org: string) {
     const result = await db.query(
@@ -32,13 +33,19 @@ export async function recentAudit(db: Sql, org: string) {
 
 export async function retryFailedJob(db: Database, org: string, { actor, jobId }: { actor: Employee; jobId: string }) {
     await db.tx(async (tx) => {
-        const result = await tx.query(
+        const job = await one<{ kind: string; ref_id: string }>(
+            tx,
             `UPDATE jobs SET state='pending',due_at=now() WHERE org_id=$1 AND id=$2 AND state='failed'
-       AND kind IN('file','scan','memory_delete','message_revision') RETURNING id`,
+       AND kind IN('file','scan','memory_delete','message_revision') RETURNING kind,ref_id`,
             [org, jobId],
         );
 
-        ensure(result.rows.length, 'retry_not_allowed');
+        ensure(job, 'retry_not_allowed');
+
+        if (job.kind === 'file') {
+            await reopenDownload(tx, org, job.ref_id);
+        }
+
         await audit(tx, org, { actor: actor.id, action: 'admin.job.retry', objectId: jobId });
     });
 }

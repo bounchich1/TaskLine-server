@@ -77,8 +77,10 @@ URL on the client bot.
 
 ### Allowed media hosts
 
-Client attachments are downloaded only from hosts listed in `MAX_MEDIA_HOSTS`. On a new
-install, send a photo to the bot, then:
+Client attachments are downloaded only from hosts listed in `MAX_MEDIA_HOSTS`. MAX serves
+photos from `i.oneme.ru` (prefilled); videos and documents may come from other hosts. Until a
+host is listed, its files fail with `media_host_denied` and show «Файл недоступен» in the
+mini-app. On a new install, send a photo, a video and a document to the bot, then:
 
 ```sh
 docker compose run --rm api node dist/cli.js media-hosts
