@@ -101,6 +101,32 @@ it('runs triage through both recall tools and one schema repair', async () => {
     expect(steps.rows.map((row) => row.step_key)).toEqual(['triage-0', 'triage-1', 'triage-2', 'triage-repair']);
 });
 
+it('keeps the triage when the model calls tools in parallel or searches twice', async () => {
+    await context.create();
+    const job = await claim('triage');
+
+    const parallel: ModelReply = {
+        content: null,
+        toolCalls: [
+            { id: 'call-1', name: 'search_resolved_cases', arguments: JSON.stringify({ query: 'подключение' }) },
+            { id: 'call-2', name: 'search_resolved_cases', arguments: JSON.stringify({ query: 'роутер' }) },
+        ],
+        usage: {},
+    };
+
+    const provider = scripted([
+        parallel,
+        toolCall('call-3', 'search_resolved_cases', { query: 'интернет' }),
+        text(JSON.stringify(validTriage(job))),
+    ]);
+
+    await new Workflows(context.db, context.c, new Gateway(context.db, context.c, provider), recall).triage(job);
+    const ticket = await context.ticket();
+
+    expect(ticket.ai_status).toBe('done');
+    expect(ticket.suggestion).toMatchObject({ evidence_memory_ids: [recalled.id] });
+});
+
 it('accepts a triage wrapped in a single-key envelope without a repair call', async () => {
     await context.create();
     const job = await claim('triage');

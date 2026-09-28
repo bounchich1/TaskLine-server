@@ -9,6 +9,11 @@ import type { CaseEvidence, Recall } from '../memory/memory-record.js';
 
 const MAX_TOOL_CALLS = 2;
 
+const BUDGET_SPENT = {
+    error: 'tool_budget_spent',
+    note: 'One search and one expansion only. Return the triage JSON now.',
+};
+
 export const RECALL_TOOLS: Row[] = [
     functionTool('search_resolved_cases', 'Search authorized resolved cases.', {
         type: 'object',
@@ -48,26 +53,24 @@ export class RecallSession {
     }
 
     async answer(reply: ModelReply, messages: ModelMessage[]): Promise<void> {
-        ensure(reply.toolCalls.length === 1 && this.calls < MAX_TOOL_CALLS, 'ai_tool_budget', 422);
+        ensure(reply.toolCalls.length > 0 && this.calls < MAX_TOOL_CALLS, 'ai_tool_budget', 422);
         this.calls++;
-        const call = reply.toolCalls[0];
-        const args = object(strictJson(call.arguments));
-        const data = await this.run(call.name, args);
 
-        messages.push(
-            {
-                role: 'assistant',
-                content: reply.content,
-                tool_calls: [
-                    {
-                        id: call.id,
-                        type: 'function',
-                        function: { name: call.name, arguments: call.arguments },
-                    },
-                ],
-            },
-            { role: 'tool', tool_call_id: call.id, content: JSON.stringify(data) },
-        );
+        messages.push({
+            role: 'assistant',
+            content: reply.content,
+            tool_calls: reply.toolCalls.map((call) => ({
+                id: call.id,
+                type: 'function',
+                function: { name: call.name, arguments: call.arguments },
+            })),
+        });
+
+        for (const [index, call] of reply.toolCalls.entries()) {
+            const data = index === 0 ? await this.run(call.name, object(strictJson(call.arguments))) : BUDGET_SPENT;
+
+            messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(data) });
+        }
     }
 
     private async run(name: string, args: Row): Promise<unknown> {
@@ -83,7 +86,10 @@ export class RecallSession {
     }
 
     private async search(args: Row): Promise<unknown> {
-        ensure(!this.searched, 'ai_tool_budget', 422);
+        if (this.searched) {
+            return BUDGET_SPENT;
+        }
+
         this.searched = true;
         const { query } = searchArgs.parse(args);
 
@@ -97,7 +103,10 @@ export class RecallSession {
     }
 
     private async expand(args: Row): Promise<unknown> {
-        ensure(this.searched && !this.expanded, 'ai_tool_budget', 422);
+        if (!this.searched || this.expanded) {
+            return BUDGET_SPENT;
+        }
+
         this.expanded = true;
         const { ids } = expandArgs.parse(args);
 
