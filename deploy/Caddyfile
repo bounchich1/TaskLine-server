@@ -1,5 +1,5 @@
 {$DOMAIN} {
-	@api path /v1/* /download/* /webhooks/* /health/*
+	@api path /v1/* /download/* /webhooks/* /health/* /openapi.yaml
 	handle @api {
 		reverse_proxy {$COMPOSE_PROJECT}-api-1:3000
 	}
