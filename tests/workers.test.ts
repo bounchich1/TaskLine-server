@@ -89,6 +89,23 @@ it('gives up on learning after six failed attempts', async () => {
     expect(closure?.learning_status).toBe('failed');
 });
 
+it('keeps a learned closure learned when its learning job fails afterwards', async () => {
+    const job = await closedTicketLearningJob();
+    const runner = new JobRunner(context.db, context.c, failingModel(new Error('down')));
+
+    await runner.run(String(job.id));
+    await context.db.query("UPDATE closures SET learning_status='learned'");
+
+    await context.db.query(`UPDATE jobs SET due_at=now(),payload=jsonb_set(payload,'{retry_count}','5') WHERE id=$1`, [
+        job.id,
+    ]);
+
+    await runner.run(String(job.id));
+
+    expect(await one(context.db, 'SELECT state FROM jobs WHERE id=$1', [job.id])).toEqual({ state: 'failed' });
+    expect(await one(context.db, 'SELECT learning_status FROM closures')).toEqual({ learning_status: 'learned' });
+});
+
 it('fails triage for review after repeated worker errors', async () => {
     await context.create();
     const job = await jobOf('triage');

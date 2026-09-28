@@ -89,10 +89,10 @@ export async function recordJobFailure(
     }
 
     if (job.kind === 'learning' && state !== 'pending') {
-        await tx.query('UPDATE closures SET learning_status=$2 WHERE id=$1 AND NOT invalidated', [
-            job.ref_id,
-            LEARNING_STATUS[state],
-        ]);
+        await tx.query(
+            "UPDATE closures SET learning_status=$2 WHERE id=$1 AND NOT invalidated AND learning_status<>'learned'",
+            [job.ref_id, LEARNING_STATUS[state]],
+        );
     }
 
     if (job.kind === 'file' && state === 'failed') {

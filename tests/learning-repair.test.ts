@@ -43,10 +43,13 @@ async function closedConversation(): Promise<{ client: string; staff: string }> 
     };
 }
 
-function memorizing(attempts: Row[], requests: ModelRequest[]): Gateway {
+function memorizing(attempts: Row[], requests: ModelRequest[], acknowledgement?: string): Gateway {
     return new Gateway(context.db, context.c, (request) => {
         if (!request.forceTool) {
-            return Promise.resolve({ content: JSON.stringify(request.mock), toolCalls: [], usage: {} });
+            const receipt = JSON.stringify(request.mock).includes('tool_receipt_id');
+            const content = receipt && acknowledgement !== undefined ? acknowledgement : JSON.stringify(request.mock);
+
+            return Promise.resolve({ content, toolCalls: [], usage: {} });
         }
 
         requests.push(structuredClone(request));
@@ -144,4 +147,26 @@ it('keeps the schema errors of a failed learning job for diagnostics', async () 
 
     expect(stored).toMatchObject({ state: 'failed', reason: 'invalid_memory_schema' });
     expect(String(stored.payload.error_detail)).toContain('evidence_message_ids');
+});
+
+it('finishes learning when the model garbles the receipt acknowledgement', async () => {
+    const { client, staff } = await closedConversation();
+
+    const resolution = {
+        problem_summary: 'Сбой подключения',
+        solution_summary: 'Перезапустить соединение',
+        steps: [{ action: 'Перезапуск соединения', evidence_message_ids: [staff] }],
+        observed_result: 'Клиент подтвердил восстановление',
+        evidence_message_ids: [client, staff],
+    };
+
+    const gateway = memorizing([resolution], [], 'Готово, решение сохранено.');
+    const workflow = new Workflows(context.db, context.c, gateway, noRecall);
+    const job = await claim('learning');
+
+    expect(await workflow.learning(job)).toBe(false);
+    expect(await workflow.learning(job)).toBe(true);
+    const saved = await context.db.query("SELECT step_key FROM ai_checkpoints WHERE step_key='completion'");
+
+    expect(saved.rows).toHaveLength(1);
 });

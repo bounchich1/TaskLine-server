@@ -45,18 +45,31 @@ export async function acknowledgeReceipt(
         mock: receipt,
     });
 
-    const acknowledgement = z
-        .object({
-            schema_version: z.literal('1.0'),
-            tool_receipt_id: z.literal(receiptId),
-            status: z.literal('accepted_pending_persistence'),
-        })
-        .strict()
-        .parse(strictJson(response.content ?? ''));
+    const acknowledgement = readAcknowledgement(response.content, receiptId);
 
     await checkpoints.save('completion', {
-        value: acknowledgement,
+        value: acknowledgement ?? { ...receipt, status: 'needs_review' },
         coveredIds,
         inputHash: hash(JSON.stringify(receipt)),
     });
+}
+
+function readAcknowledgement(content: string | null, receiptId: string): Row | null {
+    let value: unknown;
+
+    try {
+        value = strictJson(content ?? '');
+    } catch {
+        return null;
+    }
+
+    const parsed = z
+        .object({
+            schema_version: z.literal('1.0').default('1.0'),
+            tool_receipt_id: z.literal(receiptId),
+            status: z.enum(['accepted_pending_persistence', 'persisted', 'needs_review']),
+        })
+        .safeParse(value);
+
+    return parsed.success ? parsed.data : null;
 }
