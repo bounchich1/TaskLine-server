@@ -9,12 +9,6 @@ export function scripted(replies: ModelReply[]) {
     };
 }
 
-export const toolCall = (id: string, name: string, args: unknown): ModelReply => ({
-    content: null,
-    toolCalls: [{ id, name, arguments: JSON.stringify(args) }],
-    usage: {},
-});
-
 export const text = (content: string): ModelReply => ({ content, toolCalls: [], usage: {} });
 
 export const recalled = {

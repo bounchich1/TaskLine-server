@@ -45,8 +45,8 @@ async function recoverAbandonedWork(tx: Sql, ctx: Ctx): Promise<void> {
 
     await tx.query(
         `UPDATE jobs SET state='pending',due_at=now(),reason='worker_recovery'
-     WHERE org_id=$1 AND state='running' AND claimed_at<now()-interval '5 minutes'`,
-        [ctx.org],
+     WHERE org_id=$1 AND state='running' AND claimed_at<now()-GREATEST(300,$2+60)*interval '1 second'`,
+        [ctx.org, ctx.config.AI_TRIAGE_DEADLINE_SECONDS],
     );
 }
 

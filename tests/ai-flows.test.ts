@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 
 import { buildGateway } from '../src/app/gateway/build-gateway.js';
-import { Gateway, GatewayClient, Workflows, type ModelReply } from '../src/modules/ai/index.js';
+import type { ModelProvider } from '../src/modules/ai/gateway/model.js';
+import { Gateway, GatewayClient, Workflows, type ModelRequest } from '../src/modules/ai/index.js';
 import { one } from '../src/shared/db.js';
 import type { Job, Row } from '../src/shared/types/entities.js';
 
 import { fixture, testConfig } from './helpers.js';
-import { recall, recalled, scripted, text, toolCall, validTriage } from './support/triage-replies.js';
+import { recall, recalled, scripted, text, validTriage } from './support/triage-replies.js';
 
 let context: Awaited<ReturnType<typeof fixture>>;
 
@@ -28,53 +29,51 @@ async function claim(kind: string): Promise<Job> {
     return job!;
 }
 
-it('runs triage through both recall tools and one schema repair', async () => {
+it('hands the recalled cases to one model call and repairs an invalid answer once', async () => {
     await context.create();
     const job = await claim('triage');
+    const requests: ModelRequest[] = [];
+    const replies = [text('not json'), text(JSON.stringify(validTriage(job)))];
 
-    const provider = scripted([
-        toolCall('call-1', 'search_resolved_cases', { query: 'подключение' }),
-        toolCall('call-2', 'get_case_evidence', { ids: [recalled.id] }),
-        text('not json'),
-        text(JSON.stringify(validTriage(job))),
-    ]);
+    const provider: ModelProvider = (request) => {
+        requests.push(structuredClone(request));
 
-    const gateway = new Gateway(context.db, context.c, provider);
-
-    await new Workflows(context.db, context.c, gateway, recall).triage(job);
-    const ticket = await context.ticket();
-
-    expect(ticket.ai_status).toBe('done');
-    expect(ticket.suggestion).toMatchObject({ evidence_memory_ids: [recalled.id] });
-    const steps = await context.db.query('SELECT step_key FROM ai_calls ORDER BY step_key');
-
-    expect(steps.rows.map((row) => row.step_key)).toEqual(['triage-0', 'triage-1', 'triage-2', 'triage-repair']);
-});
-
-it('keeps the triage when the model calls tools in parallel or searches twice', async () => {
-    await context.create();
-    const job = await claim('triage');
-
-    const parallel: ModelReply = {
-        content: null,
-        toolCalls: [
-            { id: 'call-1', name: 'search_resolved_cases', arguments: JSON.stringify({ query: 'подключение' }) },
-            { id: 'call-2', name: 'search_resolved_cases', arguments: JSON.stringify({ query: 'роутер' }) },
-        ],
-        usage: {},
+        return Promise.resolve(replies.shift()!);
     };
-
-    const provider = scripted([
-        parallel,
-        toolCall('call-3', 'search_resolved_cases', { query: 'интернет' }),
-        text(JSON.stringify(validTriage(job))),
-    ]);
 
     await new Workflows(context.db, context.c, new Gateway(context.db, context.c, provider), recall).triage(job);
     const ticket = await context.ticket();
 
     expect(ticket.ai_status).toBe('done');
     expect(ticket.suggestion).toMatchObject({ evidence_memory_ids: [recalled.id] });
+    expect(requests[0]?.tools).toBeUndefined();
+    const input = JSON.parse(String(requests[0]?.messages[1]?.content)) as Row;
+
+    expect(input.resolved_cases).toEqual([recalled]);
+    expect(input).not.toHaveProperty('memory_unavailable');
+    const steps = await context.db.query('SELECT step_key FROM ai_calls ORDER BY step_key');
+
+    expect(steps.rows.map((row) => row.step_key)).toEqual(['triage', 'triage-repair']);
+});
+
+it('triages without cases and says so when memory is unavailable', async () => {
+    await context.create();
+    const job = await claim('triage');
+    const requests: ModelRequest[] = [];
+    const down = { search: () => Promise.reject(new Error('memory down')), expand: () => Promise.resolve([]) };
+
+    const provider: ModelProvider = (request) => {
+        requests.push(request);
+
+        return Promise.resolve(text(JSON.stringify({ ...validTriage(job), evidence_memory_ids: [] })));
+    };
+
+    await new Workflows(context.db, context.c, new Gateway(context.db, context.c, provider), down).triage(job);
+
+    expect((await context.ticket()).ai_status).toBe('done');
+    const input = JSON.parse(String(requests[0]?.messages[1]?.content)) as Row;
+
+    expect(input).toMatchObject({ resolved_cases: [], memory_unavailable: true });
 });
 
 it('accepts a triage wrapped in a single-key envelope without a repair call', async () => {
@@ -96,7 +95,7 @@ it('accepts a triage wrapped in a single-key envelope without a repair call', as
     expect(ticket.suggestion).toMatchObject({ customer_reply: 'Перезапустите, пожалуйста, роутер.' });
     const steps = await context.db.query('SELECT step_key FROM ai_calls ORDER BY step_key');
 
-    expect(steps.rows.map((row) => row.step_key)).toEqual(['triage-0']);
+    expect(steps.rows.map((row) => row.step_key)).toEqual(['triage']);
 });
 
 it('trims a long tip, drops foreign case refs, scrubs case ids from the reply and flags dropped cautions', async () => {
@@ -113,10 +112,7 @@ it('trims a long tip, drops foreign case refs, scrubs case ids from the reply an
         missing_information: ['Модель', 'Модель', 'Адрес', 'Время', 'Ошибка', 'Тариф'],
     };
 
-    const provider = scripted([
-        toolCall('call-1', 'search_resolved_cases', { query: 'подключение' }),
-        text(JSON.stringify(triage)),
-    ]);
+    const provider = scripted([text(JSON.stringify(triage))]);
 
     const cautionedRecall = { search: () => Promise.resolve([cautioned]), expand: () => Promise.resolve([cautioned]) };
 

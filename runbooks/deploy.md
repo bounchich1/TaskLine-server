@@ -97,18 +97,21 @@ and retry the failed file job in Управление → Состояние с�
 AI stays off until `AI_ENABLED=true`, `AI_API_KEY` and `AI_MODEL` are set in `.env` (then
 `docker compose up -d`). The provider must accept OpenAI-style chat completions over HTTPS.
 
-Triage of a new ticket has `AI_TRIAGE_DEADLINE_SECONDS` (default 120) from ticket creation for
-all its model calls together (up to two recall tool turns, the answer and one schema repair).
-Each call gets at most `AI_TRIAGE_TIMEOUT_SECONDS` (default 45, at most 170, below the 3-minute
-lost-call sweep) and never more than the time left, so a large value lets the final answer use
-whatever the deadline still allows; close to the deadline the recall tools and the repair are skipped, and no call is
-started with less than 5 s left (`triage_deadline`). Answers are capped by `AI_TRIAGE_MAX_TOKENS`
-and `AI_LEARNING_MAX_TOKENS`. Reasoning models get slow when they think long: set
-`AI_TRIAGE_REASONING_EFFORT=low` (and `AI_LEARNING_REASONING_EFFORT`) — it is sent as
-`reasoning_effort`. `AI_THINKING_BUDGET` goes to `chat_template_kwargs.thinking_token_budget`,
-which some providers ignore (neuraldeep.ru does for glm-5.3-flash). `AI_TRIAGE_MODEL` runs triage
-on a different model than learning (empty = `AI_MODEL`). Every call carries the job id
-as `prompt_cache_key` so the turns of one job can reuse the provider's prompt cache.
+Triage of a new ticket is one model call: the host first searches the solved cases with the
+redacted first message and passes up to five of them in, then the model answers; an invalid
+answer gets at most one schema repair. The whole triage has `AI_TRIAGE_DEADLINE_SECONDS`
+(default 120; 300 on the production hosts) from ticket creation. Each call gets at most
+`AI_TRIAGE_TIMEOUT_SECONDS` (default 45, at most 170, below the 3-minute lost-call sweep) and
+never more than the time left; the repair is skipped when less than 20 s remain, and no call is
+started with less than 5 s left (`triage_deadline`). Running jobs are only treated as abandoned
+after 5 minutes or the triage deadline plus a minute, whichever is longer. Answers are capped by
+`AI_TRIAGE_MAX_TOKENS` and `AI_LEARNING_MAX_TOKENS`. `AI_TRIAGE_REASONING_EFFORT` and
+`AI_LEARNING_REASONING_EFFORT` are sent as `reasoning_effort`; `AI_THINKING_BUDGET` goes to
+`chat_template_kwargs.thinking_token_budget`, which some providers ignore (neuraldeep.ru does for
+glm-5.3-flash, whose final answers take 40–90 s either way). `AI_TRIAGE_MODEL` runs triage on a
+different model than learning (empty = `AI_MODEL`); qwen3.7-flash and deepseek-v4.1-flash were
+tried on 2026-09-29 and rejected (broken JSON, stalled calls). Every call carries the job id as
+`prompt_cache_key`.
 
 A call that times out on our side, gets any other 5xx or loses the connection is left
 `uncertain` together with its permit (the provider may still be working on it); the ticket falls
@@ -118,7 +121,7 @@ provider did finish but that cannot be used (4xx, cut-off or unparseable) frees 
 Provider answers 408, 500, 502 and 503 (`provider_unavailable`) and 429 (`provider_busy`) free the
 permit and forget the call, so the job retries it later; `Retry-After` is honoured. A triage job
 that ends without an AI analysis is marked failed with the reason (`ai_timeout`,
-`triage_deadline`, `ai_tool_budget`, `invalid_ai_schema`, `result_ignored`, …) in Управление →
+`triage_deadline`, `invalid_ai_schema`, `result_ignored`, …) in Управление →
 Состояние системы.
 Occupied permits are listed at `/health` of the gateway and in Управление → Состояние системы.
 Every failed call is logged by the gateway as `Model call failed` with `job_id`, `step`,

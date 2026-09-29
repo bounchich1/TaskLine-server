@@ -7,7 +7,7 @@ import { AppError } from '../src/shared/errors.js';
 import type { Job } from '../src/shared/types/entities.js';
 
 import { fixture } from './helpers.js';
-import { recall, scripted, text, toolCall, validTriage } from './support/triage-replies.js';
+import { recall, scripted, text, validTriage } from './support/triage-replies.js';
 
 let context: Awaited<ReturnType<typeof fixture>>;
 
@@ -29,58 +29,64 @@ async function claim(kind: string): Promise<Job> {
     return job!;
 }
 
-it('skips the recall tools and shortens the call when the triage deadline is near', async () => {
+it('gives the model call no more than the time left before the triage deadline', async () => {
     const ticket = await context.create();
 
     await context.db.query("UPDATE tickets SET created_at=now()-interval '80 seconds' WHERE id=$1", [ticket.id]);
     const job = await claim('triage');
-    const seen: { tools: unknown; timeoutMs: number }[] = [];
+    const timeouts: number[] = [];
 
-    const provider: ModelProvider = (request, options) => {
-        seen.push({ tools: request.tools, timeoutMs: options.timeoutMs });
+    const provider: ModelProvider = (_request, options) => {
+        timeouts.push(options.timeoutMs);
 
-        return Promise.resolve(text(JSON.stringify({ ...validTriage(job), evidence_memory_ids: [] })));
+        return Promise.resolve(text(JSON.stringify(validTriage(job))));
     };
 
     await new Workflows(context.db, context.c, new Gateway(context.db, context.c, provider), recall).triage(job);
 
     expect((await context.ticket()).ai_status).toBe('done');
-    expect(seen).toHaveLength(1);
-    expect(seen[0].tools).toBeUndefined();
-    expect(seen[0].timeoutMs).toBeLessThanOrEqual(37000);
-    const steps = await context.db.query('SELECT step_key FROM ai_calls');
-
-    expect(steps.rows).toEqual([{ step_key: 'triage-0-late' }]);
+    expect(timeouts).toHaveLength(1);
+    expect(timeouts[0]).toBeLessThanOrEqual(37000);
 });
 
-it('retries a triage the provider rate-limited without replaying a mismatched step', async () => {
+it('skips the schema repair when too little time is left for it', async () => {
     const ticket = await context.create();
+
+    await context.db.query("UPDATE tickets SET created_at=now()-interval '105 seconds' WHERE id=$1", [ticket.id]);
     const job = await claim('triage');
-    const valid = text(JSON.stringify({ ...validTriage(job), evidence_memory_ids: [] }));
+    const gateway = new Gateway(context.db, context.c, scripted([text('not json')]));
+
+    await expect(new Workflows(context.db, context.c, gateway, recall).triage(job)).rejects.toBeInstanceOf(AppError);
+
+    expect((await context.ticket()).ai_status).toBe('failed');
+    const steps = await context.db.query('SELECT step_key FROM ai_calls');
+
+    expect(steps.rows).toEqual([{ step_key: 'triage' }]);
+});
+
+it('retries a triage call the provider rate-limited', async () => {
+    await context.create();
+    const job = await claim('triage');
+    const valid = text(JSON.stringify(validTriage(job)));
     const limited = Object.assign(new AppError('provider_busy', 503), { retryAfterSeconds: 5 });
     let calls = 0;
 
     const provider: ModelProvider = () => {
         calls++;
 
-        if (calls === 1) {
-            return Promise.resolve(toolCall('call-1', 'search_resolved_cases', { query: 'подключение' }));
-        }
-
-        return calls === 2 ? Promise.reject(limited) : Promise.resolve(valid);
+        return calls === 1 ? Promise.reject(limited) : Promise.resolve(valid);
     };
 
     const workflows = new Workflows(context.db, context.c, new Gateway(context.db, context.c, provider), recall);
 
     await expect(workflows.triage(job)).rejects.toMatchObject({ code: 'provider_busy' });
     expect(await one(context.db, "SELECT count(*)::int AS n FROM ai_permits WHERE state<>'free'")).toEqual({ n: 0 });
-    await context.db.query("UPDATE tickets SET created_at=now()-interval '80 seconds' WHERE id=$1", [ticket.id]);
     await workflows.triage(job);
 
     expect((await context.ticket()).ai_status).toBe('done');
     const steps = await context.db.query('SELECT step_key FROM ai_calls');
 
-    expect(steps.rows.map((row) => row.step_key).sort()).toEqual(['triage-0', 'triage-0-late']);
+    expect(steps.rows).toEqual([{ step_key: 'triage' }]);
 });
 
 it('does not call the model once the triage deadline is too close', async () => {
