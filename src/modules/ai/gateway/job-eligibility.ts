@@ -1,7 +1,8 @@
+import type { Ctx } from '../../../shared/context.js';
 import { one, type Sql } from '../../../shared/db.js';
 import type { Job } from '../../../shared/types/entities.js';
 
-export async function eligibleJob(tx: Sql, org: string, job: Job): Promise<boolean> {
+export async function eligibleJob(tx: Sql, ctx: Ctx, job: Job): Promise<boolean> {
     if (job.kind === 'triage') {
         return !!(await one(
             tx,
@@ -9,8 +10,14 @@ export async function eligibleJob(tx: Sql, org: string, job: Job): Promise<boole
       WHERE t.id=$1 AND t.org_id=$2 AND t.status IN('open','in_progress') AND t.lifecycle=$3
       AND c.consent_state='granted' AND c.consent_revision=$4
       AND t.consent_revision=c.consent_revision AND t.ai_status='pending'
-      AND t.created_at>now()-interval '120 seconds'`,
-            [job.ref_id, org, job.payload.lifecycle, job.payload.consent_revision],
+      AND t.created_at>now()-$5*interval '1 second'`,
+            [
+                job.ref_id,
+                ctx.org,
+                job.payload.lifecycle,
+                job.payload.consent_revision,
+                ctx.config.AI_TRIAGE_DEADLINE_SECONDS,
+            ],
         ));
     }
 
@@ -22,9 +29,20 @@ export async function eligibleJob(tx: Sql, org: string, job: Job): Promise<boole
       WHERE cl.id=$1 AND cl.org_id=$2 AND NOT cl.invalidated AND cl.lifecycle=t.lifecycle
       AND t.current_cycle_id=cl.id AND c.consent_state='granted' AND c.consent_revision=$3
       AND t.consent_revision=c.consent_revision`,
-            [job.ref_id, org, job.payload.consent_revision],
+            [job.ref_id, ctx.org, job.payload.consent_revision],
         ));
     }
 
     return false;
+}
+
+export async function triageTimeLeftMs(tx: Sql, ctx: Ctx, ticketId: string): Promise<number> {
+    const row = await one(
+        tx,
+        `SELECT GREATEST(0,EXTRACT(EPOCH FROM created_at+$3*interval '1 second'-now())*1000)::int AS ms
+     FROM tickets WHERE id=$1 AND org_id=$2`,
+        [ticketId, ctx.org, ctx.config.AI_TRIAGE_DEADLINE_SECONDS],
+    );
+
+    return Number(row?.ms ?? 0);
 }

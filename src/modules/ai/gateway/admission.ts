@@ -26,7 +26,7 @@ export async function admitCall(tx: Sql, ctx: Ctx, call: CallRequest): Promise<A
     const current = await one<Job>(tx, 'SELECT * FROM jobs WHERE id=$1 AND org_id=$2 FOR UPDATE', [job.id, ctx.org]);
 
     ensure(current?.state === 'running' && current.generation === job.generation, 'job_stale');
-    ensure(await eligibleJob(tx, ctx.org, current), 'job_ineligible');
+    ensure(await eligibleJob(tx, ctx, current), 'job_ineligible');
     const previous = await one(tx, 'SELECT * FROM ai_calls WHERE job_id=$1 AND step_key=$2', [job.id, step]);
 
     if (previous) {

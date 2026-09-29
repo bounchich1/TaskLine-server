@@ -8,7 +8,9 @@ import type { Recall } from '../memory/memory-record.js';
 import { RECALL_TOOLS, RecallSession } from './recall-session.js';
 
 const MAX_TURNS = 3;
-const RETRY_LATER_CODES = ['ai_busy', 'gateway_unavailable'];
+const RETRY_LATER_CODES = ['ai_busy', 'gateway_unavailable', 'provider_busy', 'provider_unavailable'];
+const FINAL_ANSWER_RESERVE_MS = 45000;
+const REPAIR_RESERVE_MS = 20000;
 
 const REPAIR_PROMPT =
     'Invalid schema or evidence. Return one corrected JSON object using only the supplied ' +
@@ -21,6 +23,7 @@ export interface Conversation {
     dictionaryVersion: string;
     dictionaries: Row[];
     fallback: TriageResult;
+    deadline: number;
 }
 
 export interface TriageOutcome {
@@ -61,12 +64,14 @@ async function askForTriage(
     conversation: Conversation,
     session: RecallSession,
 ): Promise<TriageResult | undefined> {
-    const { job, messages, fallback } = conversation;
+    const { job, messages, fallback, deadline } = conversation;
 
     for (let turn = 0; turn < MAX_TURNS; turn++) {
-        const reply = await model.complete(job, `triage-${turn}`, {
+        const outOfTime = session.canCallTools && deadline - Date.now() <= FINAL_ANSWER_RESERVE_MS;
+
+        const reply = await model.complete(job, outOfTime ? `triage-${turn}-late` : `triage-${turn}`, {
             messages,
-            tools: session.canCallTools ? RECALL_TOOLS : undefined,
+            tools: session.canCallTools && !outOfTime ? RECALL_TOOLS : undefined,
             json: true,
             mock: fallback,
         });
@@ -94,7 +99,7 @@ async function parseOrRepair(
         reply: ModelReply;
     },
 ): Promise<TriageResult> {
-    const { job, messages, messageId, dictionaryVersion, dictionaries, fallback } = conversation;
+    const { job, messages, messageId, dictionaryVersion, dictionaries, fallback, deadline } = conversation;
 
     const parse = (content: string | null) =>
         parseTriage(content ?? '', {
@@ -107,7 +112,11 @@ async function parseOrRepair(
 
     try {
         return parse(reply.content);
-    } catch {
+    } catch (error) {
+        if (deadline - Date.now() < REPAIR_RESERVE_MS) {
+            throw error;
+        }
+
         messages.push(
             { role: 'assistant', content: reply.content?.slice(0, 32768) ?? '' },
             { role: 'user', content: REPAIR_PROMPT },

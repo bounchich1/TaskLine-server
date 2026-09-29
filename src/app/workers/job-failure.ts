@@ -11,6 +11,7 @@ const DISABLED_RETRY_SECONDS = 60;
 
 const DEFERRED_CODES = [
     'ai_busy',
+    'provider_busy',
     'memory_writer_busy',
     'snapshot_waiting_files',
     'memory_disabled',
@@ -37,9 +38,12 @@ export function classifyJobFailure(error: unknown, previousRetries: number): Job
     const retries = previousRetries + (deferred ? 0 : 1);
     const rejected = error instanceof AppError && error.status === 422;
 
-    const delaySeconds = DISABLED_CODES.includes(code)
+    const backoffSeconds = DISABLED_CODES.includes(code)
         ? DISABLED_RETRY_SECONDS
         : Math.min(MAX_BACKOFF_SECONDS, 2 ** Math.min(retries + 1, 10));
+
+    const retryAfterSeconds = error instanceof AppError ? (error.retryAfterSeconds ?? 0) : 0;
+    const delaySeconds = Math.max(backoffSeconds, Math.min(MAX_BACKOFF_SECONDS, retryAfterSeconds));
 
     return {
         code,

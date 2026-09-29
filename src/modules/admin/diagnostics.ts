@@ -3,8 +3,8 @@ import type { Sql } from '../../shared/db.js';
 export async function adminDiagnostics(db: Sql, org: string) {
     const [jobs, deliveries, memory, permits] = await Promise.all([
         db.query(
-            `SELECT id,kind,ref_id,state,attempts,reason,created_at,due_at FROM jobs
-       WHERE org_id=$1 ORDER BY created_at DESC LIMIT 100`,
+            `SELECT id,kind,ref_id,CASE WHEN kind='triage' THEN ref_id END AS ticket_id,state,attempts,reason,
+       created_at,due_at FROM jobs WHERE org_id=$1 ORDER BY created_at DESC LIMIT 100`,
             [org],
         ),
         db.query(

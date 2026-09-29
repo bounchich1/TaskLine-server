@@ -6,6 +6,7 @@ import { one } from '../src/shared/db.js';
 import type { Job, Row } from '../src/shared/types/entities.js';
 
 import { fixture, testConfig } from './helpers.js';
+import { recall, recalled, scripted, text, toolCall, validTriage } from './support/triage-replies.js';
 
 let context: Awaited<ReturnType<typeof fixture>>;
 
@@ -25,57 +26,6 @@ async function claim(kind: string): Promise<Job> {
     );
 
     return job!;
-}
-
-function scripted(replies: ModelReply[]) {
-    return () => {
-        const reply = replies.shift();
-
-        return reply ? Promise.resolve(reply) : Promise.reject(new Error('unexpected model call'));
-    };
-}
-
-const toolCall = (id: string, name: string, args: unknown): ModelReply => ({
-    content: null,
-    toolCalls: [{ id, name, arguments: JSON.stringify(args) }],
-    usage: {},
-});
-
-const text = (content: string): ModelReply => ({ content, toolCalls: [], usage: {} });
-
-const recalled = {
-    id: 'case-1',
-    problem_summary: 'Сбой подключения',
-    solution_summary: 'Перезапуск роутера',
-    applicability: [],
-    cautions: [],
-};
-
-const recall = {
-    search: () => Promise.resolve([recalled]),
-    expand: (ids: string[]) => Promise.resolve(ids.includes(recalled.id) ? [recalled] : []),
-};
-
-function validTriage(job: Job): Row {
-    const dictionaries = job.payload.dictionaries as Row[];
-    const code = (dimension: string) => dictionaries.find((entry) => entry.dimension === dimension)?.code;
-
-    return {
-        schema_version: '1.1',
-        dictionary_version: job.payload.dictionary_version,
-        tags: { tag: code('tag'), urgency: code('urgency'), complexity: code('complexity') },
-        tip: {
-            summary: 'Сбой подключения → роутер.',
-            steps: [{ text: 'Перезапустить роутер.', case_refs: [recalled.id] }],
-            cautions: [],
-        },
-        customer_reply: 'Перезапустите, пожалуйста, роутер.',
-        evidence_message_ids: [job.payload.message_id],
-        evidence_memory_ids: [recalled.id],
-        missing_information: [],
-        confidence: 0.8,
-        needs_review: false,
-    };
 }
 
 it('runs triage through both recall tools and one schema repair', async () => {
@@ -186,12 +136,15 @@ it('trims a long tip, drops foreign case refs, scrubs case ids from the reply an
     expect(ticket.review_required).toBe(true);
 });
 
-it('falls back to a review-required suggestion when the model call fails', async () => {
+it('falls back to a review-required suggestion and reports why when the model call fails', async () => {
     await context.create();
     const job = await claim('triage');
     const gateway = new Gateway(context.db, context.c, scripted([]));
 
-    await new Workflows(context.db, context.c, gateway, recall).triage(job);
+    await expect(new Workflows(context.db, context.c, gateway, recall).triage(job)).rejects.toMatchObject({
+        code: 'ai_failed',
+    });
+
     const ticket = await context.ticket();
 
     expect(ticket.ai_status).toBe('failed');

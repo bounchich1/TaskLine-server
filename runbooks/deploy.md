@@ -97,13 +97,27 @@ and retry the failed file job in Управление → Состояние с�
 AI stays off until `AI_ENABLED=true`, `AI_API_KEY` and `AI_MODEL` are set in `.env` (then
 `docker compose up -d`). The provider must accept OpenAI-style chat completions over HTTPS.
 
-Each model call must finish within `AI_TRIAGE_TIMEOUT_SECONDS` (default 45, at most 90). A
-reasoning model with `AI_THINKING_BUDGET` set can take 30–40 s per call, so use 90 there. A call
-that times out, hits a provider 5xx or loses the connection is left `uncertain` together with its
-permit (the provider may still be working on it); the ticket falls back to manual classification,
-and the permit stays taken until an operator releases it:
+Triage of a new ticket has `AI_TRIAGE_DEADLINE_SECONDS` (default 120) from ticket creation for
+all its model calls together (up to two recall tool turns, the answer and one schema repair).
+Each call gets at most `AI_TRIAGE_TIMEOUT_SECONDS` (default 45, at most 90) and never more than
+the time left; close to the deadline the recall tools and the repair are skipped, and no call is
+started with less than 5 s left (`triage_deadline`). Answers are capped by `AI_TRIAGE_MAX_TOKENS`
+and `AI_LEARNING_MAX_TOKENS`. Reasoning models get slow when they think long: set
+`AI_TRIAGE_REASONING_EFFORT=low` (and `AI_LEARNING_REASONING_EFFORT`) — it is sent as
+`reasoning_effort`. `AI_THINKING_BUDGET` goes to `chat_template_kwargs.thinking_token_budget`,
+which some providers ignore (neuraldeep.ru does for glm-5.3-flash). Every call carries the job id
+as `prompt_cache_key` so the turns of one job can reuse the provider's prompt cache.
+
+A call that times out on our side, gets any other 5xx or loses the connection is left
+`uncertain` together with its permit (the provider may still be working on it); the ticket falls
+back to manual classification, and the permit stays taken until an operator releases it:
 `docker compose run --rm api node dist/cli.js permit-resolve <slot> "<evidence>"`. A reply the
 provider did finish but that cannot be used (4xx, cut-off or unparseable) frees its permit.
+Provider answers 408, 500, 502 and 503 (`provider_unavailable`) and 429 (`provider_busy`) free the
+permit and forget the call, so the job retries it later; `Retry-After` is honoured. A triage job
+that ends without an AI analysis is marked failed with the reason (`ai_timeout`,
+`triage_deadline`, `ai_tool_budget`, `invalid_ai_schema`, `result_ignored`, …) in Управление →
+Состояние системы.
 Occupied permits are listed at `/health` of the gateway and in Управление → Состояние системы.
 Every failed call is logged by the gateway as `Model call failed` with `job_id`, `step`,
 `reason`/`detail` (`TimeoutError`, `provider_unknown` + `status`, `fetch failed` + `cause`, …) and

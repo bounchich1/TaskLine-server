@@ -29,12 +29,18 @@ export class GatewayClient implements Model {
         const data = object(strictJson(await boundedText(response, MAX_RESPONSE_BYTES), false, MAX_RESPONSE_BYTES));
 
         if (!response.ok) {
-            throw new AppError(
+            const error = new AppError(
                 typeof data.code === 'string' ? data.code : 'gateway_unavailable',
                 response.status,
                 'Модель временно недоступна.',
                 true,
             );
+
+            if (typeof data.retry_after === 'number') {
+                error.retryAfterSeconds = data.retry_after;
+            }
+
+            throw error;
         }
 
         return data as ModelReply;

@@ -17,11 +17,17 @@ export async function applyTriage(
     tx: Sql,
     ctx: Ctx,
     { job, messageId, outcome }: { job: Job; messageId: string; outcome: TriageOutcome },
-): Promise<void> {
+): Promise<string | null> {
     const ticket = await lockTicket(tx, ctx, job);
 
-    if (!ticket || !(await eligibleJob(tx, ctx.org, job))) {
-        return;
+    if (!ticket) {
+        return 'result_ignored';
+    }
+
+    if (!(await eligibleJob(tx, ctx, job))) {
+        await auditTriage(tx, ctx, { ticket, success: false, reason: 'result_ignored' });
+
+        return 'result_ignored';
     }
 
     const current = await one<Message>(tx, 'SELECT * FROM messages WHERE id=$1', [messageId]);
@@ -33,12 +39,13 @@ export async function applyTriage(
             [ticket.id],
         );
 
-        return;
+        return 'message_revised';
     }
 
-    const { result, failure } = outcome;
+    const { result } = outcome;
     const codesActive = await applyClassification(tx, ctx, { job, ticket, result });
     const success = outcome.success && codesActive;
+    const failure = outcome.success ? 'dictionary_value_retired' : outcome.failure;
 
     await tx.query('UPDATE tickets SET ai_status=$2,suggestion=$3,review_required=$4,version=version+1 WHERE id=$1', [
         ticket.id,
@@ -47,18 +54,23 @@ export async function applyTriage(
         !success || result.needs_review,
     ]);
 
+    await auditTriage(tx, ctx, { ticket, success, reason: success ? null : failure });
+    await emit(tx, ctx.org, { type: 'ticket.classified', ticketId: ticket.id });
+
+    return success ? null : failure;
+}
+
+async function auditTriage(
+    tx: Sql,
+    ctx: Ctx,
+    { ticket, success, reason }: { ticket: Ticket; success: boolean; reason: string | null },
+): Promise<void> {
     await audit(tx, ctx.org, {
         actor: null,
         action: 'ai.triage',
         objectId: ticket.id,
-        detail: {
-            success,
-            reason: success ? null : failure,
-            skill_hash: hash(TRIAGE_SKILL),
-        },
+        detail: { success, reason, skill_hash: hash(TRIAGE_SKILL) },
     });
-
-    await emit(tx, ctx.org, { type: 'ticket.classified', ticketId: ticket.id });
 }
 
 async function lockTicket(tx: Sql, ctx: Ctx, job: Job): Promise<Ticket | undefined> {

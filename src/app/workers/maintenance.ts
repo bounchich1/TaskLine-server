@@ -18,8 +18,8 @@ export async function runMaintenance(db: Database, ctx: Ctx): Promise<void> {
 async function expireOverdueTriage(tx: Sql, ctx: Ctx): Promise<void> {
     const { rows: expired } = await tx.query<{ id: string }>(
         `UPDATE tickets SET ai_status='failed',review_required=true,version=version+1
-     WHERE org_id=$1 AND ai_status='pending' AND created_at<=now()-interval '120 seconds' RETURNING id`,
-        [ctx.org],
+     WHERE org_id=$1 AND ai_status='pending' AND created_at<=now()-$2*interval '1 second' RETURNING id`,
+        [ctx.org, ctx.config.AI_TRIAGE_DEADLINE_SECONDS],
     );
 
     for (const ticket of expired) {

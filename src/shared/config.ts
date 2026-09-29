@@ -8,6 +8,8 @@ const bool = z
     .default('false')
     .transform((value) => value === 'true');
 
+const reasoningEffort = z.enum(['', 'low', 'medium', 'high']).default('');
+
 const schema = z.object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     APP_VERSION: z.string().min(1).default('dev'),
@@ -43,7 +45,12 @@ const schema = z.object({
     AI_MODEL: z.string().default(''),
     AI_THINKING_BUDGET: z.coerce.number().int().min(0).max(4096).default(0),
     AI_MAX_CONCURRENCY: z.coerce.number().int().min(10).max(15).default(12),
+    AI_TRIAGE_REASONING_EFFORT: reasoningEffort,
+    AI_LEARNING_REASONING_EFFORT: reasoningEffort,
+    AI_TRIAGE_MAX_TOKENS: z.coerce.number().int().min(256).max(8192).default(3000),
+    AI_LEARNING_MAX_TOKENS: z.coerce.number().int().min(256).max(8192).default(6000),
     AI_TRIAGE_TIMEOUT_SECONDS: z.coerce.number().int().min(1).max(90).default(45),
+    AI_TRIAGE_DEADLINE_SECONDS: z.coerce.number().int().min(60).max(600).default(120),
     AI_LEARNING_TIMEOUT_SECONDS: z.coerce.number().int().min(1).max(120).default(90),
     AI_INPUT_CHARS: z.coerce.number().int().min(4000).max(100000).default(24000),
     MEMORY_ENABLED: bool,

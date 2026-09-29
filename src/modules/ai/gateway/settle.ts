@@ -31,11 +31,19 @@ export async function settleSuccess(
     });
 }
 
+export type CallOutcome = 'answered' | 'retryable' | 'unknown';
+
 export async function settleFailure(
     db: Database,
-    { callId, permit, known }: { callId: string; permit: Permit; known: boolean },
+    { callId, permit, outcome }: { callId: string; permit: Permit; outcome: CallOutcome },
 ): Promise<void> {
     await db.tx(async (tx) => {
+        if (outcome === 'retryable') {
+            await tx.query("DELETE FROM ai_calls WHERE id=$1 AND state='running'", [callId]);
+        }
+
+        const known = outcome !== 'unknown';
+
         await tx.query(
             `UPDATE ai_calls SET state=$2,reason=$3,finished_at=CASE WHEN $2='failed' THEN now() ELSE NULL END
        WHERE id=$1 AND state='running'`,

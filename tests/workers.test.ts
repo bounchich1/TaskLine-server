@@ -63,6 +63,45 @@ it('defers a triage job while the model is busy, without counting a retry', asyn
     expect((stored?.payload as Row).retry_count).toBe(0);
 });
 
+it('fails a triage job with the reason the analysis did not happen', async () => {
+    await context.create();
+    const job = await jobOf('triage');
+
+    await new JobRunner(context.db, context.c, failingModel(new AppError('ai_timeout', 504))).run(String(job.id));
+    const stored = await one(context.db, 'SELECT state,reason FROM jobs WHERE id=$1', [job.id]);
+
+    expect(stored).toMatchObject({ state: 'failed', reason: 'ai_timeout' });
+    expect(await context.ticket()).toMatchObject({ ai_status: 'failed', review_required: true });
+});
+
+it('waits as long as the provider asks when it rate-limits a triage call', async () => {
+    await context.create();
+    const job = await jobOf('triage');
+    const limited = Object.assign(new AppError('provider_busy', 503), { retryAfterSeconds: 120 });
+
+    await new JobRunner(context.db, context.c, failingModel(limited)).run(String(job.id));
+
+    const stored = await one(
+        context.db,
+        "SELECT state,reason,payload,due_at>now()+interval '100 seconds' AS later FROM jobs WHERE id=$1",
+        [job.id],
+    );
+
+    expect(stored).toMatchObject({ state: 'pending', reason: 'provider_busy', later: true });
+    expect((stored?.payload as Row).retry_count).toBe(0);
+});
+
+it('cancels a triage job picked up after its deadline', async () => {
+    const ticket = await context.create();
+    const job = await jobOf('triage');
+
+    await context.db.query("UPDATE tickets SET created_at=now()-interval '3 minutes' WHERE id=$1", [ticket.id]);
+    await new JobRunner(context.db, context.c, failingModel(new Error('unused'))).run(String(job.id));
+    const stored = await one(context.db, 'SELECT state,reason FROM jobs WHERE id=$1', [job.id]);
+
+    expect(stored).toMatchObject({ state: 'canceled', reason: 'job_ineligible' });
+});
+
 it('marks learning for review when the model outcome is uncertain', async () => {
     const job = await closedTicketLearningJob();
     const uncertain = failingModel(new AppError('ai_uncertain', 409));

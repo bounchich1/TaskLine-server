@@ -19,7 +19,7 @@ export interface Snapshot {
 export async function takeSnapshot(tx: Sql, ctx: Ctx, job: Job): Promise<Snapshot> {
     const { cycle, ticket } = await lockCycle(tx, ctx, job);
 
-    ensure(await eligibleJob(tx, ctx.org, job), 'job_ineligible');
+    ensure(await eligibleJob(tx, ctx, job), 'job_ineligible');
 
     if (cycle.snapshot) {
         const frozen = decrypt<Omit<Snapshot, 'cycle'>>(cycle.snapshot, ctx.config.ENCRYPTION_KEY);

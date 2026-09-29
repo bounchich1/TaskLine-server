@@ -37,9 +37,11 @@ export async function buildGateway(db: Database, config: Config): Promise<Fastif
                 );
             }
 
-            return reply
-                .code(error instanceof AppError ? error.status : 503)
-                .send({ code: error instanceof AppError ? error.code : 'gateway_unavailable' });
+            if (!(error instanceof AppError)) {
+                return reply.code(503).send({ code: 'gateway_unavailable' });
+            }
+
+            return reply.code(error.status).send({ code: error.code, retry_after: error.retryAfterSeconds });
         }
     });
 

@@ -26,7 +26,14 @@ export interface Model {
     complete(job: Job, step: string, request: ModelRequest): Promise<ModelReply>;
 }
 
-export type ModelProvider = (request: ModelRequest, timeoutMs: number) => Promise<ModelReply>;
+export type CallOptions = {
+    timeoutMs: number;
+    maxTokens: number;
+    reasoningEffort: string;
+    cacheKey: string;
+};
+
+export type ModelProvider = (request: ModelRequest, options: CallOptions) => Promise<ModelReply>;
 
 export function functionTool(name: string, description: string, parameters: unknown): Row {
     return { type: 'function', function: { name, description, parameters } };

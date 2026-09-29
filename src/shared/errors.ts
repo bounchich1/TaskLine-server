@@ -1,4 +1,6 @@
 export class AppError extends Error {
+    retryAfterSeconds?: number;
+
     constructor(
         public code: string,
         public status = 409,

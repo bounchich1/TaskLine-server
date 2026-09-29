@@ -1,4 +1,4 @@
-import { fetch } from 'undici';
+import { fetch, type Response } from 'undici';
 
 import type { Config } from '../../../shared/config.js';
 import { AppError, ensure } from '../../../shared/errors.js';
@@ -6,23 +6,40 @@ import { object, strictJson } from '../../../shared/json.js';
 import { boundedText } from '../../../shared/network.js';
 import type { Row } from '../../../shared/types/entities.js';
 
-import type { ModelReply, ModelRequest } from './model.js';
+import type { CallOptions, ModelReply, ModelRequest } from './model.js';
 
 const MAX_RESPONSE_BYTES = 128 * 1024;
-const MAX_COMPLETION_TOKENS = 6000;
+const TRANSIENT_STATUSES = [408, 429, 500, 502, 503];
 
-export async function callOpenAi(config: Config, request: ModelRequest, timeoutMs: number): Promise<ModelReply> {
+export async function callOpenAi(config: Config, request: ModelRequest, options: CallOptions): Promise<ModelReply> {
     ensure(config.AI_API_KEY && config.AI_MODEL, 'provider_rejected', 503);
 
+    try {
+        return await post(config, request, options);
+    } catch (error) {
+        if (error instanceof Error && error.name === 'TimeoutError') {
+            throw Object.assign(new AppError('ai_timeout', 504), { cause: error });
+        }
+
+        throw error;
+    }
+}
+
+async function post(config: Config, request: ModelRequest, options: CallOptions): Promise<ModelReply> {
     const response = await fetch(config.AI_API_URL, {
         method: 'POST',
         headers: { Authorization: `Bearer ${config.AI_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(completionBody(config, request)),
+        body: JSON.stringify(completionBody(config, request, options)),
         redirect: 'error',
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: AbortSignal.timeout(options.timeoutMs),
     });
 
     const status = { status: response.status };
+
+    if (TRANSIENT_STATUSES.includes(response.status)) {
+        await response.body?.cancel();
+        throw transientError(response);
+    }
 
     if (response.status >= 400 && response.status < 500) {
         await response.body?.cancel();
@@ -42,6 +59,20 @@ export async function callOpenAi(config: Config, request: ModelRequest, timeoutM
     };
 }
 
+function transientError(response: Response): AppError {
+    const error = providerError(response.status === 429 ? 'provider_busy' : 'provider_unavailable', {
+        status: response.status,
+    });
+
+    const retryAfter = Number(response.headers.get('retry-after'));
+
+    if (Number.isInteger(retryAfter) && retryAfter > 0) {
+        error.retryAfterSeconds = retryAfter;
+    }
+
+    return error;
+}
+
 function parseReply(text: string): Omit<ModelReply, 'providerRef'> {
     try {
         return parseCompletion(object(strictJson(text, false, MAX_RESPONSE_BYTES)));
@@ -54,13 +85,18 @@ function parseReply(text: string): Omit<ModelReply, 'providerRef'> {
     }
 }
 
-function completionBody(config: Config, request: ModelRequest): Row {
+function completionBody(config: Config, request: ModelRequest, options: CallOptions): Row {
     const body: Row = {
         model: config.AI_MODEL,
         messages: request.messages,
-        max_completion_tokens: MAX_COMPLETION_TOKENS,
+        max_completion_tokens: options.maxTokens,
+        prompt_cache_key: options.cacheKey,
         store: false,
     };
+
+    if (options.reasoningEffort) {
+        body.reasoning_effort = options.reasoningEffort;
+    }
 
     if (config.AI_THINKING_BUDGET > 0) {
         body.chat_template_kwargs = { thinking_token_budget: config.AI_THINKING_BUDGET };

@@ -177,19 +177,20 @@ docker compose up -d --build
 Полный список переменных сервера с пустыми секретами — [.env.example](.env.example)
 (разработка) и [deploy/.env.example](deploy/.env.example) (продакшн). Основные:
 
-| Переменная                                                         | Назначение                                                                                    |
-| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                                                         | `production` включает строгие проверки: только `live`-режимы, HTTPS-адреса, реальная политика |
-| `PUBLIC_URL`, `APP_ORIGIN`, `DOMAIN`                               | внешний адрес API и мини-приложения                                                           |
-| `DATABASE_URL`, `REDIS_URL`                                        | подключения к PostgreSQL и Redis                                                              |
-| `MAX_STAFF_BOT_TOKEN`, `MAX_STAFF_WEBHOOK_SECRET`                  | необязательный второй бот — только для сотрудников                                            |
-| `MAX_MEDIA_HOSTS`                                                  | хосты, с которых разрешено скачивать файлы клиентов (`i.oneme.ru`)                            |
-| `MAX_CA_FILE`                                                      | корневой сертификат Минцифры для TLS до MAX API (уже в образе)                                |
-| `AI_THINKING_BUDGET`, `AI_MAX_CONCURRENCY`, `AI_*_TIMEOUT_SECONDS` | параметры модели и лимиты                                                                     |
-| `MEMORY_ENABLED`, `AGENTMEMORY_URL`, `AGENTMEMORY_SECRET`          | база знаний agentmemory                                                                       |
-| `STORAGE_MODE`, `S3_*`, `SCANNER_MODE`, `CLAMAV_*`                 | хранилище файлов и антивирус                                                                  |
-| `BOOTSTRAP_MAX_USER_ID`, `BOOTSTRAP_NAME`                          | первый администратор (`node dist/cli.js bootstrap`)                                           |
-| `DEV_AUTH_ENABLED`                                                 | вход без MAX для разработки, только с `127.0.0.1`, запрещён в production                      |
+| Переменная                                                                 | Назначение                                                                                    |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                                                                 | `production` включает строгие проверки: только `live`-режимы, HTTPS-адреса, реальная политика |
+| `PUBLIC_URL`, `APP_ORIGIN`, `DOMAIN`                                       | внешний адрес API и мини-приложения                                                           |
+| `DATABASE_URL`, `REDIS_URL`                                                | подключения к PostgreSQL и Redis                                                              |
+| `MAX_STAFF_BOT_TOKEN`, `MAX_STAFF_WEBHOOK_SECRET`                          | необязательный второй бот — только для сотрудников                                            |
+| `MAX_MEDIA_HOSTS`                                                          | хосты, с которых разрешено скачивать файлы клиентов (`i.oneme.ru`)                            |
+| `MAX_CA_FILE`                                                              | корневой сертификат Минцифры для TLS до MAX API (уже в образе)                                |
+| `AI_*_REASONING_EFFORT`, `AI_*_MAX_TOKENS`, `AI_THINKING_BUDGET`           | глубина рассуждений модели и потолок длины ответа                                             |
+| `AI_MAX_CONCURRENCY`, `AI_*_TIMEOUT_SECONDS`, `AI_TRIAGE_DEADLINE_SECONDS` | параллельность, таймаут одного вызова и общий срок разбора обращения                          |
+| `MEMORY_ENABLED`, `AGENTMEMORY_URL`, `AGENTMEMORY_SECRET`                  | база знаний agentmemory                                                                       |
+| `STORAGE_MODE`, `S3_*`, `SCANNER_MODE`, `CLAMAV_*`                         | хранилище файлов и антивирус                                                                  |
+| `BOOTSTRAP_MAX_USER_ID`, `BOOTSTRAP_NAME`                                  | первый администратор (`node dist/cli.js bootstrap`)                                           |
+| `DEV_AUTH_ENABLED`                                                         | вход без MAX для разработки, только с `127.0.0.1`, запрещён в production                      |
 
 Рабочих токенов, паролей и ключей в репозитории нет.
 

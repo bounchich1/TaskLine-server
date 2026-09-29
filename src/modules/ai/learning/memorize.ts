@@ -157,7 +157,7 @@ async function storeResolution(
 
     await tx.query('SELECT id FROM clients WHERE id=$1 FOR UPDATE', [ticket.client_id]);
     await tx.query('SELECT id FROM tickets WHERE id=$1 FOR UPDATE', [ticket.id]);
-    ensure(await eligibleJob(tx, ctx.org, job), 'job_ineligible');
+    ensure(await eligibleJob(tx, ctx, job), 'job_ineligible');
     const record = await insertRecord(tx, ctx, stored, ticket);
 
     await insertCheckpoint(tx, {

@@ -1,9 +1,10 @@
 import type { Ctx } from '../../../shared/context.js';
 import { one, type Database } from '../../../shared/db.js';
+import { AppError, ensure } from '../../../shared/errors.js';
 import type { Job, Message, Row } from '../../../shared/types/entities.js';
 import { triageSchema } from '../contracts/contracts.js';
 import { redact } from '../contracts/redact.js';
-import { eligibleJob } from '../gateway/job-eligibility.js';
+import { eligibleJob, triageTimeLeftMs } from '../gateway/job-eligibility.js';
 import type { Model, ModelMessage } from '../gateway/model.js';
 import type { Recall } from '../memory/memory-record.js';
 import { TRIAGE_SKILL } from '../skills.js';
@@ -22,10 +23,6 @@ export interface TriageDeps {
 export async function runTriage(deps: TriageDeps, job: Job): Promise<void> {
     const conversation = await startConversation(deps, job);
 
-    if (!conversation) {
-        return;
-    }
-
     const outcome = await dropStaleMemoryEvidence(deps.memory, {
         outcome: await converse(deps, conversation),
         conversation,
@@ -33,20 +30,21 @@ export async function runTriage(deps: TriageDeps, job: Job): Promise<void> {
 
     const { messageId } = conversation;
 
-    await deps.db.tx(async (tx) => {
-        await applyTriage(tx, deps.ctx, { job, messageId, outcome });
-    });
+    const failure = await deps.db.tx(async (tx) => applyTriage(tx, deps.ctx, { job, messageId, outcome }));
+
+    if (failure) {
+        throw new AppError(failure, 422, 'ИИ-разбор не выполнен.');
+    }
 }
 
-async function startConversation({ db, ctx }: TriageDeps, job: Job): Promise<Conversation | undefined> {
+async function startConversation({ db, ctx }: TriageDeps, job: Job): Promise<Conversation> {
     const message = await one<Message>(db, 'SELECT * FROM messages WHERE org_id=$1 AND id=$2', [
         ctx.org,
         job.payload.message_id,
     ]);
 
-    if (!message || !(await eligibleJob(db, ctx.org, job))) {
-        return undefined;
-    }
+    ensure(message && (await eligibleJob(db, ctx, job)), 'job_ineligible');
+    const deadline = Date.now() + (await triageTimeLeftMs(db, ctx, job.ref_id));
 
     const { rows: attachments } = await db.query(
         `SELECT id,status,extraction,extraction_status FROM attachments
@@ -80,7 +78,7 @@ async function startConversation({ db, ctx }: TriageDeps, job: Job): Promise<Con
 
     const fallback = fallbackTriage(dictionaryVersion, message.id);
 
-    return { job, messages, messageId: message.id, dictionaryVersion, dictionaries, fallback };
+    return { job, messages, messageId: message.id, dictionaryVersion, dictionaries, fallback, deadline };
 }
 
 async function dropStaleMemoryEvidence(
