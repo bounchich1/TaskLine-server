@@ -1,9 +1,20 @@
+import { menuKeyboard } from '../../integrations/max/index.js';
 import type { Ctx } from '../../shared/context.js';
 import { one, type Sql } from '../../shared/db.js';
 import { formatTicketNumber } from '../../shared/ticket-number.js';
 import type { Client, Row, Ticket } from '../../shared/types/entities.js';
 import { addMessage } from '../messages/index.js';
 import { render } from '../templates/index.js';
+
+const MENU_TEMPLATES = new Set([
+    'consent_accepted',
+    'ticket_created',
+    'ticket_reopened',
+    'rating_accepted',
+    'rating_attempts_exhausted',
+    'rating_expired',
+    'help',
+]);
 
 export interface BotMessage {
     client: Client;
@@ -48,7 +59,11 @@ export async function queueBotMessage(tx: Sql, ctx: Ctx, bot: BotMessage): Promi
             cycleId ?? null,
             key,
             template,
-            JSON.stringify({ text, ...extra }),
+            JSON.stringify({ text, ...withMenu(template), ...extra }),
         ],
     );
+}
+
+function withMenu(template: string): Row {
+    return MENU_TEMPLATES.has(template) ? { attachments: [menuKeyboard()] } : {};
 }

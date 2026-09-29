@@ -4,3 +4,4 @@ export { declineConsent, grantConsent } from './grant-decline.js';
 export { clearPreconsentBuffers, listPreconsentBuffers } from './preconsent-buffers.js';
 export { PreconsentExpiry } from './preconsent-expiry.js';
 export { withdrawConsent } from './withdraw.js';
+export { confirmWithdrawal } from './withdraw-confirmation.js';

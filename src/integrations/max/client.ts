@@ -46,7 +46,12 @@ export class MaxClient implements MaxTransport {
         this.token = options.token ?? c.MAX_BOT_TOKEN;
     }
 
-    async request(path: string, body: Row, query: Record<string, string> = {}): Promise<Row> {
+    async request(
+        path: string,
+        body: Row,
+        query: Record<string, string> = {},
+        method: 'POST' | 'PATCH' = 'POST',
+    ): Promise<Row> {
         await this.rate();
         const url = new URL(path, this.c.MAX_API_URL);
 
@@ -54,7 +59,7 @@ export class MaxClient implements MaxTransport {
             url.searchParams.set(key, value);
         }
 
-        const response = await this.post(url, body);
+        const response = await this.call(method, url, body);
 
         await rejectUnsuccessful(response);
 
@@ -78,10 +83,10 @@ export class MaxClient implements MaxTransport {
         }
     }
 
-    private async post(url: URL, body: Row): Promise<Response> {
+    private async call(method: string, url: URL, body: Row): Promise<Response> {
         try {
             return await fetch(url, {
-                method: 'POST',
+                method,
                 headers: { Authorization: this.token, 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
                 redirect: 'error',

@@ -1,3 +1,4 @@
+import { menuKeyboard } from '../../integrations/max/index.js';
 import type { Ctx } from '../../shared/context.js';
 import type { Sql } from '../../shared/db.js';
 import type { Client, Employee, Message, Ticket } from '../../shared/types/entities.js';
@@ -29,7 +30,12 @@ export async function queueHistoryPage(
     await tx.query(
         `INSERT INTO deliveries(org_id,client_id,logical_key,kind,body)
      VALUES($1,$2,$3,'history_page',$4) ON CONFLICT DO NOTHING`,
-        [ctx.org, client.id, `history:${page.sourceKey}`, JSON.stringify({ text: page.text })],
+        [
+            ctx.org,
+            client.id,
+            `history:${page.sourceKey}`,
+            JSON.stringify({ text: page.text, attachments: [menuKeyboard()] }),
+        ],
     );
 }
 

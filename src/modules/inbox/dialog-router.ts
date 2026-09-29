@@ -1,16 +1,30 @@
+import { MENU_LABELS } from '../../integrations/max/index.js';
 import type { Ctx } from '../../shared/context.js';
 import type { Sql } from '../../shared/db.js';
 import type { ClientInput } from '../../shared/types/client-input.js';
 import type { Client } from '../../shared/types/entities.js';
-import { passesConsentGate, withdrawConsent } from '../consent/index.js';
+import { confirmWithdrawal, passesConsentGate, withdrawConsent } from '../consent/index.js';
 import { reviseClientMessage } from '../messages/index.js';
 import { queueBotMessage } from '../outbox/index.js';
 import { handleClientContent, sendTicketHistory } from '../tickets/index.js';
 
 import { handleCallback } from './callback.js';
 
-const WITHDRAW_COMMANDS = ['/withdraw', 'отозвать согласие'];
-const HISTORY_COMMANDS = ['/tickets', 'мои обращения'];
+type ClientCommand = (tx: Sql, ctx: Ctx, client: Client, sourceKey: string) => Promise<void>;
+
+const sendHelp: ClientCommand = (tx, ctx, client, sourceKey) =>
+    queueBotMessage(tx, ctx, { client, template: 'help', key: `help:${sourceKey}` });
+
+const COMMANDS = new Map<string, ClientCommand>([
+    ['/withdraw', withdrawConsent],
+    [MENU_LABELS.withdraw.toLowerCase(), confirmWithdrawal],
+    ['/tickets', sendTicketHistory],
+    [MENU_LABELS.tickets.toLowerCase(), sendTicketHistory],
+    ['/help', sendHelp],
+    ['/menu', sendHelp],
+    ['меню', sendHelp],
+    [MENU_LABELS.help.toLowerCase(), sendHelp],
+]);
 
 export interface RoutedInput {
     client: Client;
@@ -32,15 +46,10 @@ export async function routeClientInput(tx: Sql, ctx: Ctx, { client, input, recei
     }
 
     const command = input.text?.trim().toLowerCase() ?? '';
+    const run = COMMANDS.get(command);
 
-    if (WITHDRAW_COMMANDS.includes(command)) {
-        await withdrawConsent(tx, ctx, client, input.sourceKey);
-
-        return;
-    }
-
-    if (HISTORY_COMMANDS.includes(command)) {
-        await sendTicketHistory(tx, ctx, client, input.sourceKey);
+    if (run) {
+        await run(tx, ctx, client, input.sourceKey);
 
         return;
     }

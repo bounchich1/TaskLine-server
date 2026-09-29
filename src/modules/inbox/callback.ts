@@ -2,10 +2,12 @@ import type { Ctx } from '../../shared/context.js';
 import { one, type Sql } from '../../shared/db.js';
 import type { ClientInput } from '../../shared/types/client-input.js';
 import type { Client } from '../../shared/types/entities.js';
-import { declineConsent, sendConsentPrompt } from '../consent/index.js';
+import { declineConsent, sendConsentPrompt, withdrawConsent } from '../consent/index.js';
 import { queueCallbackAnswer } from '../outbox/index.js';
 
 import { acceptConsent } from './accept-consent.js';
+
+const NOTIFICATIONS: Partial<Record<string, string>> = { keep: 'Согласие сохранено' };
 
 export async function handleCallback(tx: Sql, ctx: Ctx, client: Client, input: ClientInput): Promise<void> {
     const action = await one(
@@ -19,7 +21,7 @@ export async function handleCallback(tx: Sql, ctx: Ctx, client: Client, input: C
     await queueCallbackAnswer(tx, ctx, client, {
         sourceKey: input.sourceKey,
         callbackId: input.callbackId,
-        notification: action ? 'Принято' : 'Кнопка устарела',
+        notification: action ? (NOTIFICATIONS[String(action.action)] ?? 'Принято') : 'Кнопка устарела',
     });
 
     if (!action || action.used_at) {
@@ -27,6 +29,16 @@ export async function handleCallback(tx: Sql, ctx: Ctx, client: Client, input: C
     }
 
     await tx.query('UPDATE callback_actions SET used_at=now() WHERE nonce=$1', [input.callbackPayload]);
+
+    if (action.action === 'withdraw') {
+        await withdrawConsent(tx, ctx, client, input.sourceKey);
+
+        return;
+    }
+
+    if (action.action === 'keep') {
+        return;
+    }
 
     if (action.policy_version !== ctx.config.POLICY_VERSION) {
         await sendConsentPrompt(tx, ctx, client, input.sourceKey);

@@ -47,6 +47,9 @@ The server refuses to start in production with placeholders left in: an empty
 `MAX_BOT_TOKEN`, a `POLICY_VERSION` starting with `dev-`, or a non-HTTPS / `.invalid` URL.
 `BOOTSTRAP_MAX_USER_ID` is your own MAX user id; it becomes the first administrator.
 
+`subscribe` also registers the client bot's `/tickets`, `/help` and `/withdraw` hints shown when
+a client types `/`. Run it again on an existing install whenever that list changes.
+
 To use a managed S3 bucket (Yandex Object Storage, Selectel, VK Cloud) instead of the local
 `s3` service, set `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET` and the key pair in `.env`, skip
 `storage-init` if the bucket already exists with versioning, and stop the `s3` service.

@@ -1,4 +1,4 @@
-import { MaxClient } from '../../../integrations/max/index.js';
+import { BOT_COMMANDS, MaxClient } from '../../../integrations/max/index.js';
 import { ensure } from '../../../shared/errors.js';
 import type { CliCommand } from '../cli-command.js';
 
@@ -20,11 +20,15 @@ export const subscribeCommand: CliCommand = async ({ config, args }) => {
         return 'Staff bot webhook subscription registered.';
     }
 
-    await new MaxClient(config).request('/subscriptions', {
+    const max = new MaxClient(config);
+
+    await max.request('/subscriptions', {
         url: `${config.PUBLIC_URL}/webhooks/max`,
         secret: config.MAX_WEBHOOK_SECRET,
         update_types: UPDATE_TYPES,
     });
 
-    return 'Webhook subscription registered.';
+    await max.request('/me/commands', { commands: BOT_COMMANDS }, {}, 'PATCH');
+
+    return 'Webhook subscription and bot commands registered.';
 };
