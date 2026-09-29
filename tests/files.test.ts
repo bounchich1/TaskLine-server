@@ -126,6 +126,29 @@ it('scans an upload clean and sends it with a staff reply', async () => {
     expect(await staffDeliveryState()).toBe('delivered');
 });
 
+it('retries a staff reply when uploading its attachment to MAX fails', async () => {
+    const ticket = await context.create();
+
+    await context.command('assign');
+    const id = await upload(ticket.id, { name: 'note.txt', kind: 'file', content: 'hello world' });
+
+    await runScanJob(id);
+    await context.command('messages', { text: '', attachment_ids: [id] });
+    const max = new MaxClient(context.c);
+
+    max.upload = () => Promise.reject(new Error('media_host_denied'));
+    const worker = new DeliveryWorker(context.db, context.c, max, new Files(context.db, context.c));
+
+    for (let attempt = 0; attempt < 10 && (await staffDeliveryState()) === 'queued'; attempt++) {
+        await worker.deliver(ticket.client_id);
+        await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+
+    const delivery = await one(context.db, "SELECT state,reason FROM deliveries WHERE kind='staff'");
+
+    expect(delivery).toMatchObject({ state: 'retry_wait', reason: 'attachment_upload_failed' });
+});
+
 it('rejects content that does not match the declared kind, and infected files', async () => {
     const ticket = await context.create();
 

@@ -84,12 +84,20 @@ async function withUploadedAttachments(deps: SendDeps, deliveryBody: Row): Promi
 }
 
 async function uploadAttachment(max: MaxTransport, files: Files, id: string): Promise<Row> {
-    const file = await files.materialize(id);
-
     try {
-        return await max.upload(file.kind, file.path, file.filename, file.mime);
-    } finally {
-        await file.cleanup();
+        const file = await files.materialize(id);
+
+        try {
+            return await max.upload(file.kind, file.path, file.filename, file.mime);
+        } finally {
+            await file.cleanup();
+        }
+    } catch (error) {
+        if (error instanceof TransportFailure && error.outcome !== 'unknown') {
+            throw error;
+        }
+
+        throw new TransportFailure('retry', 'attachment_upload_failed');
     }
 }
 

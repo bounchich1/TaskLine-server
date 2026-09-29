@@ -3,7 +3,7 @@ import { openAsBlob } from 'node:fs';
 
 import { fetch, FormData, type Response } from 'undici';
 
-import { mediaHosts, type Config } from '../../shared/config.js';
+import type { Config } from '../../shared/config.js';
 import { jsonText, object, strictJson } from '../../shared/json.js';
 import { boundedText, mediaFetch } from '../../shared/network.js';
 import { maxDispatcher, maxTrustedRoots } from '../../shared/tls.js';
@@ -26,7 +26,10 @@ export interface MaxTransport {
 }
 
 const MAX_RESPONSE_BYTES = 1024 * 1024;
+const MAX_ERROR_BYTES = 16 * 1024;
 const REQUEST_TIMEOUT_MS = 20000;
+const ATTACHMENT_WAITS_MS = [1000, 2000, 4000, 8000];
+const NOT_READY = 'attachment_not_ready';
 const noRateLimit = (): Promise<void> => Promise.resolve();
 
 interface MaxClientOptions {
@@ -67,10 +70,7 @@ export class MaxClient implements MaxTransport {
             const result = object(strictJson(await boundedText(response), true, MAX_RESPONSE_BYTES));
 
             if (result.success === false) {
-                throw new TransportFailure(
-                    result.code === 'attachment.not.ready' ? 'retry' : 'failed',
-                    jsonText(result.code ?? 'max_rejected'),
-                );
+                throw notReady(result.code) ?? new TransportFailure('failed', jsonText(result.code ?? 'max_rejected'));
             }
 
             return result;
@@ -103,12 +103,7 @@ export class MaxClient implements MaxTransport {
             return `mock-${randomUUID()}`;
         }
 
-        const result = await this.request(
-            '/messages',
-            { ...body, notify: true },
-            { chat_id: chatId, disable_link_preview: 'true' },
-        );
-
+        const result = await this.sendWhenAttachmentsReady(chatId, body);
         const message = object(result.message);
         const responseBody = object(message.body);
 
@@ -117,6 +112,24 @@ export class MaxClient implements MaxTransport {
         }
 
         return responseBody.mid;
+    }
+
+    private async sendWhenAttachmentsReady(chatId: string, body: Row): Promise<Row> {
+        const query = { chat_id: chatId, disable_link_preview: 'true' };
+
+        for (const wait of ATTACHMENT_WAITS_MS) {
+            try {
+                return await this.request('/messages', { ...body, notify: true }, query);
+            } catch (error) {
+                if (!(error instanceof TransportFailure) || error.reason !== NOT_READY) {
+                    throw error;
+                }
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, wait));
+        }
+
+        return this.request('/messages', { ...body, notify: true }, query);
     }
 
     async answer(callbackId: string, text: string) {
@@ -144,7 +157,7 @@ export class MaxClient implements MaxTransport {
 
         const media = await mediaFetch(
             allocation.url,
-            mediaHosts(this.c),
+            [new URL(allocation.url).hostname],
             { method: 'POST', body: form },
             maxTrustedRoots(this.c),
         );
@@ -186,9 +199,29 @@ export class MaxClient implements MaxTransport {
     }
 }
 
+function notReady(code: unknown): TransportFailure | undefined {
+    return code === 'attachment.not.ready' ? new TransportFailure('retry', NOT_READY) : undefined;
+}
+
+async function errorCode(response: Response): Promise<unknown> {
+    try {
+        return object(strictJson(await boundedText(response, MAX_ERROR_BYTES), true, MAX_ERROR_BYTES)).code;
+    } catch {
+        await response.body?.cancel().catch(() => undefined);
+
+        return undefined;
+    }
+}
+
 async function rejectUnsuccessful(response: Response): Promise<void> {
     if (response.ok) {
         return;
+    }
+
+    if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+        const failure = notReady(await errorCode(response));
+
+        throw failure ?? new TransportFailure('failed', `max_rejected_${response.status}`);
     }
 
     await response.body?.cancel();
