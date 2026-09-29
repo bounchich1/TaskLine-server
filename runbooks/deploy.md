@@ -97,21 +97,21 @@ and retry the failed file job in Управление → Состояние с�
 AI stays off until `AI_ENABLED=true`, `AI_API_KEY` and `AI_MODEL` are set in `.env` (then
 `docker compose up -d`). The provider must accept OpenAI-style chat completions over HTTPS.
 
-Triage of a new ticket is one model call: the host first searches the solved cases with the
-redacted first message and passes up to five of them in, then the model answers; an invalid
-answer gets at most one schema repair. The whole triage has `AI_TRIAGE_DEADLINE_SECONDS`
-(default 120; 300 on the production hosts) from ticket creation. Each call gets at most
+Triage of a new ticket takes two model calls: the model may search the solved cases once
+(`search_resolved_cases`, up to five cases with their evidence), then answers; an invalid answer
+gets at most one schema repair. The whole triage has `AI_TRIAGE_DEADLINE_SECONDS` (default 120;
+300 on the production hosts) from ticket creation. Each call gets at most
 `AI_TRIAGE_TIMEOUT_SECONDS` (default 45, at most 170, below the 3-minute lost-call sweep) and
-never more than the time left; the repair is skipped when less than 20 s remain, and no call is
-started with less than 5 s left (`triage_deadline`). Running jobs are only treated as abandoned
-after 5 minutes or the triage deadline plus a minute, whichever is longer. Answers are capped by
-`AI_TRIAGE_MAX_TOKENS` and `AI_LEARNING_MAX_TOKENS`. `AI_TRIAGE_REASONING_EFFORT` and
-`AI_LEARNING_REASONING_EFFORT` are sent as `reasoning_effort`; `AI_THINKING_BUDGET` goes to
-`chat_template_kwargs.thinking_token_budget`, which some providers ignore (neuraldeep.ru does for
-glm-5.3-flash, whose final answers take 40–90 s either way). `AI_TRIAGE_MODEL` runs triage on a
-different model than learning (empty = `AI_MODEL`); qwen3.7-flash and deepseek-v4.1-flash were
-tried on 2026-09-29 and rejected (broken JSON, stalled calls). Every call carries the job id as
-`prompt_cache_key`.
+never more than the time left; with less than 45 s left the search is skipped, the repair is
+skipped when less than 20 s remain, and no call is started with less than 5 s left
+(`triage_deadline`). Running jobs are only treated as abandoned after 5 minutes or the triage
+deadline plus a minute, whichever is longer. Answers are capped by `AI_TRIAGE_MAX_TOKENS` and
+`AI_LEARNING_MAX_TOKENS`. `AI_TRIAGE_REASONING_EFFORT` and `AI_LEARNING_REASONING_EFFORT` are sent
+as `reasoning_effort`; `AI_THINKING_BUDGET` goes to `chat_template_kwargs.thinking_token_budget`.
+neuraldeep.ru's glm-5.3-flash honours neither reliably: measured on 2026-09-29 one ticket at a
+time, a triage took 57–120 s (median 90 s). `AI_TRIAGE_MODEL` runs triage on a different model
+than learning (empty = `AI_MODEL`); qwen3.7-flash (broken JSON) and deepseek-v4.1-flash (stalled
+calls) were rejected. Every call carries the job id as `prompt_cache_key`.
 
 A call that times out on our side, gets any other 5xx or loses the connection is left
 `uncertain` together with its permit (the provider may still be working on it); the ticket falls

@@ -2,10 +2,14 @@ import { AppError } from '../../../shared/errors.js';
 import type { TriageResult } from '../../../shared/types/ai.js';
 import type { Job, Row } from '../../../shared/types/entities.js';
 import { parseTriage } from '../contracts/contracts.js';
-import type { Model, ModelMessage } from '../gateway/model.js';
-import type { CaseEvidence } from '../memory/memory-record.js';
+import type { Model, ModelMessage, ModelReply } from '../gateway/model.js';
+import type { Recall } from '../memory/memory-record.js';
 
+import { RECALL_TOOLS, RecallSession } from './recall-session.js';
+
+const MAX_TURNS = 2;
 const RETRY_LATER_CODES = ['ai_busy', 'gateway_unavailable', 'provider_busy', 'provider_unavailable'];
+const FINAL_ANSWER_RESERVE_MS = 45000;
 const REPAIR_RESERVE_MS = 20000;
 
 const REPAIR_PROMPT =
@@ -18,7 +22,6 @@ export interface Conversation {
     messageId: string;
     dictionaryVersion: string;
     dictionaries: Row[];
-    cases: CaseEvidence[];
     fallback: TriageResult;
     deadline: number;
 }
@@ -29,9 +32,20 @@ export interface TriageOutcome {
     failure: string;
 }
 
-export async function converse(model: Model, conversation: Conversation): Promise<TriageOutcome> {
+export async function converse(
+    deps: { model: Model; memory: Recall },
+    conversation: Conversation,
+): Promise<TriageOutcome> {
+    const session = new RecallSession(deps.memory);
+
     try {
-        return { result: await askForTriage(model, conversation), success: true, failure: 'ai_failed' };
+        const result = await askForTriage(deps.model, conversation, session);
+
+        if (result) {
+            return { result, success: true, failure: 'ai_failed' };
+        }
+
+        return { result: conversation.fallback, success: false, failure: 'ai_failed' };
     } catch (error) {
         if (error instanceof AppError && RETRY_LATER_CODES.includes(error.code)) {
             throw error;
@@ -45,19 +59,56 @@ export async function converse(model: Model, conversation: Conversation): Promis
     }
 }
 
-async function askForTriage(model: Model, conversation: Conversation): Promise<TriageResult> {
-    const { job, messages, messageId, dictionaryVersion, dictionaries, cases, fallback, deadline } = conversation;
+async function askForTriage(
+    model: Model,
+    conversation: Conversation,
+    session: RecallSession,
+): Promise<TriageResult | undefined> {
+    const { job, messages, fallback, deadline } = conversation;
+
+    for (let turn = 0; turn < MAX_TURNS; turn++) {
+        const outOfTime = session.canCallTools && deadline - Date.now() <= FINAL_ANSWER_RESERVE_MS;
+
+        const reply = await model.complete(job, outOfTime ? `triage-${turn}-late` : `triage-${turn}`, {
+            messages,
+            tools: session.canCallTools && !outOfTime ? RECALL_TOOLS : undefined,
+            json: true,
+            mock: fallback,
+        });
+
+        if (reply.toolCalls.length) {
+            await session.answer(reply, messages);
+            continue;
+        }
+
+        return parseOrRepair(model, { conversation, session, reply });
+    }
+
+    return undefined;
+}
+
+async function parseOrRepair(
+    model: Model,
+    {
+        conversation,
+        session,
+        reply,
+    }: {
+        conversation: Conversation;
+        session: RecallSession;
+        reply: ModelReply;
+    },
+): Promise<TriageResult> {
+    const { job, messages, messageId, dictionaryVersion, dictionaries, fallback, deadline } = conversation;
 
     const parse = (content: string | null) =>
         parseTriage(content ?? '', {
             dictionaryVersion,
             dictionaries,
             messageIds: [messageId],
-            memoryIds: cases.map((evidence) => evidence.id),
-            cautionedMemoryIds: cases.filter((evidence) => evidence.cautions.length > 0).map((evidence) => evidence.id),
+            memoryIds: session.caseIds,
+            cautionedMemoryIds: session.cautionedCaseIds,
         });
-
-    const reply = await model.complete(job, 'triage', { messages, json: true, mock: fallback });
 
     try {
         return parse(reply.content);
@@ -71,7 +122,11 @@ async function askForTriage(model: Model, conversation: Conversation): Promise<T
             { role: 'user', content: REPAIR_PROMPT },
         );
 
-        const repair = await model.complete(job, 'triage-repair', { messages, json: true, mock: fallback });
+        const repair = await model.complete(job, 'triage-repair', {
+            messages,
+            json: true,
+            mock: fallback,
+        });
 
         return parse(repair.content);
     }
