@@ -17,7 +17,7 @@ schemaVersion: '1.0'
 
 solution:
   name: 'TaskLine — служба поддержки клиентов в MAX с ИИ-подсказками'
-  teamId: 'ponysquad4000'
+  teamId: 'ponysquad40000'
   repositories:
     - https://github.com/bounchich1/TaskLine-server
     - https://github.com/bounchich1/TaskLine-mini-app
