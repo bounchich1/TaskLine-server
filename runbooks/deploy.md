@@ -99,13 +99,15 @@ AI stays off until `AI_ENABLED=true`, `AI_API_KEY` and `AI_MODEL` are set in `.e
 
 Triage of a new ticket has `AI_TRIAGE_DEADLINE_SECONDS` (default 120) from ticket creation for
 all its model calls together (up to two recall tool turns, the answer and one schema repair).
-Each call gets at most `AI_TRIAGE_TIMEOUT_SECONDS` (default 45, at most 90) and never more than
-the time left; close to the deadline the recall tools and the repair are skipped, and no call is
+Each call gets at most `AI_TRIAGE_TIMEOUT_SECONDS` (default 45, at most 170, below the 3-minute
+lost-call sweep) and never more than the time left, so a large value lets the final answer use
+whatever the deadline still allows; close to the deadline the recall tools and the repair are skipped, and no call is
 started with less than 5 s left (`triage_deadline`). Answers are capped by `AI_TRIAGE_MAX_TOKENS`
 and `AI_LEARNING_MAX_TOKENS`. Reasoning models get slow when they think long: set
 `AI_TRIAGE_REASONING_EFFORT=low` (and `AI_LEARNING_REASONING_EFFORT`) — it is sent as
 `reasoning_effort`. `AI_THINKING_BUDGET` goes to `chat_template_kwargs.thinking_token_budget`,
-which some providers ignore (neuraldeep.ru does for glm-5.3-flash). Every call carries the job id
+which some providers ignore (neuraldeep.ru does for glm-5.3-flash). `AI_TRIAGE_MODEL` runs triage
+on a different model than learning (empty = `AI_MODEL`). Every call carries the job id
 as `prompt_cache_key` so the turns of one job can reuse the provider's prompt cache.
 
 A call that times out on our side, gets any other 5xx or loses the connection is left

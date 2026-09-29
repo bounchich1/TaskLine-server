@@ -96,6 +96,7 @@ export class Gateway implements Model {
 
         if (job.kind !== 'triage') {
             return {
+                model: config.AI_MODEL,
                 timeoutMs: config.AI_LEARNING_TIMEOUT_SECONDS * 1000,
                 maxTokens: config.AI_LEARNING_MAX_TOKENS,
                 reasoningEffort: config.AI_LEARNING_REASONING_EFFORT,
@@ -108,6 +109,7 @@ export class Gateway implements Model {
         ensure(timeLeftMs >= MIN_TRIAGE_CALL_MS, 'triage_deadline', 422);
 
         return {
+            model: config.AI_TRIAGE_MODEL || config.AI_MODEL,
             timeoutMs: Math.min(config.AI_TRIAGE_TIMEOUT_SECONDS * 1000, timeLeftMs),
             maxTokens: config.AI_TRIAGE_MAX_TOKENS,
             reasoningEffort: config.AI_TRIAGE_REASONING_EFFORT,

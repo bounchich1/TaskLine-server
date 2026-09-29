@@ -78,7 +78,7 @@ it('sends the per-kind limits and frees the permit whenever the provider settled
     await context.create();
     const job = await claim('triage');
     const provider = await providerServer();
-    const gatewayConfig = { ...context.c, AI_TRIAGE_REASONING_EFFORT: 'low' as const };
+    const gatewayConfig = { ...context.c, AI_TRIAGE_REASONING_EFFORT: 'low' as const, AI_TRIAGE_MODEL: 'triage-model' };
 
     const gateway = new Gateway(context.db, gatewayConfig, (request, options) =>
         callOpenAi(provider.config, request, options),
@@ -92,6 +92,7 @@ it('sends the per-kind limits and frees the permit whenever the provider settled
         expect(await callRow('garbled')).toMatchObject({ state: 'failed', reason: 'provider_rejected' });
 
         expect(provider.state.bodies[0]).toMatchObject({
+            model: 'triage-model',
             max_completion_tokens: 3000,
             reasoning_effort: 'low',
             prompt_cache_key: job.id,

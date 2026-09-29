@@ -27,6 +27,7 @@ export interface Model {
 }
 
 export type CallOptions = {
+    model: string;
     timeoutMs: number;
     maxTokens: number;
     reasoningEffort: string;

@@ -87,7 +87,7 @@ function parseReply(text: string): Omit<ModelReply, 'providerRef'> {
 
 function completionBody(config: Config, request: ModelRequest, options: CallOptions): Row {
     const body: Row = {
-        model: config.AI_MODEL,
+        model: options.model,
         messages: request.messages,
         max_completion_tokens: options.maxTokens,
         prompt_cache_key: options.cacheKey,
