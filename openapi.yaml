@@ -223,11 +223,16 @@ paths:
         - { name: complexity, in: query, schema: { type: string, maxLength: 64 } }
         - { name: status, in: query, schema: { $ref: '#/components/schemas/TicketStatus' } }
         - { name: assignee, in: query, schema: { type: string, format: uuid } }
+        - name: sla
+          in: query
+          description: '`at_risk` — открытые обращения, у которых пройден порог предупреждения SLA или срок'
+          schema: { type: string, enum: [at_risk] }
         - { name: from, in: query, schema: { type: string, format: date-time } }
         - { name: to, in: query, schema: { type: string, format: date-time } }
         - name: sort
           in: query
-          schema: { type: string, enum: [urgency, complexity, newest, oldest, rating], default: urgency }
+          description: '`sla_risk` — сначала обращения с ближайшим сроком SLA'
+          schema: { type: string, enum: [urgency, complexity, newest, oldest, rating, sla_risk], default: urgency }
         - { name: cursor, in: query, description: '`next_cursor` предыдущей страницы', schema: { type: string } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 30 } }
       responses:
@@ -434,6 +439,50 @@ paths:
                     tag: { type: integer }
                     urgency: { type: integer }
                     complexity: { type: integer }
+      responses:
+        '200':
+          $ref: '#/components/responses/Ticket'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/tickets/{id}/wait:
+    post:
+      operationId: postTicketsByIdWait
+      tags: [tickets]
+      summary: Ждать ответа клиента — срок решения SLA на паузе до следующего сообщения клиента
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '200':
+          $ref: '#/components/responses/Ticket'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/tickets/{id}/resume:
+    post:
+      operationId: postTicketsByIdResume
+      tags: [tickets]
+      summary: Снять ожидание ответа клиента и продолжить отсчёт срока решения
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
       responses:
         '200':
           $ref: '#/components/responses/Ticket'
@@ -1015,6 +1064,46 @@ paths:
               schema: { $ref: '#/components/schemas/Settings' }
         '409':
           $ref: '#/components/responses/Error'
+  /v1/admin/sla:
+    get:
+      operationId: getAdminSla
+      tags: [admin]
+      summary: Рабочее время, праздники, сроки SLA и таймеры ожидания клиента
+      responses:
+        '200':
+          description: Настройки SLA
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SlaConfig' }
+        '401':
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: putAdminSla
+      tags: [admin]
+      summary: Изменить настройки SLA
+      description: >-
+        Новые сроки применяются к новым обращениям; открытые обращения сохраняют свои сроки. При включении
+        SLA сроки рассчитываются для открытых обращений без сроков, при выключении — снимаются.
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SlaConfigInput' }
+      responses:
+        '200':
+          description: Настройки SLA
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SlaConfig' }
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
   /v1/admin/diagnostics:
     get:
       operationId: getAdminDiagnostics
@@ -1511,6 +1600,19 @@ components:
         suggestion_stale: { type: boolean }
         rating: { type: [integer, 'null'], minimum: 1, maximum: 10 }
         rated_at: { type: [string, 'null'], format: date-time }
+        sla_first_response_minutes: { type: [integer, 'null'], description: Цель первого ответа, рабочие минуты }
+        sla_resolution_minutes: { type: [integer, 'null'], description: Цель решения, рабочие минуты }
+        first_response_warn_at: { type: [string, 'null'], format: date-time, description: 75 % цели первого ответа }
+        first_response_due_at: { type: [string, 'null'], format: date-time }
+        first_responded_at: { type: [string, 'null'], format: date-time, description: Доставлен первый ответ }
+        resolution_started_at: { type: [string, 'null'], format: date-time, description: Начало текущего цикла }
+        resolution_warn_at: { type: [string, 'null'], format: date-time }
+        resolution_due_at: { type: [string, 'null'], format: date-time, description: С учётом пауз ожидания }
+        waiting_since: { type: [string, 'null'], format: date-time, description: Ждём ответа клиента с }
+        sla_paused_seconds: { type: integer, description: Рабочее время на паузе в текущем цикле }
+        sla_breached: { type: array, items: { type: string, enum: [first_response, resolution] } }
+        sla_due_at: { type: [string, 'null'], format: date-time, description: Ближайший действующий срок }
+        sla_warn_at: { type: [string, 'null'], format: date-time, description: Ближайший порог предупреждения }
     TicketDetail:
       allOf:
         - $ref: '#/components/schemas/Ticket'
@@ -1532,6 +1634,7 @@ components:
       properties:
         open: { type: integer }
         closed: { type: integer }
+        at_risk: { type: integer, description: Открытые обращения с пройденным порогом предупреждения SLA }
         snapshot_at: { type: string, format: date-time }
     TicketPage:
       type: object
@@ -1684,6 +1787,75 @@ components:
         timezone: { type: string }
         version: { type: integer }
         retention: { $ref: '#/components/schemas/Retention' }
+    WorkHours:
+      type: array
+      maxItems: 4
+      description: Рабочие интервалы дня по местному времени организации, по возрастанию
+      items:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$|^24:00$' }
+      examples: [[['09:00', '13:00'], ['14:00', '18:00']]]
+    SlaPolicy:
+      type: object
+      additionalProperties: false
+      required: [urgency, tag, first_response_minutes, resolution_minutes]
+      properties:
+        urgency: { type: string }
+        tag: { type: string, description: 'Код темы или `*` для любой темы' }
+        first_response_minutes: { type: integer, minimum: 1, maximum: 43200 }
+        resolution_minutes: { type: integer, minimum: 1, maximum: 43200 }
+    SlaConfigInput:
+      type: object
+      additionalProperties: false
+      required:
+        - enabled
+        - week
+        - holidays
+        - workdays
+        - notify_max
+        - client_eta
+        - waiting_reminder_hours
+        - waiting_close_hours
+        - policies
+      properties:
+        enabled: { type: boolean }
+        week:
+          type: object
+          description: 'Ключи 1–7: понедельник–воскресенье'
+          additionalProperties: false
+          required: ['1', '2', '3', '4', '5', '6', '7']
+          properties:
+            '1': { $ref: '#/components/schemas/WorkHours' }
+            '2': { $ref: '#/components/schemas/WorkHours' }
+            '3': { $ref: '#/components/schemas/WorkHours' }
+            '4': { $ref: '#/components/schemas/WorkHours' }
+            '5': { $ref: '#/components/schemas/WorkHours' }
+            '6': { $ref: '#/components/schemas/WorkHours' }
+            '7': { $ref: '#/components/schemas/WorkHours' }
+        holidays: { type: array, maxItems: 400, items: { type: string, format: date } }
+        workdays:
+          type: array
+          maxItems: 100
+          description: Перенесённые рабочие дни (работают по графику обычного будня)
+          items: { type: string, format: date }
+        notify_max: { type: boolean, description: Дублировать предупреждения SLA сотрудникам в MAX }
+        client_eta: { type: boolean, description: Сообщать клиенту срок ответа при создании обращения }
+        waiting_reminder_hours: { type: integer, minimum: 0, maximum: 720, description: 0 — не напоминать }
+        waiting_close_hours: { type: integer, minimum: 0, maximum: 2160, description: 0 — не закрывать }
+        policies:
+          type: array
+          maxItems: 500
+          items: { $ref: '#/components/schemas/SlaPolicy' }
+    SlaConfig:
+      allOf:
+        - $ref: '#/components/schemas/SlaConfigInput'
+        - type: object
+          required: [timezone, version]
+          properties:
+            timezone: { type: string }
+            version: { type: integer, description: Передаётся в `If-Match` }
     Retention:
       type: object
       description: Сроки хранения; null — хранить бессрочно

@@ -50,6 +50,21 @@ export type Ticket = Row & {
     suggestion: TriageResult | null;
     consent_revision: number;
     purged_at: string | null;
+    created_at: Date | string;
+    sla_first_response_minutes: number | null;
+    sla_resolution_minutes: number | null;
+    first_response_warn_at: Date | string | null;
+    first_response_due_at: Date | string | null;
+    first_responded_at: Date | string | null;
+    resolution_started_at: Date | string | null;
+    resolution_warn_at: Date | string | null;
+    resolution_due_at: Date | string | null;
+    waiting_since: Date | string | null;
+    waiting_reminded: boolean;
+    sla_paused_seconds: number;
+    first_response_stage: number;
+    resolution_stage: number;
+    sla_breached: string[];
 };
 
 export type Message = Row & {

@@ -74,3 +74,11 @@ export async function relayAlerts(db: Sql, org: string, sender: AlertSender, bod
 
     return rows.length;
 }
+
+const staffAlertPayload = z.object({ user_id: z.string().min(1), text: z.string().min(1).max(MAX_TEXT) });
+
+export async function sendStaffAlert(sender: AlertSender, payload: unknown): Promise<void> {
+    const alert = staffAlertPayload.parse(payload);
+
+    await sender.sendToUser(alert.user_id, alert.text);
+}

@@ -16,6 +16,7 @@ import { close } from './handlers/close.js';
 import { reopen } from './handlers/reopen.js';
 import { reply } from './handlers/reply.js';
 import { transfer } from './handlers/transfer.js';
+import { resume, wait } from './handlers/wait.js';
 import { lockCommandTarget } from './lock-target.js';
 
 interface CommandDefinition {
@@ -31,6 +32,8 @@ const COMMANDS = new Map<string, CommandDefinition>([
     ['messages', { action: 'reply', handle: reply, event: 'message.from_agent' }],
     ['close', { action: 'close', handle: close, event: 'ticket.closed' }],
     ['reopen', { action: 'reopen', handle: reopen, event: 'ticket.reopened' }],
+    ['wait', { action: 'reply', handle: wait, event: 'ticket.updated' }],
+    ['resume', { action: 'reply', handle: resume, event: 'ticket.updated' }],
 ]);
 
 export interface TicketCommandRequest {

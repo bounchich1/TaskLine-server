@@ -1,3 +1,4 @@
+export { sendStaffAlert, type AlertSender } from './alert-relay.js';
 export { alertRoutes } from './alerts.routes.js';
 export { authRoutes } from './auth.routes.js';
 export { findActiveAdmin } from './employee-directory.js';

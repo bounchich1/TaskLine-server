@@ -1,4 +1,5 @@
 import { emit } from '../../shared/events.js';
+import { markFirstResponse } from '../sla/index.js';
 
 import type { ClaimedDelivery } from './claim.js';
 import type { DeliveryDeps } from './delivery.js';
@@ -30,6 +31,10 @@ export async function recordOutcome(
                 state,
                 ref,
             ]);
+        }
+
+        if (delivery.ticket_id && delivery.kind === 'staff' && state === 'delivered') {
+            await markFirstResponse(tx, delivery.ticket_id);
         }
 
         if (delivery.ticket_id) {

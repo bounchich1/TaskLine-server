@@ -5,6 +5,7 @@ import { audit, emit } from '../../../shared/events.js';
 import type { TriageResult } from '../../../shared/types/ai.js';
 import type { Job, Message, Row, Ticket } from '../../../shared/types/entities.js';
 import { findActiveDictionaryLabel } from '../../dictionaries/index.js';
+import { reclassifySla } from '../../sla/index.js';
 import { eligibleJob } from '../gateway/job-eligibility.js';
 import { TRIAGE_SKILL } from '../skills.js';
 
@@ -44,6 +45,8 @@ export async function applyTriage(
 
     const { result } = outcome;
     const codesActive = await applyClassification(tx, ctx, { job, ticket, result });
+
+    await reclassifySla(tx, ctx.org, ticket.id);
     const success = outcome.success && codesActive;
     const failure = outcome.success ? 'dictionary_value_retired' : outcome.failure;
 

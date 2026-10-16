@@ -26,24 +26,26 @@ Every edge points down a layer, so the graph has no cycles. The table is enforce
 `eslint-plugin-boundaries` (`MODULE_DEPENDENCIES` in `eslint.config.js`); adding an edge is an
 architectural decision and happens there.
 
-| Module        | May import (besides `shared` and `integrations`)  |
-| ------------- | ------------------------------------------------- |
-| templates     | –                                                 |
-| learning      | –                                                 |
-| dictionaries  | –                                                 |
-| staff         | –                                                 |
-| files         | –                                                 |
-| messages      | learning                                          |
-| outbox        | templates, messages                               |
-| ratings       | outbox                                            |
-| consent       | outbox, learning                                  |
-| tickets       | messages, outbox, ratings, learning, dictionaries |
-| inbox         | consent, tickets, messages, outbox                |
-| delivery      | files                                             |
-| notifications | staff                                             |
-| admin         | templates, dictionaries, files                    |
-| ai            | dictionaries                                      |
-| demo-access   | –                                                 |
+| Module        | May import (besides `shared` and `integrations`)       |
+| ------------- | ------------------------------------------------------ |
+| templates     | –                                                      |
+| learning      | –                                                      |
+| dictionaries  | –                                                      |
+| staff         | –                                                      |
+| files         | –                                                      |
+| sla           | –                                                      |
+| messages      | learning                                               |
+| outbox        | templates, messages                                    |
+| ratings       | outbox                                                 |
+| consent       | outbox, learning                                       |
+| tickets       | messages, outbox, ratings, learning, dictionaries, sla |
+| inbox         | consent, tickets, messages, outbox                     |
+| delivery      | files, sla                                             |
+| notifications | staff                                                  |
+| admin         | templates, dictionaries, files, privacy, sla           |
+| ai            | dictionaries, sla                                      |
+| demo-access   | –                                                      |
+| privacy       | consent, outbox, learning                              |
 
 `app/` may import any module (through its `index.ts`). `shared/` imports only `shared/`.
 

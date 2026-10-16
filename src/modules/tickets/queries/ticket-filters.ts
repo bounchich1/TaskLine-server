@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { SLA_WARN } from './ticket-projection.js';
+
 export const filtersSchema = z
     .object({
         tab: z.enum(['open', 'closed']).default('open'),
@@ -9,9 +11,10 @@ export const filtersSchema = z
         complexity: z.string().max(64).optional(),
         status: z.enum(['open', 'in_progress', 'awaiting_rating', 'closed']).optional(),
         assignee: z.uuid().optional(),
+        sla: z.enum(['at_risk']).optional(),
         from: z.iso.datetime({ offset: true }).optional(),
         to: z.iso.datetime({ offset: true }).optional(),
-        sort: z.enum(['urgency', 'complexity', 'newest', 'oldest', 'rating']).default('urgency'),
+        sort: z.enum(['urgency', 'complexity', 'newest', 'oldest', 'rating', 'sla_risk']).default('urgency'),
         cursor: z.string().max(2048).optional(),
         limit: z.coerce.number().int().min(1).max(100).default(30),
     })
@@ -55,6 +58,10 @@ export function filterConditions(org: string, filters: Filters): SqlConditions {
 
     if (filters.assignee) {
         conditions.add('t.assignee_id=?', filters.assignee);
+    }
+
+    if (filters.sla === 'at_risk') {
+        conditions.clauses.push(`${SLA_WARN}<=now()`);
     }
 
     if (filters.from) {

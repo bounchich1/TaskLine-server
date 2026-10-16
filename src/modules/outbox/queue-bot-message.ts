@@ -9,7 +9,10 @@ import { render } from '../templates/index.js';
 const MENU_TEMPLATES = new Set([
     'consent_accepted',
     'ticket_created',
+    'ticket_created_eta',
+    'outside_hours',
     'ticket_reopened',
+    'auto_closed',
     'rating_accepted',
     'rating_attempts_exhausted',
     'rating_expired',
@@ -23,10 +26,11 @@ export interface BotMessage {
     ticket?: Ticket;
     cycleId?: string;
     extra?: Row;
+    values?: Record<string, string>;
 }
 
 export async function queueBotMessage(tx: Sql, ctx: Ctx, bot: BotMessage): Promise<void> {
-    const { client, template, key, ticket, cycleId, extra = {} } = bot;
+    const { client, template, key, ticket, cycleId, extra = {}, values = {} } = bot;
 
     if (await one(tx, 'SELECT id FROM deliveries WHERE logical_key=$1', [key])) {
         return;
@@ -36,6 +40,7 @@ export async function queueBotMessage(tx: Sql, ctx: Ctx, bot: BotMessage): Promi
         ticket_number: ticket ? formatTicketNumber(ticket.ticket_number) : '',
         policy_url: ctx.config.POLICY_URL,
         alternative_contact: ctx.config.ALTERNATIVE_CONTACT,
+        ...values,
     });
 
     const message = ticket

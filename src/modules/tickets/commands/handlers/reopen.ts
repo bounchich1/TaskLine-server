@@ -8,6 +8,7 @@ import type { Ticket } from '../../../../shared/types/entities.js';
 import { invalidateLearning } from '../../../learning/index.js';
 import { addMessage } from '../../../messages/index.js';
 import { cancelCycleDeliveries, queueBotMessage } from '../../../outbox/index.js';
+import { restartResolution } from '../../../sla/index.js';
 import type { TicketCommand, TicketCommandHandler } from '../command-context.js';
 
 export const reopen: TicketCommandHandler = async (tx, ctx, command) => {
@@ -31,6 +32,8 @@ export const reopen: TicketCommandHandler = async (tx, ctx, command) => {
      WHERE id=$1`,
         [ticket.id, assigneeId],
     );
+
+    await restartResolution(tx, ctx.org, ticket.id);
 
     await addMessage(tx, ctx, ticket, {
         author: 'system',

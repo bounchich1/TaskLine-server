@@ -8,6 +8,7 @@ import { snapshotActiveDictionaries } from '../dictionaries/index.js';
 import { addMessage } from '../messages/index.js';
 import { queueBotMessage } from '../outbox/index.js';
 import { acceptRatingInput } from '../ratings/index.js';
+import { resumeSla, startSla, type SlaGreeting } from '../sla/index.js';
 
 const MAX_TEXT_LENGTH = 16000;
 const MAX_ATTACHMENTS = 10;
@@ -49,7 +50,9 @@ export async function handleClientContent(
         return;
     }
 
-    const ticket = openTicket ?? (await createTicket(tx, ctx, client, { text, attachments }));
+    const { ticket, greeting } = openTicket
+        ? await continueTicket(tx, ctx, openTicket)
+        : await openNewTicket(tx, ctx, client, { text, attachments });
 
     const message = await addMessage(tx, ctx, ticket, {
         author: 'client',
@@ -70,7 +73,7 @@ export async function handleClientContent(
             employeeId: ticket.assignee_id,
         });
     } else {
-        await announceNewTicket(tx, ctx, { client, ticket, message });
+        await announceNewTicket(tx, ctx, { client, ticket, message, greeting });
     }
 }
 
@@ -91,6 +94,25 @@ function rejectionFor(
     }
 
     return undefined;
+}
+
+async function continueTicket(tx: Sql, ctx: Ctx, ticket: Ticket): Promise<{ ticket: Ticket; greeting?: SlaGreeting }> {
+    if (ticket.waiting_since) {
+        await resumeSla(tx, ctx.org, ticket);
+    }
+
+    return { ticket };
+}
+
+async function openNewTicket(
+    tx: Sql,
+    ctx: Ctx,
+    client: Client,
+    content: { text: string; attachments: InputAttachment[] },
+): Promise<{ ticket: Ticket; greeting?: SlaGreeting }> {
+    const ticket = await createTicket(tx, ctx, client, content);
+
+    return { ticket, greeting: await startSla(tx, ctx.org, ticket) };
 }
 
 async function createTicket(
@@ -148,16 +170,20 @@ async function storeAttachments(
     }
 }
 
-async function announceNewTicket(
-    tx: Sql,
-    ctx: Ctx,
-    { client, ticket, message }: { client: Client; ticket: Ticket; message: Message },
-): Promise<void> {
+interface NewTicket {
+    client: Client;
+    ticket: Ticket;
+    message: Message;
+    greeting?: SlaGreeting;
+}
+
+async function announceNewTicket(tx: Sql, ctx: Ctx, { client, ticket, message, greeting }: NewTicket): Promise<void> {
     await queueBotMessage(tx, ctx, {
         client,
-        template: 'ticket_created',
+        template: greeting?.template ?? 'ticket_created',
         key: `created:${ticket.id}`,
         ticket,
+        values: greeting ? { eta: greeting.eta } : {},
     });
 
     const dictionaries = await snapshotActiveDictionaries(tx, ctx.org);

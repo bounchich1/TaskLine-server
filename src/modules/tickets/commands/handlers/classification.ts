@@ -1,6 +1,7 @@
 import { ensure } from '../../../../shared/errors.js';
 import type { Row } from '../../../../shared/types/entities.js';
 import { findActiveDictionaryEntry } from '../../../dictionaries/index.js';
+import { reclassifySla } from '../../../sla/index.js';
 import type { TicketCommandHandler } from '../command-context.js';
 
 const FIELDS = ['tag', 'urgency', 'complexity'] as const;
@@ -26,5 +27,9 @@ export const classify: TicketCommandHandler = async (tx, ctx, { ticket, body }) 
        WHERE id=$1`,
             [ticket.id, body[field], field, JSON.stringify({ label: entry.label, version: entry.version })],
         );
+    }
+
+    if (body.urgency !== undefined || body.tag !== undefined) {
+        await reclassifySla(tx, ctx.org, ticket.id);
     }
 };

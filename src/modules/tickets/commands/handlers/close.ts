@@ -3,6 +3,7 @@ import { ensure } from '../../../../shared/errors.js';
 import { enqueue } from '../../../../shared/events.js';
 import type { Client, Closure, Ticket } from '../../../../shared/types/entities.js';
 import { queueBotMessage } from '../../../outbox/index.js';
+import { stopSla } from '../../../sla/index.js';
 import type { TicketCommandHandler } from '../command-context.js';
 
 export const close: TicketCommandHandler = async (tx, ctx, command) => {
@@ -23,6 +24,8 @@ export const close: TicketCommandHandler = async (tx, ctx, command) => {
         "UPDATE tickets SET status='awaiting_rating',closed_at=now(),closed_by=$2,current_cycle_id=$3 WHERE id=$1",
         [ticket.id, actor.id, cycle.id],
     );
+
+    await stopSla(tx, ticket.id);
 
     await queueBotMessage(tx, ctx, {
         client,

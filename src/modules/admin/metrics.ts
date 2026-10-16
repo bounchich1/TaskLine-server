@@ -36,6 +36,13 @@ const QUERIES: Record<string, string> = {
      WHERE org_id=$1 AND status<>'closed' GROUP BY status`,
     waiting: `SELECT coalesce(extract(epoch FROM now()-min(created_at)),0)::float AS age FROM tickets
      WHERE org_id=$1 AND status='open'`,
+    sla: `SELECT count(*) FILTER(WHERE due<=now())::int AS breached,
+       count(*) FILTER(WHERE warn<=now() AND due>now())::int AS at_risk FROM (
+       SELECT least(CASE WHEN first_responded_at IS NULL THEN first_response_due_at END,
+           CASE WHEN waiting_since IS NULL THEN resolution_due_at END) AS due,
+         least(CASE WHEN first_responded_at IS NULL THEN first_response_warn_at END,
+           CASE WHEN waiting_since IS NULL THEN resolution_warn_at END) AS warn
+       FROM tickets WHERE org_id=$1 AND status IN('open','in_progress')) clocks`,
     learning: 'SELECT learning_status,count(*)::int AS n FROM closures WHERE org_id=$1 GROUP BY learning_status',
     memory: 'SELECT state,count(*)::int AS n FROM memory_records WHERE org_id=$1 GROUP BY state',
     backups: 'SELECT kind,extract(epoch FROM max(finished_at))::float AS at FROM backup_runs GROUP BY kind',
@@ -134,6 +141,7 @@ function single(name: string, help: string, value: unknown): Family {
 function domainFamilies(results: Results): Family[] {
     const inbox = first(results, 'inbox');
     const latency = first(results, 'aiLatency');
+    const sla = first(results, 'sla');
 
     return [
         single('taskline_inbox_pending', 'Client updates waiting to be processed', inbox?.pending),
@@ -145,6 +153,8 @@ function domainFamilies(results: Results): Family[] {
             'Wait of the oldest open ticket',
             first(results, 'waiting')?.age,
         ),
+        single('taskline_sla_breached_active', 'Open tickets past an SLA deadline', sla?.breached),
+        single('taskline_sla_at_risk', 'Open tickets past the SLA warning point, not yet breached', sla?.at_risk),
         ...GROUPS.map((spec) => grouped(spec, all(results, spec.query))),
     ];
 }

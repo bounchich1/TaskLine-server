@@ -52,6 +52,7 @@ worker, gateway) did the work.
 | `taskline_ai_call_p50_seconds`, `…_p95_seconds`                                                              | model latency, last hour                       |
 | `taskline_triage_last_hour{ai_status}`                                                                       | new tickets by AI analysis result              |
 | `taskline_tickets_active{status}`, `taskline_ticket_oldest_unassigned_seconds`                               | queue size and wait                            |
+| `taskline_sla_at_risk`, `taskline_sla_breached_active`                                                       | open tickets past the SLA warning / deadline   |
 | `taskline_closures{learning_status}`, `taskline_memory_records{state}`                                       | closure learning and knowledge base            |
 | `taskline_backup_last_success_timestamp{kind}`                                                               | last successful `deploy/backup.sh` run         |
 | `taskline_pg_wal_*`, `taskline_pg_replicas`, `taskline_pg_replica_lag_seconds`, `taskline_pg_database_bytes` | archiving, standby, size                       |

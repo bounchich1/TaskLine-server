@@ -1,3 +1,4 @@
+import { ensureSlaDefaults } from '../../modules/sla/index.js';
 import { DEFAULT_TEMPLATES } from '../../modules/templates/index.js';
 import type { Config } from '../../shared/config.js';
 import { one, requireOne, type Database, type Sql } from '../../shared/db.js';
@@ -40,6 +41,7 @@ export async function seed(db: Database, config: Config): Promise<void> {
         await ensureTicketSequence(tx, config.ORG_ID);
         await tx.query('INSERT INTO memory_writer(org_id) VALUES($1) ON CONFLICT DO NOTHING', [config.ORG_ID]);
         await seedDictionary(tx, config.ORG_ID);
+        await ensureSlaDefaults(tx, config.ORG_ID);
 
         for (const [code, body] of Object.entries(DEFAULT_TEMPLATES)) {
             await tx.query('INSERT INTO templates(org_id,code,body) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [

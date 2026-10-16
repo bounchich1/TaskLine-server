@@ -1,6 +1,8 @@
+import { MaxClient } from '../../integrations/max/index.js';
 import { GatewayClient, Memory, Workflows, type Model } from '../../modules/ai/index.js';
 import { Files } from '../../modules/files/index.js';
 import { applyDeferredRevision } from '../../modules/messages/index.js';
+import { sendStaffAlert, type AlertSender } from '../../modules/staff/index.js';
 import type { Config } from '../../shared/config.js';
 import { createCtx, type Ctx } from '../../shared/context.js';
 import { one, type Database, type Sql } from '../../shared/db.js';
@@ -15,6 +17,7 @@ export class JobRunner {
     private readonly ctx: Ctx;
     private readonly memory: Memory;
     private readonly workflows: Workflows;
+    private readonly staffAlerts: AlertSender;
 
     constructor(
         private readonly db: Database,
@@ -26,6 +29,11 @@ export class JobRunner {
         this.files = new Files(db, config);
         this.memory = memory ?? new Memory(db, config);
         this.workflows = new Workflows(db, config, model, this.memory);
+
+        this.staffAlerts = new MaxClient(
+            config,
+            config.MAX_STAFF_BOT_TOKEN ? { token: config.MAX_STAFF_BOT_TOKEN } : {},
+        );
     }
 
     async run(id: string): Promise<void> {
@@ -86,6 +94,10 @@ export class JobRunner {
                 return true;
             case 'message_revision':
                 await applyDeferredRevision(this.db, this.ctx, job);
+
+                return true;
+            case 'staff_alert':
+                await sendStaffAlert(this.staffAlerts, job.payload);
 
                 return true;
             default:

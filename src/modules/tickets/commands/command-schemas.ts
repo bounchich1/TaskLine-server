@@ -30,4 +30,6 @@ export const COMMAND_SCHEMAS: Readonly<Record<string, z.ZodType>> = {
         .strict(),
     close: z.object({ note: z.string().max(2000).optional() }).strict(),
     reopen: z.object({ reason: z.string().trim().min(1).max(2000), employee_id: uuid.optional() }).strict(),
+    wait: z.object({}).strict(),
+    resume: z.object({}).strict(),
 };

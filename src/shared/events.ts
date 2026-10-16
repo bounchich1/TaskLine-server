@@ -24,10 +24,11 @@ export interface UiEvent {
     ticketId: string | null;
     payload?: unknown;
     employeeId?: string | null;
+    employeeIds?: readonly string[];
 }
 
 export async function emit(tx: Sql, org: string, event: UiEvent): Promise<void> {
-    const { type, ticketId, payload = {}, employeeId } = event;
+    const { type, ticketId, payload = {}, employeeId, employeeIds } = event;
 
     const { cursor } = await requireOne(tx, 'UPDATE organizations SET cursor=cursor+1 WHERE id=$1 RETURNING cursor', [
         org,
@@ -41,7 +42,14 @@ export async function emit(tx: Sql, org: string, event: UiEvent): Promise<void> 
         JSON.stringify(payload),
     ]);
 
-    if (employeeId) {
+    if (employeeIds) {
+        await tx.query(
+            `INSERT INTO notifications(org_id,employee_id,cursor,type,ticket_id)
+       SELECT $1,id,$2,$3,$4 FROM employees WHERE org_id=$1 AND id=ANY($5::uuid[])
+       ON CONFLICT DO NOTHING`,
+            [org, cursor, type, ticketId, employeeIds],
+        );
+    } else if (employeeId) {
         await tx.query(
             `INSERT INTO notifications(org_id,employee_id,cursor,type,ticket_id) VALUES($1,$2,$3,$4,$5)
        ON CONFLICT DO NOTHING`,

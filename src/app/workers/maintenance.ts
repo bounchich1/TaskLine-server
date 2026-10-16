@@ -1,6 +1,8 @@
 import { PreconsentExpiry } from '../../modules/consent/index.js';
 import { applyRetention } from '../../modules/privacy/index.js';
 import { RatingTimers } from '../../modules/ratings/index.js';
+import { SlaTimers } from '../../modules/sla/index.js';
+import { WaitingTimers } from '../../modules/tickets/index.js';
 import type { Ctx } from '../../shared/context.js';
 import type { Database, Sql } from '../../shared/db.js';
 import { emit } from '../../shared/events.js';
@@ -8,6 +10,8 @@ import { emit } from '../../shared/events.js';
 export async function runMaintenance(db: Database, ctx: Ctx): Promise<void> {
     await new RatingTimers(db, ctx.config).run();
     await new PreconsentExpiry(db, ctx.config).run();
+    await new SlaTimers(db, ctx.config).run();
+    await new WaitingTimers(db, ctx.config).run();
 
     await db.tx(async (tx) => {
         await expireOverdueTriage(tx, ctx);

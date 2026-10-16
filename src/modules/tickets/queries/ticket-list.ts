@@ -5,7 +5,7 @@ import { ensure } from '../../../shared/errors.js';
 import type { Row } from '../../../shared/types/entities.js';
 
 import { filterConditions, type Filters, type SqlConditions } from './ticket-filters.js';
-import { TICKET_JOINS, TICKET_PROJECTION } from './ticket-projection.js';
+import { SLA_DUE, SLA_WARN, TICKET_JOINS, TICKET_PROJECTION } from './ticket-projection.js';
 
 const OPEN_STATUSES = "t.status IN('open','in_progress')";
 const CLOSED_STATUSES = "t.status IN('awaiting_rating','closed')";
@@ -14,6 +14,7 @@ const SORT_SCORES: Record<Filters['sort'], string> = {
     urgency: 'coalesce(du.rank,0)',
     complexity: 'coalesce(dc.rank,0)',
     rating: 'coalesce(c.rating,-1)',
+    sla_risk: `-coalesce(extract(epoch FROM ${SLA_DUE}),1e11)`,
     newest: '0',
     oldest: '0',
 };
@@ -26,7 +27,8 @@ export async function listTickets(db: Sql, org: string, filters: Filters, counts
     const counts = await one(
         db,
         `SELECT count(*) FILTER(WHERE ${OPEN_STATUSES})::int AS open,
-       count(*) FILTER(WHERE ${CLOSED_STATUSES})::int AS closed,now() AS snapshot_at
+       count(*) FILTER(WHERE ${CLOSED_STATUSES})::int AS closed,
+       count(*) FILTER(WHERE ${SLA_WARN}<=now())::int AS at_risk,now() AS snapshot_at
      ${TICKET_JOINS} WHERE ${conditions.where()}`,
         conditions.values,
     );

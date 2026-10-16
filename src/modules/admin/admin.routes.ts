@@ -31,6 +31,7 @@ function addAdminReads(app: FastifyInstance, admin: Admin): void {
 
     app.get('/v1/admin/templates', access('organization.configure'), async () => admin.templates());
     app.get('/v1/admin/settings', access('organization.configure'), async () => admin.currentSettings());
+    app.get('/v1/admin/sla', access('organization.configure'), async () => admin.sla());
     app.get('/v1/admin/audit', access('audit.view'), async () => admin.audit());
 }
 
@@ -56,6 +57,8 @@ function addAdminMutations(app: FastifyInstance, admin: Admin): void {
     app.put('/v1/admin/settings', access('organization.configure'), async (request) =>
         admin.settings(mutation(request)),
     );
+
+    app.put('/v1/admin/sla', access('organization.configure'), async (request) => admin.saveSla(mutation(request)));
 }
 
 function mutation(request: FastifyRequest): AdminRequest {
