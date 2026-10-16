@@ -14,6 +14,7 @@ export const reopen: TicketCommandHandler = async (tx, ctx, command) => {
     const { actor, client, ticket, body } = command;
 
     ensure(['awaiting_rating', 'closed'].includes(ticket.status), 'already_open');
+    ensure(!ticket.purged_at, 'ticket_purged', 409, 'Данные обращения удалены, переоткрыть его нельзя.');
     ensure(typeof body.reason === 'string' && body.reason.trim().length > 0, 'reason_required', 422);
     await ensureConversationSlotFree(tx, command);
 

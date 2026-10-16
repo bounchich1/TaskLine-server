@@ -24,7 +24,7 @@ export async function settleSuccess(
         );
 
         await tx.query(
-            `UPDATE ai_permits SET state='free',holder=NULL,started_at=NULL,provider_ref=NULL
+            `UPDATE ai_permits SET state='free',holder=NULL,started_at=NULL,provider_ref=NULL,org_id=NULL
        WHERE slot=$1 AND holder=$2 AND generation=$3`,
             [permit.slot, callId, permit.generation],
         );
@@ -51,7 +51,8 @@ export async function settleFailure(
         );
 
         await tx.query(
-            `UPDATE ai_permits SET state=$4,holder=CASE WHEN $4='free' THEN NULL ELSE holder END
+            `UPDATE ai_permits SET state=$4,holder=CASE WHEN $4='free' THEN NULL ELSE holder END,
+         org_id=CASE WHEN $4='free' THEN NULL ELSE org_id END
        WHERE slot=$1 AND holder=$2 AND generation=$3`,
             [permit.slot, callId, permit.generation, known ? 'free' : 'uncertain'],
         );

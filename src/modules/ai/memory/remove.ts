@@ -41,5 +41,10 @@ export async function removeMemory(deps: MemoryDeps, id: string): Promise<void> 
         ]);
     }
 
-    await db.query("UPDATE memory_records SET state='deleted',eligible=false WHERE id=$1", [id]);
+    await db.query(
+        `UPDATE memory_records m SET state='deleted',eligible=false,
+       content=CASE WHEN t.purged_at IS NULL THEN m.content ELSE '{}'::jsonb END
+     FROM tickets t WHERE m.id=$1 AND t.id=m.ticket_id`,
+        [id],
+    );
 }

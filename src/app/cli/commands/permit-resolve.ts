@@ -34,7 +34,9 @@ export const permitResolveCommand: CliCommand = async ({ db, config, args }) => 
             [permit.holder],
         );
 
-        await tx.query("UPDATE ai_permits SET state='free',holder=NULL,started_at=NULL WHERE slot=$1", [slot]);
+        await tx.query("UPDATE ai_permits SET state='free',holder=NULL,started_at=NULL,org_id=NULL WHERE slot=$1", [
+            slot,
+        ]);
     });
 
     return 'Permit released using recorded operator evidence.';

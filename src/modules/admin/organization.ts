@@ -2,11 +2,16 @@ import { z } from 'zod';
 
 import { one, type Sql } from '../../shared/db.js';
 import { ensure } from '../../shared/errors.js';
+import { readRetention, retentionSchema } from '../privacy/index.js';
 
 export const templateBody = z.object({ body: z.string().max(3000) }).strict();
 
 export const settingsBody = z
-    .object({ name: z.string().min(1).max(120), timezone: z.string().min(1).max(80) })
+    .object({
+        name: z.string().min(1).max(120),
+        timezone: z.string().min(1).max(80),
+        retention: retentionSchema.optional(),
+    })
     .strict();
 
 export function assertValidTimezone(timezone: string): void {
@@ -40,12 +45,19 @@ export async function updateSettings(
 ) {
     const row = await one(
         tx,
-        `UPDATE organizations SET name=$2,timezone=$3,version=version+1
+        `UPDATE organizations SET name=$2,timezone=$3,version=version+1,
+       settings=CASE WHEN $5::jsonb IS NULL THEN settings ELSE jsonb_set(settings,'{retention}',$5::jsonb) END
      WHERE id=$1 AND version=$4 RETURNING name,timezone,version`,
-        [org, settings.name, settings.timezone, expectedVersion],
+        [
+            org,
+            settings.name,
+            settings.timezone,
+            expectedVersion,
+            settings.retention ? JSON.stringify(settings.retention) : null,
+        ],
     );
 
     ensure(row, 'version_conflict');
 
-    return row;
+    return { ...row, retention: await readRetention(tx, org) };
 }

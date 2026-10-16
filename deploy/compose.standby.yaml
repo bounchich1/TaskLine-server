@@ -1,0 +1,43 @@
+name: max-support-standby
+
+services:
+  postgres-standby:
+    image: max-support-postgres:18.3-pgbackrest
+    build: ../infra/postgres
+    restart: unless-stopped
+    entrypoint: [standby-entrypoint]
+    command:
+      - postgres
+      - -c
+      - hot_standby=on
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=/usr/local/bin/pgbackrest-archive %p
+      - -c
+      - archive_timeout=${BACKUP_ARCHIVE_TIMEOUT:-60}
+    environment:
+      POSTGRES_USER: support
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD to the primary's password}
+      POSTGRES_DB: support
+      BACKUP_REPO_TYPE: ${BACKUP_REPO_TYPE:?the standby restores from the backup repository}
+      BACKUP_REPO_PATH: ${BACKUP_REPO_PATH:-/pgbackrest}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:-}
+      BACKUP_S3_KEY: ${BACKUP_S3_KEY:-}
+      BACKUP_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:-}
+      BACKUP_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
+      BACKUP_CIPHER_PASS: ${BACKUP_CIPHER_PASS:-}
+      BACKUP_RETENTION_FULL: ${BACKUP_RETENTION_FULL:-2}
+      STANDBY_PRIMARY_CONNINFO: ${STANDBY_PRIMARY_CONNINFO:-}
+    ports: ['${STANDBY_BIND:-127.0.0.1:55432}:5432']
+    volumes: [standby-data:/var/lib/postgresql]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U support -d support']
+      interval: 10s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  standby-data:

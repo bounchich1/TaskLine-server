@@ -39,8 +39,15 @@ Configuration: `NODE_ENV=production`, `AI_ENABLED=false`, `MEMORY_ENABLED=false`
 10. **Restart.** `docker compose restart api worker` in the middle of a conversation loses and
     duplicates nothing. Note what MAX does with webhooks sent while the API was down.
 11. **Deploy and rollback.** `deploy.sh server <new>` and back to `<old>` both finish healthy.
-12. **Backup.** Last night's dump restores into a scratch database and contains the test
-    tickets.
+12. **Backup.** `./backup.sh info` lists a full backup and a recent diff; a point-in-time
+    restore of the repository into a scratch container on another host stops at the chosen second
+    and contains the test tickets ([backup-and-recovery.md](backup-and-recovery.md)).
+13. **Monitoring.** With `OPS_TOKEN` set, stopping `worker` for 5 minutes makes every active
+    administrator receive «Тревога · TaskLine … InboxBacklog» in MAX, and «Решено» after it is
+    started again.
+14. **Personal data.** Admin → ticket → «Выгрузить данные» returns the client's JSON; «Удалить
+    данные» on a test client closes its tickets, blanks the conversation and files, and the client
+    starts with a fresh consent prompt on the next message.
 
 ## Gate 2 — AI triage
 

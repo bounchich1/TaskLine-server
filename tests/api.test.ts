@@ -161,6 +161,38 @@ it('webhook ACK follows durable commit and secret verification', async () => {
     expect((await one(context.db, 'SELECT count(*)::int AS n FROM tickets'))!.n).toBe(0);
 });
 
+it('never rate limits signed webhooks but still limits unsigned ones', async () => {
+    const payload = {
+        update_type: 'message_created',
+        message: {
+            sender: { user_id: 100 },
+            recipient: { chat_id: 100, chat_type: 'dialog' },
+            body: { mid: 'burst-m1', text: 'Привет' },
+        },
+    };
+
+    const send = (secret: string) =>
+        app.inject({ method: 'POST', url: '/webhooks/max', headers: { 'x-max-bot-api-secret': secret }, payload });
+
+    const remaining = async () => Number((await send('wrong-secret')).headers['x-ratelimit-remaining']);
+    const before = await remaining();
+
+    for (let index = 0; index < 200; index++) {
+        expect((await send(context.c.MAX_WEBHOOK_SECRET)).statusCode).toBe(200);
+    }
+
+    expect(await remaining()).toBe(before - 1);
+
+    const unsigned = [];
+
+    for (let index = 0; index <= before - 1; index++) {
+        unsigned.push((await send('wrong-secret')).statusCode);
+    }
+
+    expect(unsigned.slice(0, -1).every((code) => code === 401)).toBe(true);
+    expect(unsigned.at(-1)).toBe(429);
+});
+
 it('paginates deterministic queue, searches and denies admin access to support', async () => {
     await context.create('Ошибка подключения', '100');
     await context.create('Не печатается документ', '101');

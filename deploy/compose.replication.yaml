@@ -1,0 +1,3 @@
+services:
+  postgres:
+    ports: ['${PG_REPLICATION_BIND:?set PG_REPLICATION_BIND to a private address, for example 10.0.0.2:5432}:5432']

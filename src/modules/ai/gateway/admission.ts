@@ -58,6 +58,7 @@ async function takePermit(tx: Sql, ctx: Ctx, call: CallRequest): Promise<Permit>
     const occupied = await requireOne(tx, "SELECT count(*)::int AS n FROM ai_permits WHERE state<>'free'");
 
     ensure(Number(occupied.n) < Number(settings.cap), 'ai_busy', 429, 'Модель занята.');
+    await ensureOrgQuota(tx, ctx.org);
 
     const permit = await one(
         tx,
@@ -69,11 +70,10 @@ async function takePermit(tx: Sql, ctx: Ctx, call: CallRequest): Promise<Permit>
     ensure(permit, 'ai_busy', 429);
     const generation = Number(permit.generation) + 1;
 
-    await tx.query("UPDATE ai_permits SET state='running',holder=$2,generation=$3,started_at=now() WHERE slot=$1", [
-        permit.slot,
-        call.callId,
-        generation,
-    ]);
+    await tx.query(
+        "UPDATE ai_permits SET state='running',holder=$2,generation=$3,started_at=now(),org_id=$4 WHERE slot=$1",
+        [permit.slot, call.callId, generation, ctx.org],
+    );
 
     await tx.query(
         `INSERT INTO ai_calls(id,org_id,job_id,step_key,input_hash,permit,generation)
@@ -82,4 +82,20 @@ async function takePermit(tx: Sql, ctx: Ctx, call: CallRequest): Promise<Permit>
     );
 
     return { slot: Number(permit.slot), generation };
+}
+
+async function ensureOrgQuota(tx: Sql, org: string): Promise<void> {
+    const quota = await requireOne(
+        tx,
+        `SELECT o.ai_quota,(SELECT count(*)::int FROM ai_permits p WHERE p.org_id=o.id AND p.state<>'free') AS busy
+     FROM organizations o WHERE o.id=$1`,
+        [org],
+    );
+
+    ensure(
+        quota.ai_quota === null || Number(quota.busy) < Number(quota.ai_quota),
+        'ai_busy',
+        429,
+        'Лимит ИИ исчерпан.',
+    );
 }

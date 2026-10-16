@@ -43,6 +43,8 @@ tags:
     description: Администрирование и эксплуатация
   - name: max
     description: Вебхук бота MAX
+  - name: ops
+    description: Метрики и тревоги для мониторинга
 security:
   - bearerAuth: []
   - sessionCookie: []
@@ -1004,6 +1006,7 @@ paths:
               properties:
                 name: { type: string, minLength: 1, maxLength: 120 }
                 timezone: { type: string, minLength: 1, maxLength: 80, examples: [Asia/Krasnoyarsk] }
+                retention: { $ref: '#/components/schemas/Retention' }
       responses:
         '200':
           description: Настройки
@@ -1065,6 +1068,152 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/AuditEntry' }
         '403':
+          $ref: '#/components/responses/Error'
+
+  /v1/admin/clients/{id}/export:
+    get:
+      operationId: getAdminClientExport
+      tags: [admin]
+      summary: Выгрузка персональных данных клиента в JSON (право `clients.privacy`)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Данные клиента, согласия, обращения и переписка
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientExport' }
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /v1/admin/clients/{id}/export-grant:
+    post:
+      operationId: postAdminClientExportGrant
+      tags: [admin]
+      summary: Ссылка на выгрузку данных клиента для скачивания вне приложения
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+      responses:
+        '200':
+          description: Ссылка
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url, filename, expires_at]
+                properties:
+                  url: { type: string, format: uri }
+                  filename: { type: string }
+                  expires_at: { type: string, format: date-time }
+        '403':
+          $ref: '#/components/responses/Error'
+  /download/export/{grant}:
+    get:
+      operationId: getClientExportByGrant
+      tags: [admin]
+      summary: Скачать выгрузку данных клиента по ссылке
+      security: []
+      parameters:
+        - { name: grant, in: path, required: true, schema: { type: string, minLength: 32, maxLength: 128 } }
+      responses:
+        '200':
+          description: Выгрузка
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientExport' }
+        '404':
+          $ref: '#/components/responses/Error'
+  /v1/admin/clients/{id}/erase:
+    post:
+      operationId: postAdminClientErase
+      tags: [admin]
+      summary: Удалить персональные данные клиента по его запросу (право `clients.privacy`)
+      description: >
+        Закрывает открытые обращения без оценки, стирает переписку, вложения и базу знаний по ним,
+        обезличивает клиента. Повторный вызов возвращает already_erased.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [confirm]
+              properties:
+                confirm: { const: true }
+      responses:
+        '200':
+          description: Результат
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [client_id, tickets, already_erased]
+                properties:
+                  client_id: { type: string, format: uuid }
+                  tickets: { type: integer }
+                  already_erased: { type: boolean }
+        '403':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+
+  /metrics:
+    get:
+      operationId: getMetrics
+      tags: [ops]
+      summary: Метрики Prometheus (только при заданном OPS_TOKEN, не публикуется наружу через Caddy)
+      security: [{ opsToken: [] }]
+      responses:
+        '200':
+          description: Текстовый формат Prometheus 0.0.4
+          content:
+            text/plain:
+              schema: { type: string }
+        '401':
+          $ref: '#/components/responses/Error'
+  /internal/alerts:
+    post:
+      operationId: postInternalAlerts
+      tags: [ops]
+      summary: Приём уведомлений Alertmanager и пересылка их администраторам в MAX
+      security: [{ opsToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [alerts]
+              properties:
+                alerts:
+                  type: array
+                  maxItems: 200
+                  items:
+                    type: object
+                    required: [status, labels]
+                    properties:
+                      status: { type: string }
+                      labels: { type: object, additionalProperties: { type: string } }
+                      annotations: { type: object, additionalProperties: { type: string } }
+      responses:
+        '200':
+          description: Сколько администраторов получили сообщение
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [delivered]
+                properties:
+                  delivered: { type: integer }
+        '401':
           $ref: '#/components/responses/Error'
 
   /v1/dev/inbound:
@@ -1148,6 +1297,10 @@ components:
       type: apiKey
       in: header
       name: X-Max-Bot-Api-Secret
+    opsToken:
+      type: http
+      scheme: bearer
+      description: '`OPS_TOKEN` сервера; Prometheus и Alertmanager внутри сети развёртывания'
       description: Значение `MAX_WEBHOOK_SECRET`, заданное при подписке на вебхук
   parameters:
     Id:
@@ -1525,11 +1678,36 @@ components:
         version: { type: integer }
     Settings:
       type: object
-      required: [name, timezone, version]
+      required: [name, timezone, version, retention]
       properties:
         name: { type: string }
         timezone: { type: string }
         version: { type: integer }
+        retention: { $ref: '#/components/schemas/Retention' }
+    Retention:
+      type: object
+      description: Сроки хранения; null — хранить бессрочно
+      additionalProperties: false
+      required: [closed_ticket_days, audit_days]
+      properties:
+        closed_ticket_days: { type: [integer, 'null'], minimum: 30, maximum: 3650 }
+        audit_days: { type: [integer, 'null'], minimum: 365, maximum: 3650 }
+    ClientExport:
+      type: object
+      required: [generated_at, client, consent_events, tickets]
+      properties:
+        generated_at: { type: string, format: date-time }
+        organization: { type: [string, 'null'] }
+        client: { type: object }
+        consent_events: { type: array, items: { type: object } }
+        tickets:
+          type: array
+          items:
+            type: object
+            properties:
+              number: { type: string }
+              status: { type: string }
+              messages: { type: array, items: { type: object } }
     AuditEntry:
       type: object
       required: [id, action, created_at]

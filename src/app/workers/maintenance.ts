@@ -1,4 +1,5 @@
 import { PreconsentExpiry } from '../../modules/consent/index.js';
+import { applyRetention } from '../../modules/privacy/index.js';
 import { RatingTimers } from '../../modules/ratings/index.js';
 import type { Ctx } from '../../shared/context.js';
 import type { Database, Sql } from '../../shared/db.js';
@@ -13,6 +14,8 @@ export async function runMaintenance(db: Database, ctx: Ctx): Promise<void> {
         await recoverAbandonedWork(tx, ctx);
         await pruneExpiredRows(tx);
     });
+
+    await db.tx(async (tx) => applyRetention(tx, ctx));
 }
 
 async function expireOverdueTriage(tx: Sql, ctx: Ctx): Promise<void> {
@@ -52,6 +55,7 @@ async function recoverAbandonedWork(tx: Sql, ctx: Ctx): Promise<void> {
 
 async function pruneExpiredRows(tx: Sql): Promise<void> {
     await tx.query("DELETE FROM download_grants WHERE expires_at<now()-interval '1 hour'");
+    await tx.query("DELETE FROM export_grants WHERE expires_at<now()-interval '1 hour'");
     await tx.query("DELETE FROM callback_actions WHERE expires_at<now()-interval '1 day'");
     await tx.query("DELETE FROM staff_sessions WHERE expires_at<now()-interval '1 day'");
     await tx.query("DELETE FROM command_keys WHERE created_at<now()-interval '7 days'");

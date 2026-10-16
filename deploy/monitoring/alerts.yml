@@ -1,0 +1,121 @@
+groups:
+  - name: taskline-service
+    rules:
+      - alert: ApiDown
+        expr: up{job="taskline-api"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: API не отвечает Prometheus 2 минуты. Тревоги через API могут не дойти — проверьте внешний мониторинг.
+
+      - alert: InboxBacklog
+        expr: taskline_inbox_oldest_pending_seconds > 120
+        for: 3m
+        labels: { severity: critical }
+        annotations:
+          summary: Сообщения клиентов не обрабатываются больше 2 минут — проверьте worker.
+
+      - alert: JobsOverdue
+        expr: max(taskline_job_overdue_seconds) > 600
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: Фоновые задачи просрочены больше чем на 10 минут — проверьте worker и Redis.
+
+      - alert: JobsFailing
+        expr: delta(sum(taskline_jobs{state="failed"})[30m:]) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: Появились неудачные фоновые задачи — «Управление → Состояние системы».
+
+      - alert: DeliveriesStuck
+        expr: max(taskline_delivery_oldest_seconds{state=~"queued|retry_wait"}) > 300
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: Ответы клиентам не уходят в MAX больше 5 минут.
+
+      - alert: DeliveryOutcomeUnknown
+        expr: taskline_deliveries{state="unknown"} > 0
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: Есть отправки с неизвестным результатом — нужна проверка в «Состоянии системы».
+
+      - alert: TicketWaiting
+        expr: taskline_ticket_oldest_unassigned_seconds > 1800
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: Обращение ждёт сотрудника больше 30 минут.
+
+      - alert: EventLoopBlocked
+        expr: nodejs_eventloop_delay_p99_seconds > 0.5
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: API отвечает с задержкой — цикл событий Node.js занят дольше 0,5 с.
+
+  - name: taskline-ai
+    rules:
+      - alert: AiPermitsUncertain
+        expr: taskline_ai_permits{state="uncertain"} > 0
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: Слоты ИИ зависли в состоянии «неизвестно» — освободите их командой permit-resolve.
+
+      - alert: TriageFailing
+        expr: |
+          sum(taskline_triage_last_hour{ai_status="failed"}) / clamp_min(sum(taskline_triage_last_hour), 1) > 0.3
+          and sum(taskline_triage_last_hour) >= 5
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: Больше 30% новых обращений за час остались без разбора ИИ — проверьте провайдера модели.
+
+  - name: taskline-data
+    rules:
+      - alert: WalArchiveFailing
+        expr: increase(taskline_pg_wal_archive_failed_total[15m]) > 0 and time() - taskline_pg_wal_last_archived_timestamp > 600
+        labels: { severity: critical }
+        annotations:
+          summary: WAL не архивируется больше 10 минут — восстановление на момент времени под угрозой, диск может заполниться.
+
+      - alert: BackupStale
+        expr: time() - max(taskline_backup_last_success_timestamp{kind=~"full|diff|incr"}) > 26 * 3600
+        labels: { severity: critical }
+        annotations:
+          summary: Нет успешной резервной копии базы больше 26 часов.
+
+      - alert: BackupMissing
+        expr: absent(taskline_backup_last_success_timestamp{kind=~"full|diff|incr"})
+        for: 1h
+        labels: { severity: warning }
+        annotations:
+          summary: Резервное копирование базы не настроено или ещё не запускалось (deploy/backup.sh init).
+
+      - alert: ReplicaLagging
+        expr: taskline_pg_replicas > 0 and taskline_pg_replica_lag_seconds > 300
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: Резервная база отстаёт от основной больше чем на 5 минут.
+
+  - name: taskline-host
+    rules:
+      - alert: DiskAlmostFull
+        expr: |
+          node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}
+            / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"} < 0.15
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: На сервере осталось меньше 15% места на диске.
+
+      - alert: MemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.1
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: На сервере осталось меньше 10% свободной памяти.

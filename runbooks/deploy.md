@@ -194,32 +194,27 @@ Edit `.env`, then `docker compose up -d` (it recreates only the changed services
 
 ## Backups
 
-Nightly database dump from cron, copied off the host:
+PostgreSQL is archived continuously with pgBackRest (point-in-time recovery, encrypted, off-site
+S3) and can run a warm standby on a second host. Setup, cron schedule, restore and failover:
+[backup-and-recovery.md](backup-and-recovery.md).
 
-```sh
-0 3 * * * cd /opt/max-support/deploy && docker compose exec -T postgres pg_dump -U support -Fc support > /var/backups/support-$(date +\%F).dump
-```
+Files live in the `object-data` volume (SeaweedFS, versioning on); copy the bucket nightly with any
+S3 client (`rclone sync`, `aws s3 sync`). agentmemory keeps its state in the `memory-engine-data`
+and `memory-index-data` volumes; stop `memory` and `memory-engine` before copying them (a live copy
+is not consistent). PostgreSQL keeps the learning records, so a lost memory volume can be refilled
+from there.
 
-Restore into the running stack:
+## Monitoring
 
-```sh
-docker compose exec -T postgres pg_restore -U support -d support --clean --if-exists < /var/backups/support-YYYY-MM-DD.dump
-```
-
-agentmemory keeps its state in the `memory-engine-data` and `memory-index-data` volumes. Stop
-`memory` and `memory-engine` before copying them (a live copy is not consistent), then start them
-again; PostgreSQL keeps the learning records, so a lost memory volume can be refilled from there.
-
-Files live in the `object-data` volume (SeaweedFS, versioning on); back it up with the volume
-or copy the bucket with any S3 client (`rclone sync`, `aws s3 sync`). Continuous WAL archiving (point-in-time recovery) is still needed before full
-production, see plan chapter 09.
+`OPS_TOKEN` plus `COMPOSE_PROFILES=monitoring` start Prometheus, Alertmanager and node-exporter;
+alerts reach administrators as MAX messages. See [monitoring.md](monitoring.md).
 
 ## Operations
 
 ```sh
 docker compose ps
 docker compose logs -f api worker
-docker compose run --rm api node dist/cli.js <command>   # ai-cap, permit-resolve, memory-reconcile
+docker compose run --rm api node dist/cli.js <command>   # ai-cap, ai-quota, permit-resolve, memory-reconcile
 ```
 
 ## Known limits
@@ -237,8 +232,9 @@ docker compose run --rm api node dist/cli.js <command>   # ai-cap, permit-resolv
   smaller. After changing the network MTU, recreate it: `docker compose down && docker compose up -d`.
 - ClamAV updates its signatures with freshclam; if `docker compose logs clamav` shows download
   errors, point freshclam at a mirror. Scanning keeps working on the signatures in the image.
-- The API allows 180 requests per minute per client IP, MAX webhook deliveries included. Watch
-  for `429` on `/webhooks/max` and `/webhooks/max-staff` as traffic grows.
+- The API allows 180 requests per minute per client IP. MAX webhook deliveries that carry the
+  right `X-Max-Bot-Api-Secret` are exempt, so client traffic never hits that limit; requests with a
+  missing or wrong secret still count against it.
 - The agentmemory engine keeps its state in memory and writes it to disk every 500 ms
   (`save_interval_ms` in `infra/agentmemory/engine.yaml`); it does not flush on shutdown, so a
   write acknowledged less than 500 ms before the engine stops (crash, kill or restart) is lost.

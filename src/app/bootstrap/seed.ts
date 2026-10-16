@@ -1,6 +1,7 @@
 import { DEFAULT_TEMPLATES } from '../../modules/templates/index.js';
 import type { Config } from '../../shared/config.js';
-import type { Database, Sql } from '../../shared/db.js';
+import { one, requireOne, type Database, type Sql } from '../../shared/db.js';
+import { ensure } from '../../shared/errors.js';
 
 const DEFAULT_DICTIONARY: [string, string, string, number][] = [
     ['tag', 'undefined', 'Не определён', 0],
@@ -36,6 +37,7 @@ export async function seed(db: Database, config: Config): Promise<void> {
             config.AI_MAX_CONCURRENCY,
         ]);
 
+        await ensureTicketSequence(tx, config.ORG_ID);
         await tx.query('INSERT INTO memory_writer(org_id) VALUES($1) ON CONFLICT DO NOTHING', [config.ORG_ID]);
         await seedDictionary(tx, config.ORG_ID);
 
@@ -57,4 +59,34 @@ async function seedDictionary(tx: Sql, org: string): Promise<void> {
             [org, dimension, code, label, rank],
         );
     }
+}
+
+const SHARED_SEQUENCE = 'ticket_number_seq';
+
+async function ensureTicketSequence(tx: Sql, org: string): Promise<void> {
+    await tx.query('SELECT pg_advisory_xact_lock(7136002)');
+    const own = await requireOne(tx, 'SELECT ticket_sequence FROM organizations WHERE id=$1', [org]);
+
+    const sharedWithOthers = await one(
+        tx,
+        'SELECT 1 AS taken FROM organizations WHERE id<>$1 AND ticket_sequence=$2 LIMIT 1',
+        [org, SHARED_SEQUENCE],
+    );
+
+    if (own.ticket_sequence !== SHARED_SEQUENCE || !sharedWithOthers) {
+        return;
+    }
+
+    ensure(/^[\da-f-]{36}$/.test(org), 'invalid_org_id', 422);
+    const name = `${SHARED_SEQUENCE}_${org.replaceAll('-', '')}`;
+
+    const next = await requireOne(tx, 'SELECT coalesce(max(ticket_number),0)+1 AS n FROM tickets WHERE org_id=$1', [
+        org,
+    ]);
+
+    await tx.query(
+        `CREATE SEQUENCE IF NOT EXISTS ${name} MINVALUE 1 MAXVALUE 2147483647 START ${Number(next.n)} NO CYCLE CACHE 1`,
+    );
+
+    await tx.query('UPDATE organizations SET ticket_sequence=$2 WHERE id=$1', [org, name]);
 }

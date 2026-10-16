@@ -72,7 +72,12 @@ function documentedRoutes(spec: string): string[] {
 }
 
 it('documents every route of a fully configured API in openapi.yaml', async () => {
-    const config = testConfig({ MAX_STAFF_BOT_TOKEN: 'staff-token', MAX_STAFF_WEBHOOK_SECRET: 's'.repeat(40) });
+    const config = testConfig({
+        MAX_STAFF_BOT_TOKEN: 'staff-token',
+        MAX_STAFF_WEBHOOK_SECRET: 's'.repeat(40),
+        OPS_TOKEN: 'o'.repeat(40),
+    });
+
     const full = await fixture(undefined, config);
     const api = await buildApi(full.db, config);
 

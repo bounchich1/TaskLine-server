@@ -9,6 +9,7 @@ const OTHER_JOBS_PER_SWEEP = 40;
 
 export async function publishDueJobs(db: Database, org: string, queues: Queues): Promise<void> {
     const cap = Number((await requireOne(db, 'SELECT cap FROM ai_settings WHERE id=1')).cap);
+    const quota = (await requireOne(db, 'SELECT ai_quota FROM organizations WHERE id=$1', [org])).ai_quota;
     const aiQueue = queues['ai-execution'];
 
     if ((await aiQueue.getGlobalConcurrency()) !== cap) {
@@ -21,7 +22,7 @@ export async function publishDueJobs(db: Database, org: string, queues: Queues):
         [org],
     );
 
-    for (const job of selectDueJobs(due, cap)) {
+    for (const job of selectDueJobs(due, Math.min(cap, Number(quota ?? cap)))) {
         await queues[queueFor(job.kind)].add(
             job.kind,
             { id: job.id },

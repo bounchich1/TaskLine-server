@@ -1,3 +1,4 @@
+export { alertRoutes } from './alerts.routes.js';
 export { authRoutes } from './auth.routes.js';
 export { findActiveAdmin } from './employee-directory.js';
 export { employeesRoutes } from './employees.routes.js';

@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+scrape_configs:
+  - job_name: taskline-api
+    metrics_path: /metrics
+    authorization:
+      credentials_file: /run/secrets/ops_token
+    static_configs:
+      - targets: ['api:3000']
+
+  - job_name: node
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']

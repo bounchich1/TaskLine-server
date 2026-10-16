@@ -1,13 +1,15 @@
 import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdir, stat } from 'node:fs/promises';
+import { mkdir, rm, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 import {
     CreateBucketCommand,
+    DeleteObjectsCommand,
     GetObjectCommand,
     HeadBucketCommand,
+    ListObjectVersionsCommand,
     PutBucketVersioningCommand,
     PutObjectCommand,
     S3Client,
@@ -87,6 +89,25 @@ export class ObjectStorage {
         }
 
         return createReadStream(this.localPath(key));
+    }
+
+    async removeAllVersions(key: string): Promise<void> {
+        if (!this.s3) {
+            await rm(this.localPath(key), { force: true });
+
+            return;
+        }
+
+        const bucket = this.config.S3_BUCKET;
+        const listing = await this.s3.send(new ListObjectVersionsCommand({ Bucket: bucket, Prefix: key }));
+
+        const objects = [...(listing.Versions ?? []), ...(listing.DeleteMarkers ?? [])]
+            .filter((version) => version.Key === key)
+            .map((version) => ({ Key: key, VersionId: version.VersionId }));
+
+        if (objects.length) {
+            await this.s3.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: objects, Quiet: true } }));
+        }
     }
 
     private localPath(key: string): string {

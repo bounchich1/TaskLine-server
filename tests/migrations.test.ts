@@ -55,8 +55,8 @@ it('rolls back every pending migration when one fails', async () => {
     await addMigration('003_broken.sql', 'ALTER TABLE missing ADD COLUMN x integer;');
 
     await expect(migrate(db, directoryUrl())).rejects.toThrow();
-    expect(await migrate(db, serverFile('migrations/'))).toEqual([1, 2, 3]);
-    expect(await schemaVersion(db)).toBe(3);
+    expect(await migrate(db, serverFile('migrations/'))).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(await schemaVersion(db)).toBe(6);
 });
 
 it('refuses two migrations with the same version', async () => {

@@ -2,7 +2,7 @@ import type { Readable } from 'node:stream';
 
 import type { Config } from '../../shared/config.js';
 import { createCtx } from '../../shared/context.js';
-import type { Database } from '../../shared/db.js';
+import { one, type Database } from '../../shared/db.js';
 import type { Employee } from '../../shared/types/entities.js';
 import type { Session } from '../../shared/types/session.js';
 
@@ -64,5 +64,21 @@ export class Files {
 
     async materialize(id: string): Promise<MaterializedFile> {
         return materialize(this.deps, id);
+    }
+
+    async purge(id: string): Promise<void> {
+        const { db, ctx, storage } = this.deps;
+
+        const row = await one<{ object_key: string | null }>(
+            db,
+            'SELECT object_key FROM attachments WHERE org_id=$1 AND id=$2',
+            [ctx.org, id],
+        );
+
+        if (row?.object_key) {
+            await storage.removeAllVersions(row.object_key);
+        }
+
+        await db.query('UPDATE attachments SET object_key=NULL,sha256=NULL WHERE org_id=$1 AND id=$2', [ctx.org, id]);
     }
 }

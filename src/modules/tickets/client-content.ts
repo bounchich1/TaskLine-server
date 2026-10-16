@@ -103,8 +103,10 @@ async function createTicket(
 
     return requireOne<Ticket>(
         tx,
-        `INSERT INTO tickets(org_id,client_id,description,consent_version,consent_revision,ai_status,review_required)
-     VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+        `INSERT INTO tickets(org_id,ticket_number,client_id,description,consent_version,consent_revision,ai_status,
+       review_required)
+     VALUES($1,nextval((SELECT ticket_sequence FROM organizations WHERE id=$1)::regclass),$2,$3,$4,$5,$6,$7)
+     RETURNING *`,
         [
             ctx.org,
             client.id,

@@ -5,14 +5,15 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance } from 'fastify';
 
 import { MaxClient } from '../../integrations/max/index.js';
-import { Admin, adminRoutes, opsRoutes } from '../../modules/admin/index.js';
+import { Admin, adminRoutes, metricsRoutes, opsRoutes } from '../../modules/admin/index.js';
 import { deliveryRoutes, DeliveryWorker } from '../../modules/delivery/index.js';
 import { addDemoAccessHook, DemoRoles } from '../../modules/demo-access/index.js';
 import { dictionariesRoutes } from '../../modules/dictionaries/index.js';
 import { Files, filesRoutes } from '../../modules/files/index.js';
 import { devInboundRoutes, Inbox, webhookRoutes } from '../../modules/inbox/index.js';
 import { eventsRoutes, notificationsRoutes } from '../../modules/notifications/index.js';
-import { authRoutes, employeesRoutes, StaffBot, staffBotRoutes } from '../../modules/staff/index.js';
+import { Privacy, privacyRoutes } from '../../modules/privacy/index.js';
+import { alertRoutes, authRoutes, employeesRoutes, StaffBot, staffBotRoutes } from '../../modules/staff/index.js';
 import { TicketCommands, TicketQueries, ticketRoutes } from '../../modules/tickets/index.js';
 import type { Config } from '../../shared/config.js';
 import type { Database } from '../../shared/db.js';
@@ -21,6 +22,7 @@ import { handleError } from './error-handler.js';
 import { healthRoutes } from './health.routes.js';
 import { addOriginHook, addSessionHook } from './hooks.js';
 import { loggerOptions } from './logger.js';
+import { rateLimitOptions } from './rate-limit.js';
 import { useStrictJsonParser } from './strict-json-parser.js';
 
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -33,7 +35,7 @@ export async function buildApi(db: Database, config: Config): Promise<FastifyIns
         logger: loggerOptions(config),
     });
 
-    await registerInfrastructure(app);
+    await registerInfrastructure(app, config);
     useStrictJsonParser(app);
     app.setErrorHandler(handleError);
     addOriginHook(app, config);
@@ -50,10 +52,10 @@ export async function buildApi(db: Database, config: Config): Promise<FastifyIns
     return app;
 }
 
-async function registerInfrastructure(app: FastifyInstance): Promise<void> {
+async function registerInfrastructure(app: FastifyInstance, config: Config): Promise<void> {
     await app.register(cookie);
     await app.register(helmet, { contentSecurityPolicy: false });
-    await app.register(rateLimit, { max: 180, timeWindow: '1 minute' });
+    await app.register(rateLimit, rateLimitOptions(config));
 
     await app.register(multipart, {
         limits: { files: 1, fileSize: MAX_UPLOAD_BYTES, fields: 0, parts: 1 },
@@ -80,6 +82,7 @@ async function registerRoutes(app: FastifyInstance, db: Database, config: Config
     await app.register(filesRoutes, { files });
     await app.register(adminRoutes, { admin });
     await app.register(opsRoutes, { admin });
+    await app.register(privacyRoutes, { privacy: new Privacy(db, config) });
     await app.register(eventsRoutes, { db, config });
 
     if (config.MAX_STAFF_WEBHOOK_SECRET) {
@@ -91,4 +94,20 @@ async function registerRoutes(app: FastifyInstance, db: Database, config: Config
     if (config.DEV_AUTH_ENABLED && config.NODE_ENV !== 'production') {
         await app.register(devInboundRoutes, { inbox });
     }
+
+    if (config.OPS_TOKEN) {
+        await registerOpsRoutes(app, db, config);
+    }
+}
+
+async function registerOpsRoutes(app: FastifyInstance, db: Database, config: Config): Promise<void> {
+    const token = config.OPS_TOKEN;
+
+    const sender = new MaxClient(
+        config,
+        config.MAX_STAFF_BOT_TOKEN ? { token: config.MAX_STAFF_BOT_TOKEN } : undefined,
+    );
+
+    await app.register(metricsRoutes, { db, org: config.ORG_ID, token, version: config.APP_VERSION });
+    await app.register(alertRoutes, { db, org: config.ORG_ID, token, sender });
 }

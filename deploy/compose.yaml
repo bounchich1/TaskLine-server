@@ -82,13 +82,33 @@ services:
       start_period: 20s
 
   postgres:
-    image: postgres:18.3-alpine
+    image: max-support-postgres:18.3-pgbackrest
+    build: ../infra/postgres
     restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=/usr/local/bin/pgbackrest-archive %p
+      - -c
+      - archive_timeout=${BACKUP_ARCHIVE_TIMEOUT:-60}
     environment:
       POSTGRES_USER: support
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: support
-    volumes: [postgres-data:/var/lib/postgresql]
+      BACKUP_REPO_TYPE: ${BACKUP_REPO_TYPE:-}
+      BACKUP_REPO_PATH: ${BACKUP_REPO_PATH:-/pgbackrest}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:-}
+      BACKUP_S3_KEY: ${BACKUP_S3_KEY:-}
+      BACKUP_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:-}
+      BACKUP_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
+      BACKUP_CIPHER_PASS: ${BACKUP_CIPHER_PASS:-}
+      BACKUP_RETENTION_FULL: ${BACKUP_RETENTION_FULL:-2}
+      PG_REPLICATION_HBA: ${PG_REPLICATION_HBA:-}
+    volumes: [postgres-data:/var/lib/postgresql, backup-repo:/pgbackrest]
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U support -d support']
       interval: 3s
@@ -152,6 +172,43 @@ services:
       LOG_LEVEL: error
     volumes: [memory-index-data:/data]
 
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    profiles: [monitoring]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    secrets: [ops_token]
+    depends_on: [api]
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    profiles: [monitoring]
+    restart: unless-stopped
+    command: [--config.file=/etc/alertmanager/alertmanager.yml, --storage.path=/alertmanager]
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    secrets: [ops_token]
+
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    profiles: [monitoring]
+    restart: unless-stopped
+    command: [--path.rootfs=/host]
+    pid: host
+    volumes: ['/:/host:ro,rslave']
+
+secrets:
+  ops_token:
+    environment: OPS_TOKEN
+
 networks:
   default:
     driver_opts:
@@ -170,3 +227,6 @@ volumes:
   object-data:
   memory-engine-data:
   memory-index-data:
+  backup-repo:
+  prometheus-data:
+  alertmanager-data:

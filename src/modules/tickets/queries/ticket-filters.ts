@@ -77,7 +77,7 @@ function addSearch(conditions: SqlConditions, rawQuery: string): void {
 
     const query = rawQuery.trim().replace(/^№\s*/, '');
 
-    if (/^\d{1,6}$/.test(query)) {
+    if (/^\d{1,9}$/.test(query)) {
         conditions.add('t.ticket_number=?', Number(query));
 
         return;

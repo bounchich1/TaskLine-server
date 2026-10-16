@@ -26,7 +26,7 @@ export class DeliveryWorker {
     }
 
     async rate(): Promise<void> {
-        await waitForSendSlot(this.deps.db);
+        await waitForSendSlot(this.deps.db, this.deps.ctx.org);
     }
 
     async deliver(clientId: string): Promise<boolean> {

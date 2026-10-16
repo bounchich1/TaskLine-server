@@ -25,6 +25,7 @@ export type Client = Row & {
     consent_revision: number;
     next_ingress: string;
     synthetic: boolean;
+    erased_at: string | null;
 };
 
 export type Ticket = Row & {
@@ -48,6 +49,7 @@ export type Ticket = Row & {
     ai_status: string;
     suggestion: TriageResult | null;
     consent_revision: number;
+    purged_at: string | null;
 };
 
 export type Message = Row & {

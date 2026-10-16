@@ -1,0 +1,16 @@
+route:
+  receiver: taskline-admins
+  group_by: [alertname]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: taskline-admins
+    webhook_configs:
+      - url: http://api:3000/internal/alerts
+        send_resolved: true
+        max_alerts: 50
+        http_config:
+          authorization:
+            credentials_file: /run/secrets/ops_token

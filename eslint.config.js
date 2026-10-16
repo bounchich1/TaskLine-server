@@ -25,9 +25,10 @@ const MODULE_DEPENDENCIES = {
     inbox: ['consent', 'tickets', 'messages', 'outbox'],
     delivery: ['files'],
     notifications: ['staff'],
-    admin: ['templates', 'dictionaries', 'files'],
+    admin: ['templates', 'dictionaries', 'files', 'privacy'],
     ai: ['dictionaries'],
     'demo-access': [],
+    privacy: ['consent', 'outbox', 'learning'],
 };
 
 const publicApi = (/** @type {string} */ type, /** @type {string[] | undefined} */ names) => ({

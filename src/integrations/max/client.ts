@@ -114,6 +114,14 @@ export class MaxClient implements MaxTransport {
         return responseBody.mid;
     }
 
+    async sendToUser(userId: string, text: string): Promise<void> {
+        if (this.c.MAX_MODE === 'mock') {
+            return;
+        }
+
+        await this.request('/messages', { text, notify: true }, { user_id: userId, disable_link_preview: 'true' });
+    }
+
     private async sendWhenAttachmentsReady(chatId: string, body: Row): Promise<Row> {
         const query = { chat_id: chatId, disable_link_preview: 'true' };
 

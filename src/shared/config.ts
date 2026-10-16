@@ -34,6 +34,7 @@ const schema = z.object({
     MAX_STAFF_BOT_TOKEN: z.string().default(''),
     MAX_STAFF_WEBHOOK_SECRET: z.union([z.literal(''), z.string().regex(/^[\w-]{32,256}$/)]).default(''),
     MAX_MEDIA_HOSTS: z.string().default(''),
+    OPS_TOKEN: z.union([z.literal(''), z.string().min(32).max(256)]).default(''),
     MAX_CA_FILE: z.string().default(''),
     POLICY_VERSION: z.string().min(1),
     POLICY_URL: z.url(),

@@ -21,7 +21,7 @@ export function queueFor(kind: string): QueueName {
         return 'memory-io';
     }
 
-    return ['file', 'scan'].includes(kind) ? 'file-processing' : 'maintenance';
+    return ['file', 'scan', 'attachment_purge'].includes(kind) ? 'file-processing' : 'maintenance';
 }
 
 export function createRedisConnections(url: string): { producer: Redis; consumer: Redis } {

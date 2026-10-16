@@ -67,6 +67,7 @@ describe('role permissions', () => {
             'employees.manage',
             'organization.configure',
             'audit.view',
+            'clients.privacy',
         ]);
 
         expect(permissionsOf('unknown')).toEqual([]);

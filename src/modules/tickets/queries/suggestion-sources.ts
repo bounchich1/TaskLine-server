@@ -29,7 +29,7 @@ export type SourceRow = Row & {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const SOURCE_ROWS = `SELECT r.id AS memory_id,r.ticket_id,r.closure_id,r.content,t.current_cycle_id,
-  lpad(t.ticket_number::text,6,'0') AS number,cl.cycle_no,cl.cutoff_seq,cl.closed_at,cl.invalidated,
+  lpad(t.ticket_number::text,greatest(6,length(t.ticket_number::text)),'0') AS number,cl.cycle_no,cl.cutoff_seq,cl.closed_at,cl.invalidated,
   (c.consent_state='granted' AND c.consent_revision=t.consent_revision) AS consented
   FROM memory_records r JOIN closures cl ON cl.id=r.closure_id
   JOIN tickets t ON t.id=r.ticket_id JOIN clients c ON c.id=t.client_id

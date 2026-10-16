@@ -3,6 +3,7 @@ import { Postgres } from '../../shared/db.js';
 
 import type { CliCommand } from './cli-command.js';
 import { aiCapCommand } from './commands/ai-cap.js';
+import { aiQuotaCommand } from './commands/ai-quota.js';
 import { bootstrapCommand } from './commands/bootstrap.js';
 import { mediaHostsCommand } from './commands/media-hosts.js';
 import { memoryReconcileCommand } from './commands/memory-reconcile.js';
@@ -21,12 +22,13 @@ const COMMANDS = new Map<string, CliCommand>([
     ['memory-reconcile', memoryReconcileCommand],
     ['permit-resolve', permitResolveCommand],
     ['ai-cap', aiCapCommand],
+    ['ai-quota', aiQuotaCommand],
     ['seed-test-data', seedTestDataCommand],
 ]);
 
 const USAGE =
     'Commands: migrate, bootstrap, subscribe [staff], storage-init, media-hosts, memory-reconcile <id>, ' +
-    'permit-resolve <slot> <evidence>, ai-cap <10..15>, seed-test-data [file]';
+    'permit-resolve <slot> <evidence>, ai-cap <10..15>, ai-quota <1..15|off>, seed-test-data [file]';
 
 export async function runCli(argv: string[]): Promise<void> {
     const config = readConfig();

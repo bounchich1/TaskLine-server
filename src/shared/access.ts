@@ -18,6 +18,7 @@ const PERMISSIONS = [
     'employees.manage',
     'organization.configure',
     'audit.view',
+    'clients.privacy',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -36,7 +37,13 @@ const SUPERVISOR: readonly Permission[] = [
     'operations.retry',
 ];
 
-const ADMIN: readonly Permission[] = [...SUPERVISOR, 'employees.manage', 'organization.configure', 'audit.view'];
+const ADMIN: readonly Permission[] = [
+    ...SUPERVISOR,
+    'employees.manage',
+    'organization.configure',
+    'audit.view',
+    'clients.privacy',
+];
 
 const ROLE_PERMISSIONS = new Map<string, ReadonlySet<Permission>>([
     ['support', new Set(SUPPORT)],

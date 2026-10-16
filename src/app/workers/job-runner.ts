@@ -80,6 +80,10 @@ export class JobRunner {
                 await this.memory.remove(job.ref_id);
 
                 return true;
+            case 'attachment_purge':
+                await this.files.purge(job.ref_id);
+
+                return true;
             case 'message_revision':
                 await applyDeferredRevision(this.db, this.ctx, job);
 
