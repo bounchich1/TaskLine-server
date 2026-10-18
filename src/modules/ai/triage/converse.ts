@@ -22,6 +22,7 @@ export interface Conversation {
     messageId: string;
     dictionaryVersion: string;
     dictionaries: Row[];
+    businessVersion: number;
     fallback: TriageResult;
     deadline: number;
 }

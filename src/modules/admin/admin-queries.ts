@@ -5,6 +5,7 @@ import { EMPLOYEE_STATUS_SQL } from '../../shared/staff.js';
 import type { Employee } from '../../shared/types/entities.js';
 import { reopenDownload } from '../files/index.js';
 import { readRetention } from '../privacy/index.js';
+import { DEFAULT_TEMPLATES } from '../templates/index.js';
 
 export async function listAllEmployees(db: Sql, org: string) {
     const result = await db.query(
@@ -17,9 +18,12 @@ export async function listAllEmployees(db: Sql, org: string) {
 }
 
 export async function listTemplates(db: Sql, org: string) {
-    const result = await db.query('SELECT code,body,version FROM templates WHERE org_id=$1 ORDER BY code', [org]);
+    const result = await db.query<{ code: string }>(
+        'SELECT code,body,version FROM templates WHERE org_id=$1 ORDER BY code',
+        [org],
+    );
 
-    return { items: result.rows };
+    return { items: result.rows.map((row) => ({ ...row, default_body: DEFAULT_TEMPLATES[row.code] ?? null })) };
 }
 
 export async function readSettings(db: Sql, org: string) {

@@ -24,6 +24,7 @@ COPY package.json ./
 COPY migrations ./migrations
 COPY contracts ./contracts
 COPY agent-skills ./agent-skills
+COPY presets ./presets
 COPY certs ./certs
 COPY openapi.yaml ./
 COPY test-data ./test-data

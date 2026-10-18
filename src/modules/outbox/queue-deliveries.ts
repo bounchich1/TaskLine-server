@@ -2,6 +2,7 @@ import { menuKeyboard } from '../../integrations/max/index.js';
 import type { Ctx } from '../../shared/context.js';
 import type { Sql } from '../../shared/db.js';
 import type { Client, Employee, Message, Ticket } from '../../shared/types/entities.js';
+import { readBotSettings } from '../business/index.js';
 
 export async function queueCallbackAnswer(
     tx: Sql,
@@ -27,6 +28,8 @@ export async function queueHistoryPage(
     client: Client,
     page: { sourceKey: string; text: string },
 ): Promise<void> {
+    const { menu } = await readBotSettings(tx, ctx);
+
     await tx.query(
         `INSERT INTO deliveries(org_id,client_id,logical_key,kind,body)
      VALUES($1,$2,$3,'history_page',$4) ON CONFLICT DO NOTHING`,
@@ -34,7 +37,7 @@ export async function queueHistoryPage(
             ctx.org,
             client.id,
             `history:${page.sourceKey}`,
-            JSON.stringify({ text: page.text, attachments: [menuKeyboard()] }),
+            JSON.stringify({ text: page.text, attachments: [menuKeyboard(menu)] }),
         ],
     );
 }

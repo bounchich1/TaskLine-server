@@ -233,5 +233,13 @@ describe('security and coverage', () => {
 
         expect(cases.map((item) => confirmed(item.confirmation))).toEqual(cases.map(() => true));
         expect(confirmed('Перезагрузка не помогло, интернет так и не появился')).toBe(false);
+
+        for (const text of ['Деньги вернулись, спасибо', 'Заказ пришёл, всё отлично', 'Смогла войти, спасибо']) {
+            expect(confirmed(text)).toBe(true);
+        }
+
+        for (const text of ['Деньги так и не пришли', 'Код не пришёл', 'Заказ пришёл, но деньги не вернули']) {
+            expect(confirmed(text)).toBe(false);
+        }
     });
 });

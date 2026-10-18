@@ -3,6 +3,7 @@ import { one, type Sql } from '../../shared/db.js';
 import { ensure } from '../../shared/errors.js';
 import { audit } from '../../shared/events.js';
 import type { Client, Ticket } from '../../shared/types/entities.js';
+import { currentPolicyVersion } from '../business/index.js';
 import { clearPreconsentBuffers } from '../consent/index.js';
 import { cancelClientDeliveries } from '../outbox/index.js';
 
@@ -85,6 +86,6 @@ async function forgetClient(tx: Sql, ctx: Ctx, client: Client): Promise<void> {
     await tx.query("INSERT INTO consent_events(org_id,client_id,action,policy_version) VALUES($1,$2,'erase',$3)", [
         ctx.org,
         client.id,
-        client.consent_version ?? ctx.config.POLICY_VERSION,
+        client.consent_version ?? (await currentPolicyVersion(tx, ctx)),
     ]);
 }

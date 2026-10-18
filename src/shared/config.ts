@@ -21,6 +21,10 @@ const schema = z.object({
     ORG_ID: z.uuid().default('00000000-0000-4000-8000-000000000001'),
     ORG_NAME: z.string().default('Служба поддержки'),
     ORG_TIMEZONE: z.string().default('Asia/Krasnoyarsk'),
+    ORG_PRESET: z
+        .string()
+        .regex(/^[a-z][a-z0-9_]*$/)
+        .default('general'),
     DATABASE_URL: z.string().min(1),
     REDIS_URL: z.string().default('redis://localhost:6379'),
     ENCRYPTION_KEY: z.string().regex(/^[a-f0-9]{64}$/i),

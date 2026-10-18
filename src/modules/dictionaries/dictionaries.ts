@@ -5,7 +5,7 @@ export type DictionaryDimension = 'tag' | 'urgency' | 'complexity';
 
 export async function snapshotActiveDictionaries(tx: Sql, org: string): Promise<Row[]> {
     const result = await tx.query(
-        `SELECT dimension,code,label,rank,version FROM dictionaries
+        `SELECT dimension,code,label,description,examples,rank,version FROM dictionaries
      WHERE org_id=$1 AND active ORDER BY dimension,code`,
         [org],
     );

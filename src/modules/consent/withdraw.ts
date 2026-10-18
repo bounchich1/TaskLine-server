@@ -2,6 +2,7 @@ import type { Ctx } from '../../shared/context.js';
 import type { Sql } from '../../shared/db.js';
 import { audit, emit } from '../../shared/events.js';
 import type { Client, Ticket } from '../../shared/types/entities.js';
+import { currentPolicyVersion } from '../business/index.js';
 import { invalidateLearning } from '../learning/index.js';
 import { cancelClientDeliveries, queueBotMessage } from '../outbox/index.js';
 
@@ -59,6 +60,6 @@ async function recordWithdrawal(tx: Sql, ctx: Ctx, client: Client): Promise<void
     await tx.query("INSERT INTO consent_events(org_id,client_id,action,policy_version) VALUES($1,$2,'withdraw',$3)", [
         ctx.org,
         client.id,
-        client.consent_version ?? ctx.config.POLICY_VERSION,
+        client.consent_version ?? (await currentPolicyVersion(tx, ctx)),
     ]);
 }

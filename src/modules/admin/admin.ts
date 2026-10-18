@@ -8,7 +8,7 @@ import { DEFAULT_TEMPLATES, validateTemplate } from '../templates/index.js';
 import { runAdminMutation } from './admin-mutation.js';
 import { listAllEmployees, listTemplates, readSettings, recentAudit, retryFailedJob } from './admin-queries.js';
 import { adminDiagnostics } from './diagnostics.js';
-import { dictionaryBody, publishDictionaryEntry } from './dictionaries.js';
+import { dictionaryBody, newDictionaryCode, publishDictionaryEntry } from './dictionaries.js';
 import { createEmployee, employeeChangesBody, newEmployeeBody, updateEmployee } from './employees.js';
 import { assertValidTimezone, settingsBody, templateBody, updateSettings, updateTemplate } from './organization.js';
 
@@ -48,13 +48,18 @@ export class Admin {
 
     async dictionary(request: AdminRequest) {
         const body = dictionaryBody.parse(request.body);
-        const route = `admin.dictionary:${body.dimension}:${body.code}`;
+        const route = `admin.dictionary:${body.dimension}:${body.code ?? 'new'}`;
 
         return runAdminMutation(
             this.db,
             this.org,
             { ...request, permission: 'organization.configure', route, body },
-            (tx) => publishDictionaryEntry(tx, this.org, { body, expectedVersion: request.expectedVersion }),
+            async (tx) => {
+                const code = body.code ?? (await newDictionaryCode(tx, this.org, body));
+                const expectedVersion = body.code ? request.expectedVersion : 0;
+
+                return publishDictionaryEntry(tx, this.org, { body: { ...body, code }, expectedVersion });
+            },
         );
     }
 

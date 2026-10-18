@@ -3,6 +3,7 @@ import type { Ctx } from '../../shared/context.js';
 import { one, type Sql } from '../../shared/db.js';
 import { formatTicketNumber } from '../../shared/ticket-number.js';
 import type { Client, Row, Ticket } from '../../shared/types/entities.js';
+import { readBotSettings, type MenuLabels } from '../business/index.js';
 import { addMessage } from '../messages/index.js';
 import { render } from '../templates/index.js';
 
@@ -36,10 +37,15 @@ export async function queueBotMessage(tx: Sql, ctx: Ctx, bot: BotMessage): Promi
         return;
     }
 
+    const settings = await readBotSettings(tx, ctx);
+
     const text = await render(tx, ctx.org, template, {
         ticket_number: ticket ? formatTicketNumber(ticket.ticket_number) : '',
-        policy_url: ctx.config.POLICY_URL,
-        alternative_contact: ctx.config.ALTERNATIVE_CONTACT,
+        policy_url: settings.policyUrl,
+        alternative_contact: settings.alternativeContact,
+        menu_tickets: settings.menu.tickets,
+        menu_help: settings.menu.help,
+        menu_withdraw: settings.menu.withdraw,
         ...values,
     });
 
@@ -64,11 +70,11 @@ export async function queueBotMessage(tx: Sql, ctx: Ctx, bot: BotMessage): Promi
             cycleId ?? null,
             key,
             template,
-            JSON.stringify({ text, ...withMenu(template), ...extra }),
+            JSON.stringify({ text, ...withMenu(template, settings.menu), ...extra }),
         ],
     );
 }
 
-function withMenu(template: string): Row {
-    return MENU_TEMPLATES.has(template) ? { attachments: [menuKeyboard()] } : {};
+function withMenu(template: string, labels: MenuLabels): Row {
+    return MENU_TEMPLATES.has(template) ? { attachments: [menuKeyboard(labels)] } : {};
 }

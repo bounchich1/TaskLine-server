@@ -1,12 +1,13 @@
 import type { Ctx } from '../../shared/context.js';
 import { requireOne, type Sql } from '../../shared/db.js';
 import type { Client } from '../../shared/types/entities.js';
+import { currentPolicyVersion } from '../business/index.js';
 import { queueBotMessage } from '../outbox/index.js';
 
 import { clearPreconsentBuffers } from './preconsent-buffers.js';
 
 export async function grantConsent(tx: Sql, ctx: Ctx, client: Client, sourceKey: string): Promise<Client | undefined> {
-    const policy = ctx.config.POLICY_VERSION;
+    const policy = await currentPolicyVersion(tx, ctx);
 
     if (client.consent_state === 'granted' && client.consent_version === policy) {
         return undefined;
@@ -46,7 +47,7 @@ export async function declineConsent(tx: Sql, ctx: Ctx, client: Client, sourceKe
     await tx.query("INSERT INTO consent_events(org_id,client_id,action,policy_version) VALUES($1,$2,'decline',$3)", [
         ctx.org,
         client.id,
-        ctx.config.POLICY_VERSION,
+        await currentPolicyVersion(tx, ctx),
     ]);
 
     await queueBotMessage(tx, ctx, {

@@ -2,6 +2,7 @@ import type { Ctx } from '../../../shared/context.js';
 import { one, type Database } from '../../../shared/db.js';
 import { AppError, ensure } from '../../../shared/errors.js';
 import type { Job, Message, Row } from '../../../shared/types/entities.js';
+import { businessBrief } from '../../business/index.js';
 import { triageSchema } from '../contracts/contracts.js';
 import { redact } from '../contracts/redact.js';
 import { eligibleJob, triageTimeLeftMs } from '../gateway/job-eligibility.js';
@@ -30,7 +31,11 @@ export async function runTriage(deps: TriageDeps, job: Job): Promise<void> {
 
     const { messageId } = conversation;
 
-    const failure = await deps.db.tx(async (tx) => applyTriage(tx, deps.ctx, { job, messageId, outcome }));
+    const { businessVersion } = conversation;
+
+    const failure = await deps.db.tx(async (tx) =>
+        applyTriage(tx, deps.ctx, { job, messageId, outcome, businessVersion }),
+    );
 
     if (failure) {
         throw new AppError(failure, 422, 'ИИ-разбор не выполнен.');
@@ -54,6 +59,7 @@ async function startConversation({ db, ctx }: TriageDeps, job: Job): Promise<Con
 
     const dictionaries = job.payload.dictionaries as Row[];
     const dictionaryVersion = String(job.payload.dictionary_version);
+    const business = await businessBrief(db, ctx.org);
 
     const input = {
         first_message: {
@@ -66,6 +72,7 @@ async function startConversation({ db, ctx }: TriageDeps, job: Job): Promise<Con
         },
         dictionary_version: dictionaryVersion,
         dictionaries,
+        business: business.brief,
     };
 
     const messages: ModelMessage[] = [
@@ -78,7 +85,16 @@ async function startConversation({ db, ctx }: TriageDeps, job: Job): Promise<Con
 
     const fallback = fallbackTriage(dictionaryVersion, message.id);
 
-    return { job, messages, messageId: message.id, dictionaryVersion, dictionaries, fallback, deadline };
+    return {
+        job,
+        messages,
+        messageId: message.id,
+        dictionaryVersion,
+        dictionaries,
+        businessVersion: business.version,
+        fallback,
+        deadline,
+    };
 }
 
 async function dropStaleMemoryEvidence(

@@ -17,6 +17,7 @@ x-server: &server
     APP_ORIGIN: http://localhost:${WEB_PORT:-8080}
     ORG_NAME: ${ORG_NAME:-Служба поддержки}
     ORG_TIMEZONE: ${ORG_TIMEZONE:-Asia/Krasnoyarsk}
+    ORG_PRESET: ${ORG_PRESET:-telecom}
     DATABASE_URL: postgres://support:${POSTGRES_PASSWORD:-support-local}@postgres:5432/support
     REDIS_URL: redis://redis:6379
     GATEWAY_URL: http://gateway:3001

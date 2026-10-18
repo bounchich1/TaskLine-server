@@ -2,6 +2,7 @@ import type { Ctx } from '../../shared/context.js';
 import { one, type Sql } from '../../shared/db.js';
 import type { ClientInput } from '../../shared/types/client-input.js';
 import type { Client } from '../../shared/types/entities.js';
+import { currentPolicyVersion } from '../business/index.js';
 import { declineConsent, sendConsentPrompt, withdrawConsent } from '../consent/index.js';
 import { queueCallbackAnswer } from '../outbox/index.js';
 
@@ -40,7 +41,7 @@ export async function handleCallback(tx: Sql, ctx: Ctx, client: Client, input: C
         return;
     }
 
-    if (action.policy_version !== ctx.config.POLICY_VERSION) {
+    if (action.policy_version !== (await currentPolicyVersion(tx, ctx))) {
         await sendConsentPrompt(tx, ctx, client, input.sourceKey);
 
         return;

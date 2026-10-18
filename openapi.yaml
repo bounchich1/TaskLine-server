@@ -957,13 +957,25 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [dimension, code, label, rank, active]
+              required: [dimension, label, rank, active]
               properties:
                 dimension: { type: string, enum: [tag, urgency, complexity] }
-                code: { type: string, pattern: '^[a-z][a-z0-9_]{0,63}$' }
+                code:
+                  type: string
+                  pattern: '^[a-z][a-z0-9_]{0,63}$'
+                  description: Без кода создаётся новое значение, код генерируется из названия.
                 label: { type: string, minLength: 1, maxLength: 120 }
                 rank: { type: integer, minimum: 0, maximum: 100 }
                 active: { type: boolean }
+                description:
+                  type: string
+                  maxLength: 200
+                  description: Пояснение для ИИ; без поля сохраняется прежнее.
+                examples:
+                  type: array
+                  maxItems: 3
+                  items: { type: string, minLength: 1, maxLength: 100 }
+                  description: Примеры сообщений клиентов; без поля сохраняются прежние.
       responses:
         '200':
           description: Значение справочника
@@ -1103,6 +1115,173 @@ paths:
         '409':
           $ref: '#/components/responses/Error'
         '422':
+          $ref: '#/components/responses/Error'
+  /v1/admin/profile:
+    get:
+      operationId: getAdminProfile
+      tags: [admin]
+      summary: Профиль бизнеса для ИИ — описание, тон ответов, правила, глоссарий
+      responses:
+        '200':
+          description: Профиль
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BusinessProfile' }
+        '403':
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: putAdminProfile
+      tags: [admin]
+      summary: Изменить профиль бизнеса
+      description: >-
+        Профиль передаётся ИИ как данные о компании; он не меняет правила навыка и схему ответа.
+        `configured: true` отмечает, что первичная настройка пройдена.
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [description, offerings, tone, rules, glossary, configured]
+              properties:
+                description: { type: string, maxLength: 500 }
+                offerings: { type: string, maxLength: 500 }
+                tone: { type: string, enum: [formal, friendly] }
+                rules: { type: array, maxItems: 8, items: { type: string, minLength: 1, maxLength: 120 } }
+                glossary: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/GlossaryEntry' } }
+                configured: { type: boolean }
+      responses:
+        '200':
+          description: Профиль
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BusinessProfile' }
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/admin/bot:
+    get:
+      operationId: getAdminBot
+      tags: [admin]
+      summary: Настройки бота для клиентов — политика, другой способ связи, кнопки меню
+      responses:
+        '200':
+          description: Настройки бота
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BotSettings' }
+        '403':
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: putAdminBot
+      tags: [admin]
+      summary: Изменить настройки бота
+      description: >-
+        `new_policy_edition: true` публикует новую редакцию политики: клиенты без открытого обращения
+        снова дадут согласие при следующем сообщении. Прежние названия кнопок продолжают работать как команды.
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [policy_url, alternative_contact, menu]
+              properties:
+                policy_url: { type: string, format: uri, maxLength: 500 }
+                alternative_contact: { type: string, minLength: 1, maxLength: 300 }
+                menu: { $ref: '#/components/schemas/MenuLabels' }
+                new_policy_edition: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Настройки бота
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BotSettings' }
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/admin/presets:
+    get:
+      operationId: getAdminPresets
+      tags: [admin]
+      summary: Отраслевые наборы тем и настроек
+      responses:
+        '200':
+          description: Наборы
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, current]
+                properties:
+                  current: { type: [string, 'null'] }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, title, summary, topics]
+                      properties:
+                        id: { type: string, examples: [ecommerce] }
+                        title: { type: string }
+                        summary: { type: string }
+                        topics: { type: array, items: { type: string } }
+        '403':
+          $ref: '#/components/responses/Error'
+  /v1/admin/presets/{id}/preview:
+    get:
+      operationId: getAdminPresetsByIdPreview
+      tags: [admin]
+      summary: Что изменится при применении набора
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Изменения
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PresetPreview' }
+        '404':
+          $ref: '#/components/responses/Error'
+  /v1/admin/presets/{id}/apply:
+    post:
+      operationId: postAdminPresetsByIdApply
+      tags: [admin]
+      summary: Применить отраслевой набор
+      description: >-
+        Добавляет и обновляет темы набора с описаниями и примерами, выключает темы, которых в наборе нет
+        (история обращений сохраняется), задаёт описания уровней срочности и сложности, дополняет правила
+        и глоссарий профиля. `If-Match` — версия профиля бизнеса.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Профиль после применения
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [profile]
+                properties:
+                  profile: { $ref: '#/components/schemas/BusinessProfile' }
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
           $ref: '#/components/responses/Error'
   /v1/admin/diagnostics:
     get:
@@ -1733,13 +1912,15 @@ components:
         evidence: { type: string, maxLength: 2000, description: Чем подтверждено решение }
     DictionaryEntry:
       type: object
-      required: [dimension, code, label, rank, active, version]
+      required: [dimension, code, label, rank, active, description, examples, version]
       properties:
         dimension: { type: string, enum: [tag, urgency, complexity] }
         code: { type: string }
         label: { type: string }
         rank: { type: integer }
         active: { type: boolean }
+        description: { type: string }
+        examples: { type: array, items: { type: string } }
         version: { type: integer }
     Colleague:
       type: object
@@ -1778,7 +1959,56 @@ components:
       properties:
         code: { type: string, examples: [consent_request, ticket_created, ticket_closed] }
         body: { type: string }
+        default_body: { type: [string, 'null'], description: Стандартный текст для кнопки «Вернуть стандартный» }
         version: { type: integer }
+    BusinessProfile:
+      type: object
+      required: [preset, description, offerings, tone, rules, glossary, configured, version]
+      properties:
+        preset: { type: [string, 'null'], examples: [ecommerce] }
+        description: { type: string, maxLength: 500 }
+        offerings: { type: string, maxLength: 500 }
+        tone: { type: string, enum: [formal, friendly] }
+        rules: { type: array, maxItems: 8, items: { type: string, maxLength: 120 } }
+        glossary: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/GlossaryEntry' } }
+        configured: { type: boolean }
+        version: { type: integer }
+    GlossaryEntry:
+      type: object
+      additionalProperties: false
+      required: [term, meaning]
+      properties:
+        term: { type: string, minLength: 1, maxLength: 40 }
+        meaning: { type: string, minLength: 1, maxLength: 120 }
+    MenuLabels:
+      type: object
+      additionalProperties: false
+      required: [tickets, help, withdraw]
+      properties:
+        tickets: { type: string, minLength: 1, maxLength: 40 }
+        help: { type: string, minLength: 1, maxLength: 40 }
+        withdraw: { type: string, minLength: 1, maxLength: 40 }
+    BotSettings:
+      type: object
+      required: [policy_url, policy_version, policy_version_source, alternative_contact, menu, default_menu, version]
+      properties:
+        policy_url: { type: string, format: uri }
+        policy_version: { type: string }
+        policy_version_source: { type: string, enum: [deployment, organization] }
+        alternative_contact: { type: string }
+        menu: { $ref: '#/components/schemas/MenuLabels' }
+        default_menu: { $ref: '#/components/schemas/MenuLabels' }
+        version: { type: integer }
+    PresetPreview:
+      type: object
+      required: [id, title, add, update, deactivate, levels_described]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        add: { type: array, items: { type: string }, description: Новые темы }
+        update: { type: array, items: { type: string }, description: Темы, у которых изменится описание или название }
+        deactivate: { type: array, items: { type: string }, description: Темы, которые будут выключены }
+        levels_described: { type: boolean }
     Settings:
       type: object
       required: [name, timezone, version, retention]

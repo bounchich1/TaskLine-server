@@ -12,12 +12,20 @@ import { TRIAGE_SKILL } from '../skills.js';
 import type { TriageOutcome } from './converse.js';
 
 const FIELDS = ['tag', 'urgency', 'complexity'] as const;
+
+interface TriageApplication {
+    job: Job;
+    messageId: string;
+    outcome: TriageOutcome;
+    businessVersion: number;
+}
+
 const DEFAULT_CODES = { tag: 'undefined', urgency: 'medium', complexity: 'medium' };
 
 export async function applyTriage(
     tx: Sql,
     ctx: Ctx,
-    { job, messageId, outcome }: { job: Job; messageId: string; outcome: TriageOutcome },
+    { job, messageId, outcome, businessVersion }: TriageApplication,
 ): Promise<string | null> {
     const ticket = await lockTicket(tx, ctx, job);
 
@@ -26,7 +34,7 @@ export async function applyTriage(
     }
 
     if (!(await eligibleJob(tx, ctx, job))) {
-        await auditTriage(tx, ctx, { ticket, success: false, reason: 'result_ignored' });
+        await auditTriage(tx, ctx, { ticket, success: false, reason: 'result_ignored', businessVersion });
 
         return 'result_ignored';
     }
@@ -57,22 +65,29 @@ export async function applyTriage(
         !success || result.needs_review,
     ]);
 
-    await auditTriage(tx, ctx, { ticket, success, reason: success ? null : failure });
+    await auditTriage(tx, ctx, { ticket, success, reason: success ? null : failure, businessVersion });
     await emit(tx, ctx.org, { type: 'ticket.classified', ticketId: ticket.id });
 
     return success ? null : failure;
 }
 
+interface TriageAudit {
+    ticket: Ticket;
+    success: boolean;
+    reason: string | null;
+    businessVersion: number;
+}
+
 async function auditTriage(
     tx: Sql,
     ctx: Ctx,
-    { ticket, success, reason }: { ticket: Ticket; success: boolean; reason: string | null },
+    { ticket, success, reason, businessVersion }: TriageAudit,
 ): Promise<void> {
     await audit(tx, ctx.org, {
         actor: null,
         action: 'ai.triage',
         objectId: ticket.id,
-        detail: { success, reason, skill_hash: hash(TRIAGE_SKILL) },
+        detail: { success, reason, skill_hash: hash(TRIAGE_SKILL), business_version: businessVersion },
     });
 }
 

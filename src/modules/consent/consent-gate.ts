@@ -2,6 +2,7 @@ import type { Ctx } from '../../shared/context.js';
 import { one, type Sql } from '../../shared/db.js';
 import type { ClientInput } from '../../shared/types/client-input.js';
 import type { Client, Ticket } from '../../shared/types/entities.js';
+import { currentPolicyVersion } from '../business/index.js';
 import { queueBotMessage } from '../outbox/index.js';
 
 import { sendConsentPrompt } from './consent-prompt.js';
@@ -16,7 +17,7 @@ export async function passesConsentGate(tx: Sql, ctx: Ctx, client: Client, input
 
     const consented =
         client.consent_state === 'granted' &&
-        (openTicket !== undefined || client.consent_version === ctx.config.POLICY_VERSION);
+        (openTicket !== undefined || client.consent_version === (await currentPolicyVersion(tx, ctx)));
 
     if (consented) {
         return true;

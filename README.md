@@ -172,13 +172,14 @@ docker compose up -d --build
 | `POSTGRES_PASSWORD`                    | `support-local`                                                                      | пароль БД                                               |
 | `MINI_APP_SOURCE`                      | Git-адрес TaskLine-mini-app с коммитом                                               | откуда собирать мини-приложение                         |
 | `ORG_NAME`, `ORG_TIMEZONE`             | `Служба поддержки`, `Asia/Krasnoyarsk`                                               | организация по умолчанию                                |
+| `ORG_PRESET`                           | `telecom`                                                                            | отраслевой набор тем при первом запуске (`presets/`)    |
 | `MAX_MODE`                             | `mock`                                                                               | `mock` — без MAX; `live` — реальный Bot API             |
 | `MAX_BOT_TOKEN`                        | пусто                                                                                | токен бота (нужен при `MAX_MODE=live`)                  |
 | `MAX_WEBHOOK_SECRET`                   | `local-webhook-secret-not-for-production`                                            | секрет заголовка `X-Max-Bot-Api-Secret` вебхука         |
 | `DEMO_ROLE_CODES`                      | `support:LOCAL-SUPPORT-CODE,supervisor:LOCAL-SUPERVISOR-CODE,admin:LOCAL-ADMIN-CODE` | коды команды `/code` для выдачи ролей                   |
 | `AI_ENABLED`, `AI_MODE`                | `true`, `mock`                                                                       | ИИ-разбор; `live` — реальный провайдер                  |
 | `AI_API_URL`, `AI_API_KEY`, `AI_MODEL` | OpenAI URL, пусто, пусто                                                             | OpenAI-совместимый провайдер (нужны при `AI_MODE=live`) |
-| `POLICY_VERSION`, `POLICY_URL`         | `local-1`, `http://localhost:8080/legal/`                                            | версия и адрес политики обработки данных                |
+| `POLICY_VERSION`, `POLICY_URL`         | `local-1`, `http://localhost:8080/legal/`                                            | политика по умолчанию; админ меняет её в приложении     |
 | `ENCRYPTION_KEY`, `GATEWAY_SECRET`     | локальные значения                                                                   | ключ шифрования (64 hex) и секрет шлюза ИИ              |
 
 Полный список переменных сервера с пустыми секретами — [.env.example](.env.example)

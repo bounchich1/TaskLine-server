@@ -5,7 +5,14 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance } from 'fastify';
 
 import { MaxClient } from '../../integrations/max/index.js';
-import { Admin, adminRoutes, metricsRoutes, opsRoutes } from '../../modules/admin/index.js';
+import {
+    Admin,
+    adminRoutes,
+    BusinessAdmin,
+    businessAdminRoutes,
+    metricsRoutes,
+    opsRoutes,
+} from '../../modules/admin/index.js';
 import { deliveryRoutes, DeliveryWorker } from '../../modules/delivery/index.js';
 import { addDemoAccessHook, DemoRoles } from '../../modules/demo-access/index.js';
 import { dictionariesRoutes } from '../../modules/dictionaries/index.js';
@@ -82,6 +89,7 @@ async function registerRoutes(app: FastifyInstance, db: Database, config: Config
     await app.register(filesRoutes, { files });
     await app.register(adminRoutes, { admin });
     await app.register(opsRoutes, { admin });
+    await app.register(businessAdminRoutes, { business: new BusinessAdmin(db, config) });
     await app.register(privacyRoutes, { privacy: new Privacy(db, config) });
     await app.register(eventsRoutes, { db, config });
 

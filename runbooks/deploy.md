@@ -47,6 +47,14 @@ The server refuses to start in production with placeholders left in: an empty
 `MAX_BOT_TOKEN`, a `POLICY_VERSION` starting with `dev-`, or a non-HTTPS / `.invalid` URL.
 `BOOTSTRAP_MAX_USER_ID` is your own MAX user id; it becomes the first administrator.
 
+`ORG_PRESET` picks the industry topic set seeded on the very first start (`general`, `ecommerce`,
+`clinic`, `saas`, `telecom`; files in `presets/`). It has no effect on an organisation that already
+has topics; administrators switch sets in the mini-app («Управление → ИИ-помощник»).
+
+`POLICY_URL`, `POLICY_VERSION` and `ALTERNATIVE_CONTACT` are defaults. Once an administrator saves
+another link or contact, or publishes a new policy edition in «Управление → Организация», the value
+stored in the database wins, and changing the environment no longer affects that organisation.
+
 `subscribe` also registers the client bot's `/tickets`, `/help` and `/withdraw` hints shown when
 a client types `/`. Run it again on an existing install whenever that list changes.
 

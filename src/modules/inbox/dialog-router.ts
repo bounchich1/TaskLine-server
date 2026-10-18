@@ -1,8 +1,8 @@
-import { MENU_LABELS } from '../../integrations/max/index.js';
 import type { Ctx } from '../../shared/context.js';
 import type { Sql } from '../../shared/db.js';
 import type { ClientInput } from '../../shared/types/client-input.js';
 import type { Client } from '../../shared/types/entities.js';
+import { menuActionFor, readBotSettings, type MenuAction } from '../business/index.js';
 import { confirmWithdrawal, passesConsentGate, withdrawConsent } from '../consent/index.js';
 import { reviseClientMessage } from '../messages/index.js';
 import { queueBotMessage } from '../outbox/index.js';
@@ -17,14 +17,31 @@ const sendHelp: ClientCommand = (tx, ctx, client, sourceKey) =>
 
 const COMMANDS = new Map<string, ClientCommand>([
     ['/withdraw', withdrawConsent],
-    [MENU_LABELS.withdraw.toLowerCase(), confirmWithdrawal],
     ['/tickets', sendTicketHistory],
-    [MENU_LABELS.tickets.toLowerCase(), sendTicketHistory],
     ['/help', sendHelp],
     ['/menu', sendHelp],
     ['меню', sendHelp],
-    [MENU_LABELS.help.toLowerCase(), sendHelp],
 ]);
+
+const MENU_COMMANDS: Record<MenuAction, ClientCommand> = {
+    tickets: sendTicketHistory,
+    help: sendHelp,
+    withdraw: confirmWithdrawal,
+};
+
+const MAX_MENU_LABEL = 40;
+
+async function findCommand(tx: Sql, ctx: Ctx, command: string): Promise<ClientCommand | undefined> {
+    const fixed = COMMANDS.get(command);
+
+    if (fixed || !command || command.length > MAX_MENU_LABEL) {
+        return fixed;
+    }
+
+    const action = menuActionFor((await readBotSettings(tx, ctx)).menu, command);
+
+    return action ? MENU_COMMANDS[action] : undefined;
+}
 
 export interface RoutedInput {
     client: Client;
@@ -46,7 +63,7 @@ export async function routeClientInput(tx: Sql, ctx: Ctx, { client, input, recei
     }
 
     const command = input.text?.trim().toLowerCase() ?? '';
-    const run = COMMANDS.get(command);
+    const run = await findCommand(tx, ctx, command);
 
     if (run) {
         await run(tx, ctx, client, input.sourceKey);

@@ -12,8 +12,8 @@ export const BOT_COMMANDS = [
     { name: 'withdraw', description: 'Отозвать согласие на обработку данных' },
 ];
 
-export const menuKeyboard = () =>
+export const menuKeyboard = (labels: Record<keyof typeof MENU_LABELS, string> = MENU_LABELS) =>
     Keyboard.inlineKeyboard([
-        [Keyboard.button.message(MENU_LABELS.tickets), Keyboard.button.message(MENU_LABELS.help)],
-        [Keyboard.button.message(MENU_LABELS.withdraw)],
+        [Keyboard.button.message(labels.tickets), Keyboard.button.message(labels.help)],
+        [Keyboard.button.message(labels.withdraw)],
     ]);

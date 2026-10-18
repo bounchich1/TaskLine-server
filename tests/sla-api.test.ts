@@ -87,7 +87,7 @@ it('saves the calendar, holidays and topic overrides', async () => {
         holidays: ['2026-11-04', '2026-11-04', '2026-01-01'],
         policies: [
             { urgency: 'medium', tag: '*', first_response_minutes: 60, resolution_minutes: 960 },
-            { urgency: 'medium', tag: 'billing', first_response_minutes: 30, resolution_minutes: 120 },
+            { urgency: 'medium', tag: 'payment', first_response_minutes: 30, resolution_minutes: 120 },
         ],
     });
 

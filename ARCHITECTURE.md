@@ -34,18 +34,19 @@ architectural decision and happens there.
 | staff         | –                                                      |
 | files         | –                                                      |
 | sla           | –                                                      |
+| business      | –                                                      |
 | messages      | learning                                               |
-| outbox        | templates, messages                                    |
+| outbox        | templates, messages, business                          |
 | ratings       | outbox                                                 |
-| consent       | outbox, learning                                       |
+| consent       | outbox, learning, business                             |
 | tickets       | messages, outbox, ratings, learning, dictionaries, sla |
-| inbox         | consent, tickets, messages, outbox                     |
+| inbox         | consent, tickets, messages, outbox, business           |
 | delivery      | files, sla                                             |
 | notifications | staff                                                  |
-| admin         | templates, dictionaries, files, privacy, sla           |
-| ai            | dictionaries, sla                                      |
+| admin         | templates, dictionaries, files, privacy, sla, business |
+| ai            | dictionaries, sla, business                            |
 | demo-access   | –                                                      |
-| privacy       | consent, outbox, learning                              |
+| privacy       | consent, outbox, learning, business                    |
 
 `app/` may import any module (through its `index.ts`). `shared/` imports only `shared/`.
 

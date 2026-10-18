@@ -3,7 +3,15 @@ import { ensure } from '../../shared/errors.js';
 
 import { DEFAULT_TEMPLATES } from './default-templates.js';
 
-const PLACEHOLDERS = new Set(['ticket_number', 'policy_url', 'alternative_contact']);
+const PLACEHOLDERS = new Set([
+    'ticket_number',
+    'policy_url',
+    'alternative_contact',
+    'menu_tickets',
+    'menu_help',
+    'menu_withdraw',
+]);
+
 const ETA_TEMPLATES = new Set(['ticket_created_eta', 'outside_hours']);
 
 export function validateTemplate(body: string, code = ''): void {
