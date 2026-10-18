@@ -811,6 +811,73 @@ paths:
           $ref: '#/components/responses/Ok'
         '401':
           $ref: '#/components/responses/Error'
+  /v1/notifications/read:
+    post:
+      operationId: postNotificationsRead
+      tags: [reference]
+      summary: Отметить прочитанными все уведомления по обращению
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ticket_id]
+              properties:
+                ticket_id: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Сколько уведомлений отмечено
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [read]
+                properties:
+                  read: { type: integer }
+        '401':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/notifications/settings:
+    get:
+      operationId: getNotificationsSettings
+      tags: [reference]
+      summary: Настройки уведомлений текущего сотрудника
+      responses:
+        '200':
+          description: Настройки
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationSettings' }
+        '401':
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: putNotificationsSettings
+      tags: [reference]
+      summary: Изменить настройки уведомлений текущего сотрудника
+      description: >-
+        Сообщения клиентов по своим обращениям, передачи, оценки и предупреждения SLA приходят всегда.
+        Настройка управляет только новыми обращениями и дублированием уведомлений в MAX.
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotificationSettings' }
+      responses:
+        '200':
+          description: Настройки
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationSettings' }
+        '422':
+          $ref: '#/components/responses/Error'
   /v1/events:
     get:
       operationId: getEvents
@@ -1946,13 +2013,58 @@ components:
         created_at: { type: string, format: date-time }
     Notification:
       type: object
-      required: [id, type, ticket_id, read_at, created_at]
+      required: [id, type, ticket_id, read_at, created_at, payload, preview, actor_name, ticket]
       properties:
         id: { type: string, format: uuid }
         type: { type: string, examples: [ticket.created, ticket.transferred] }
         ticket_id: { type: string, format: uuid }
         read_at: { type: [string, 'null'], format: date-time }
         created_at: { type: string, format: date-time }
+        payload:
+          type: object
+          description: >-
+            Подробности события: `value` — оценка, `clock`/`stage` — SLA, `comment` — комментарий передачи,
+            `topic` — новое обращение по выбранной теме.
+        preview: { type: [string, 'null'], description: Текст сообщения клиента }
+        actor_name: { type: [string, 'null'], description: Кто передал обращение }
+        ticket:
+          oneOf:
+            - $ref: '#/components/schemas/NotificationTicket'
+            - type: 'null'
+    NotificationTicket:
+      type: object
+      description: Текущее состояние обращения
+      required: [id, number, status, description, tag, tag_label, urgency, urgency_label, assignee_id, assignee_name]
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: string, examples: ['000014'] }
+        status: { type: string, enum: [open, in_progress, awaiting_rating, closed] }
+        description: { type: string }
+        tag: { type: string }
+        tag_label: { type: string }
+        urgency: { type: string }
+        urgency_label: { type: string }
+        ai_status: { type: string }
+        assignee_id: { type: [string, 'null'], format: uuid }
+        assignee_name: { type: [string, 'null'] }
+        rating: { type: [integer, 'null'] }
+        purged_at: { type: [string, 'null'], format: date-time }
+        first_response_due_at: { type: [string, 'null'], format: date-time }
+        first_responded_at: { type: [string, 'null'], format: date-time }
+        resolution_due_at: { type: [string, 'null'], format: date-time }
+        waiting_since: { type: [string, 'null'], format: date-time }
+        sla_due_at: { type: [string, 'null'], format: date-time }
+        sla_warn_at: { type: [string, 'null'], format: date-time }
+    NotificationSettings:
+      type: object
+      required: [new_tickets, topics, max_alerts]
+      properties:
+        new_tickets:
+          type: string
+          enum: [all, topics, off]
+          description: Новые обращения — все, только по выбранным темам (после классификации) или не уведомлять
+        topics: { type: array, maxItems: 50, items: { type: string, pattern: '^[a-z][a-z0-9_]*$' } }
+        max_alerts: { type: boolean, description: Дублировать уведомления в личные сообщения MAX }
     Template:
       type: object
       required: [code, body, version]

@@ -26,6 +26,7 @@ exports[`keeps the registered route table stable 1`] = `
   "GET /v1/events",
   "GET /v1/me",
   "GET /v1/notifications",
+  "GET /v1/notifications/settings",
   "GET /v1/tickets",
   "GET /v1/tickets/:id",
   "GET /v1/tickets/:id/messages",
@@ -54,6 +55,7 @@ exports[`keeps the registered route table stable 1`] = `
   "HEAD /v1/events",
   "HEAD /v1/me",
   "HEAD /v1/notifications",
+  "HEAD /v1/notifications/settings",
   "HEAD /v1/tickets",
   "HEAD /v1/tickets/:id",
   "HEAD /v1/tickets/:id/messages",
@@ -75,6 +77,7 @@ exports[`keeps the registered route table stable 1`] = `
   "POST /v1/messages/:id/cancel",
   "POST /v1/messages/:id/retry",
   "POST /v1/notifications/:id/read",
+  "POST /v1/notifications/read",
   "POST /v1/tickets/:id/assign",
   "POST /v1/tickets/:id/close",
   "POST /v1/tickets/:id/messages",
@@ -91,6 +94,7 @@ exports[`keeps the registered route table stable 1`] = `
   "PUT /v1/admin/settings",
   "PUT /v1/admin/sla",
   "PUT /v1/admin/templates/:code",
+  "PUT /v1/notifications/settings",
   "PUT /v1/uploads/:id/content",
 ]
 `;

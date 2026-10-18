@@ -27,6 +27,7 @@ export async function purgeTicketContent(tx: Sql, ctx: Ctx, ticketId: string, re
 
     await tx.query("UPDATE messages SET text='',deleted=true WHERE ticket_id=$1", [ticketId]);
     await tx.query("UPDATE closures SET snapshot=NULL,snapshot_hash=NULL,note='' WHERE ticket_id=$1", [ticketId]);
+    await tx.query("UPDATE notifications SET payload=payload-'comment' WHERE ticket_id=$1", [ticketId]);
 
     await tx.query(
         `UPDATE deliveries SET body='{}'::jsonb

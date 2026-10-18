@@ -26,7 +26,7 @@ const MODULE_DEPENDENCIES = {
     tickets: ['messages', 'outbox', 'ratings', 'learning', 'dictionaries', 'sla'],
     inbox: ['consent', 'tickets', 'messages', 'outbox', 'business'],
     delivery: ['files', 'sla'],
-    notifications: ['staff'],
+    notifications: ['staff', 'tickets'],
     admin: ['templates', 'dictionaries', 'files', 'privacy', 'sla', 'business'],
     ai: ['dictionaries', 'sla', 'business'],
     'demo-access': [],

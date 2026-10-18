@@ -72,6 +72,7 @@ export async function escalate(tx: Sql, ctx: Ctx, escalation: Escalation): Promi
         ticketId: ticket.id,
         payload: { clock, stage },
         employeeIds: recipients.map((employee) => employee.id),
+        alerts: !escalation.notifyMax,
     });
 
     if (!escalation.notifyMax) {

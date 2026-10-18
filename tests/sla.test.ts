@@ -172,6 +172,12 @@ describe('escalation ladder', () => {
 
     it('jumps straight to the reached stage after downtime and duplicates alerts to MAX when enabled', async () => {
         await context.db.query('UPDATE sla_settings SET notify_max=true WHERE org_id=$1', [context.c.ORG_ID]);
+
+        await context.db.query(
+            `INSERT INTO notification_settings(org_id,employee_id,new_tickets,max_alerts) VALUES($1,$2,'off',true)`,
+            [context.c.ORG_ID, context.admin.id],
+        );
+
         const ticket = await context.create();
 
         await moveClock(ticket.id, 'first_response', [50, 30]);
@@ -186,6 +192,10 @@ describe('escalation ladder', () => {
 
         expect(alert.payload).toMatchObject({ user_id: '2' });
         expect(String(alert.payload.text)).toContain('№000001: первый ответ просрочен');
+
+        const personal = await context.db.query("SELECT id FROM jobs WHERE kind='notification_alert'");
+
+        expect(personal.rows).toEqual([]);
     });
 
     it('ignores closed tickets and disabled SLA', async () => {

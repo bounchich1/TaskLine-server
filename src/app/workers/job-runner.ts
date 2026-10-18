@@ -2,6 +2,7 @@ import { MaxClient } from '../../integrations/max/index.js';
 import { GatewayClient, Memory, Workflows, type Model } from '../../modules/ai/index.js';
 import { Files } from '../../modules/files/index.js';
 import { applyDeferredRevision } from '../../modules/messages/index.js';
+import { NotificationAlerts } from '../../modules/notifications/index.js';
 import { sendStaffAlert, type AlertSender } from '../../modules/staff/index.js';
 import type { Config } from '../../shared/config.js';
 import { createCtx, type Ctx } from '../../shared/context.js';
@@ -18,6 +19,7 @@ export class JobRunner {
     private readonly memory: Memory;
     private readonly workflows: Workflows;
     private readonly staffAlerts: AlertSender;
+    private readonly notificationAlerts: NotificationAlerts;
 
     constructor(
         private readonly db: Database,
@@ -34,6 +36,8 @@ export class JobRunner {
             config,
             config.MAX_STAFF_BOT_TOKEN ? { token: config.MAX_STAFF_BOT_TOKEN } : {},
         );
+
+        this.notificationAlerts = new NotificationAlerts(db, this.ctx.org, this.staffAlerts);
     }
 
     async run(id: string): Promise<void> {
@@ -98,6 +102,10 @@ export class JobRunner {
                 return true;
             case 'staff_alert':
                 await sendStaffAlert(this.staffAlerts, job.payload);
+
+                return true;
+            case 'notification_alert':
+                await this.notificationAlerts.send(job.ref_id);
 
                 return true;
             default:

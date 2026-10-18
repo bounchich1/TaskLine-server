@@ -25,7 +25,7 @@ export const transfer: TicketCommandHandler = async (tx, ctx, command) => {
     await emit(tx, ctx.org, {
         type: 'ticket.transferred',
         ticketId: ticket.id,
-        payload: {},
+        payload: { from: actor.id, comment: body.comment.trim() },
         employeeId: target.id,
     });
 };
