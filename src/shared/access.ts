@@ -22,6 +22,7 @@ const PERMISSIONS = [
     'reports.view',
     'teams.manage',
     'tickets.bulk',
+    'incidents.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -40,6 +41,7 @@ const SUPERVISOR: readonly Permission[] = [
     'operations.retry',
     'reports.view',
     'tickets.bulk',
+    'incidents.manage',
 ];
 
 const ADMIN: readonly Permission[] = [

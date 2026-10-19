@@ -24,6 +24,9 @@ export const DEFAULT_TEMPLATES: Readonly<Partial<Record<string, string>>> = {
         'Мы не получили ответа и закрыли обращение №{ticket_number}. ' +
         'Если вопрос остался, просто напишите — создадим новое обращение.',
     ticket_closed: 'Обращение №{ticket_number} закрыто. Оцените работу поддержки целым числом от 1 до 10.',
+    incident_known: 'Обращение №{ticket_number} создано. {incident_message}',
+    incident_closed:
+        'Обращение №{ticket_number} закрыто. Если проблема осталась, просто напишите — создадим новое обращение.',
     ticket_reopened: 'Обращение №{ticket_number} снова в работе. Вы можете продолжить переписку.',
     rating_invalid: 'Не удалось распознать оценку. Отправьте одно целое число от 1 до 10.',
     rating_accepted: 'Спасибо за оценку! Обращение №{ticket_number} завершено.',

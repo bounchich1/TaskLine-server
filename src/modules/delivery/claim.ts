@@ -78,6 +78,12 @@ async function isStillAuthorized(tx: Sql, ctx: Ctx, head: Delivery, client: Clie
             canOnTicket(employee, ticket, 'reply');
     }
 
+    if (head.kind === 'incident') {
+        valid =
+            client.consent_state === 'granted' &&
+            !!(await one(tx, 'SELECT id FROM tickets WHERE org_id=$1 AND id=$2', [ctx.org, head.ticket_id]));
+    }
+
     if (head.cycle_id && valid) {
         valid = !!(await one(
             tx,

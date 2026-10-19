@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { PGlite } from '@electric-sql/pglite';
+import { pg_trgm as trigrams } from '@electric-sql/pglite/contrib/pg_trgm';
 
 import { seed } from '../src/app/bootstrap/seed.js';
 import { PreconsentExpiry } from '../src/modules/consent/index.js';
@@ -38,7 +39,7 @@ export function testConfig(overrides: NodeJS.ProcessEnv = {}): Config {
 }
 
 export function emptyMemoryDb(): Database {
-    const pg = new PGlite();
+    const pg = new PGlite({ extensions: { pg_trgm: trigrams } });
 
     const adapt = (connection: Pick<PGlite, 'query' | 'exec'>): Sql => ({
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters

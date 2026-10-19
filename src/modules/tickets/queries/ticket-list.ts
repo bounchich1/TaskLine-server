@@ -3,12 +3,28 @@ import { z } from 'zod';
 import { one, type Sql } from '../../../shared/db.js';
 import { ensure } from '../../../shared/errors.js';
 import type { Row } from '../../../shared/types/entities.js';
+import { LINKED_TO_OPEN_INCIDENT } from '../../incidents/index.js';
 
 import { filterConditions, type Filters, type SqlConditions } from './ticket-filters.js';
 import { SLA_DUE, SLA_WARN, TICKET_JOINS, TICKET_PROJECTION } from './ticket-projection.js';
 
 const OPEN_STATUSES = "t.status IN('open','in_progress')";
 const CLOSED_STATUSES = "t.status IN('awaiting_rating','closed')";
+const QUEUE = `${OPEN_STATUSES} AND NOT ${LINKED_TO_OPEN_INCIDENT}`;
+const INCIDENT_QUEUE = `${OPEN_STATUSES} AND ${LINKED_TO_OPEN_INCIDENT}`;
+
+function tabCondition(filters: Filters): string {
+    switch (filters.tab) {
+        case 'open':
+            return filters.incident ? OPEN_STATUSES : QUEUE;
+        case 'closed':
+            return CLOSED_STATUSES;
+        case 'incident':
+            return INCIDENT_QUEUE;
+        case 'all':
+            return 'true';
+    }
+}
 
 const SORT_SCORES: Record<Filters['sort'], string> = {
     urgency: 'coalesce(du.rank,0)',
@@ -26,9 +42,10 @@ export async function listTickets(db: Sql, org: string, filters: Filters, counts
 
     const counts = await one(
         db,
-        `SELECT count(*) FILTER(WHERE ${OPEN_STATUSES})::int AS open,
+        `SELECT count(*) FILTER(WHERE ${QUEUE})::int AS open,
        count(*) FILTER(WHERE ${CLOSED_STATUSES})::int AS closed,
-       count(*) FILTER(WHERE ${SLA_WARN}<=now())::int AS at_risk,now() AS snapshot_at
+       count(*) FILTER(WHERE ${INCIDENT_QUEUE})::int AS incident,
+       count(*) FILTER(WHERE ${SLA_WARN}<=now() AND NOT ${LINKED_TO_OPEN_INCIDENT})::int AS at_risk,now() AS snapshot_at
      ${TICKET_JOINS} WHERE ${conditions.where()}`,
         conditions.values,
     );
@@ -37,7 +54,7 @@ export async function listTickets(db: Sql, org: string, filters: Filters, counts
         return counts;
     }
 
-    conditions.clauses.push(filters.tab === 'open' ? OPEN_STATUSES : CLOSED_STATUSES);
+    conditions.clauses.push(tabCondition(filters));
     const score = SORT_SCORES[filters.sort];
     const date = `${filters.sort === 'newest' ? '-' : ''}extract(epoch FROM t.created_at)`;
     const sortKey = `(-(${score}),${date},t.id)`;

@@ -1,6 +1,7 @@
 import { MaxClient } from '../../integrations/max/index.js';
 import { GatewayClient, Memory, Workflows, type Model } from '../../modules/ai/index.js';
 import { Files } from '../../modules/files/index.js';
+import { IncidentBroadcast } from '../../modules/incidents/index.js';
 import { applyDeferredRevision } from '../../modules/messages/index.js';
 import { NotificationAlerts } from '../../modules/notifications/index.js';
 import { sendStaffAlert, type AlertSender } from '../../modules/staff/index.js';
@@ -22,6 +23,7 @@ export class JobRunner {
     private readonly staffAlerts: AlertSender;
     private readonly notificationAlerts: NotificationAlerts;
     private readonly deferredClose: DeferredClose;
+    private readonly incidentBroadcast: IncidentBroadcast;
 
     constructor(
         private readonly db: Database,
@@ -41,6 +43,7 @@ export class JobRunner {
 
         this.notificationAlerts = new NotificationAlerts(db, this.ctx.org, this.staffAlerts);
         this.deferredClose = new DeferredClose(db, config);
+        this.incidentBroadcast = new IncidentBroadcast(db, config);
     }
 
     async run(id: string): Promise<void> {
@@ -103,6 +106,13 @@ export class JobRunner {
                 await applyDeferredRevision(this.db, this.ctx, job);
 
                 return true;
+            default:
+                return this.dispatchStaffWork(job);
+        }
+    }
+
+    private async dispatchStaffWork(job: Job): Promise<boolean> {
+        switch (job.kind) {
             case 'staff_alert':
                 await sendStaffAlert(this.staffAlerts, job.payload);
 
@@ -115,6 +125,8 @@ export class JobRunner {
                 await this.deferredClose.run(job);
 
                 return true;
+            case 'incident_broadcast':
+                return this.incidentBroadcast.run(job);
             default:
                 throw new AppError('unsupported_job_kind', 422);
         }

@@ -15,6 +15,7 @@ export interface AdminMutation {
     body: Row;
     expectedVersion: number;
     idempotencyKey: string;
+    event?: string;
 }
 
 export async function runAdminMutation(
@@ -49,7 +50,7 @@ export async function runAdminMutation(
             detail: body,
         });
 
-        await emit(tx, org, { type: 'admin.changed', ticketId: null, payload: { route } });
+        await emit(tx, org, { type: mutation.event ?? 'admin.changed', ticketId: null, payload: { route } });
         await saveCommandResponse(tx, commandKey, result);
 
         return result;

@@ -18,6 +18,7 @@ const DEFERRED_CODES = [
     'ai_disabled',
     'gateway_unavailable',
     'close_waiting_delivery',
+    'incident_waiting_delivery',
 ];
 
 const UNCERTAIN_CODES = ['ai_uncertain', 'memory_write_unknown', 'memory_still_unknown'];

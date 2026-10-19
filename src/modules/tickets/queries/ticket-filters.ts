@@ -4,7 +4,7 @@ import { SLA_WARN } from './ticket-projection.js';
 
 export const filtersSchema = z
     .object({
-        tab: z.enum(['open', 'closed']).default('open'),
+        tab: z.enum(['open', 'closed', 'incident', 'all']).default('open'),
         q: z.string().max(300).default(''),
         tag: z.string().max(64).optional(),
         urgency: z.string().max(64).optional(),
@@ -12,6 +12,7 @@ export const filtersSchema = z
         status: z.enum(['open', 'in_progress', 'awaiting_rating', 'closed']).optional(),
         assignee: z.uuid().optional(),
         team: z.union([z.uuid(), z.literal('none')]).optional(),
+        incident: z.uuid().optional(),
         sla: z.enum(['at_risk']).optional(),
         from: z.iso.datetime({ offset: true }).optional(),
         to: z.iso.datetime({ offset: true }).optional(),
@@ -65,6 +66,13 @@ export function filterConditions(org: string, filters: Filters): SqlConditions {
         conditions.clauses.push('t.team_id IS NULL');
     } else if (filters.team) {
         conditions.add('t.team_id=?', filters.team);
+    }
+
+    if (filters.incident) {
+        conditions.add(
+            'EXISTS(SELECT 1 FROM incident_tickets lnk WHERE lnk.ticket_id=t.id AND lnk.incident_id=?)',
+            filters.incident,
+        );
     }
 
     if (filters.sla === 'at_risk') {

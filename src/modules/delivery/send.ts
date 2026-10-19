@@ -109,7 +109,9 @@ async function wasCanceledMeanwhile(db: Database, delivery: Delivery): Promise<b
         [delivery.id],
     );
 
-    return current?.state !== 'sending' || (delivery.kind === 'staff' && current.consent_state !== 'granted');
+    const personal = delivery.kind === 'staff' || delivery.kind === 'incident';
+
+    return current?.state !== 'sending' || (personal && current.consent_state !== 'granted');
 }
 
 function failureOutcome(error: unknown, attempts: number): SendOutcome {

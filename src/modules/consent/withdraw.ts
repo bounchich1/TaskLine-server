@@ -33,6 +33,7 @@ export async function withdrawConsent(tx: Sql, ctx: Ctx, client: Client, key: st
             [ticket.id],
         );
 
+        await tx.query('DELETE FROM incident_tickets WHERE ticket_id=$1', [ticket.id]);
         await invalidateLearning(tx, ctx, ticket.id, 'withdrawn');
         await emit(tx, ctx.org, { type: 'consent.withdrawn', ticketId: ticket.id });
     }

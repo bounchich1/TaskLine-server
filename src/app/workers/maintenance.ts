@@ -1,4 +1,5 @@
 import { PreconsentExpiry } from '../../modules/consent/index.js';
+import { IncidentDetector } from '../../modules/incidents/index.js';
 import { applyRetention } from '../../modules/privacy/index.js';
 import { RatingTimers } from '../../modules/ratings/index.js';
 import { refreshFacts, ReportDigest } from '../../modules/reports/index.js';
@@ -19,6 +20,7 @@ export async function runMaintenance(db: Database, ctx: Ctx): Promise<void> {
     await new WaitingTimers(db, ctx.config).run();
     await expirePresence(db, ctx.org);
     await new RoutingTimers(db, ctx.config).run();
+    await new IncidentDetector(db, ctx.config).run();
 
     await db.tx(async (tx) => {
         await expireOverdueTriage(tx, ctx);

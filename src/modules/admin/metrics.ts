@@ -43,6 +43,8 @@ const QUERIES: Record<string, string> = {
          least(CASE WHEN first_responded_at IS NULL THEN first_response_warn_at END,
            CASE WHEN waiting_since IS NULL THEN resolution_warn_at END) AS warn
        FROM tickets WHERE org_id=$1 AND status IN('open','in_progress')) clocks`,
+    incidents: `SELECT count(DISTINCT i.id)::int AS open,count(it.ticket_id)::int AS linked FROM incidents i
+     LEFT JOIN incident_tickets it ON it.incident_id=i.id WHERE i.org_id=$1 AND i.status='open'`,
     learning: 'SELECT learning_status,count(*)::int AS n FROM closures WHERE org_id=$1 GROUP BY learning_status',
     memory: 'SELECT state,count(*)::int AS n FROM memory_records WHERE org_id=$1 GROUP BY state',
     backups: 'SELECT kind,extract(epoch FROM max(finished_at))::float AS at FROM backup_runs GROUP BY kind',
@@ -142,6 +144,7 @@ function domainFamilies(results: Results): Family[] {
     const inbox = first(results, 'inbox');
     const latency = first(results, 'aiLatency');
     const sla = first(results, 'sla');
+    const incidents = first(results, 'incidents');
 
     return [
         single('taskline_inbox_pending', 'Client updates waiting to be processed', inbox?.pending),
@@ -155,6 +158,8 @@ function domainFamilies(results: Results): Family[] {
         ),
         single('taskline_sla_breached_active', 'Open tickets past an SLA deadline', sla?.breached),
         single('taskline_sla_at_risk', 'Open tickets past the SLA warning point, not yet breached', sla?.at_risk),
+        single('taskline_incidents_open', 'Open mass incidents', incidents?.open),
+        single('taskline_incident_linked_tickets', 'Tickets linked to open incidents', incidents?.linked),
         ...GROUPS.map((spec) => grouped(spec, all(results, spec.query))),
     ];
 }

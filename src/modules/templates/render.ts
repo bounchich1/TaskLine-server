@@ -13,6 +13,7 @@ const PLACEHOLDERS = new Set([
 ]);
 
 const ETA_TEMPLATES = new Set(['ticket_created_eta', 'outside_hours']);
+const INCIDENT_TEMPLATES = new Set(['incident_known']);
 
 export function validateTemplate(body: string, code = ''): void {
     ensure(body.trim().length > 0 && body.length <= 3000, 'invalid_template', 422);
@@ -20,7 +21,13 @@ export function validateTemplate(body: string, code = ''): void {
     for (const match of body.matchAll(/\{([^{}]+)\}/g)) {
         const name = match[1];
 
-        ensure(PLACEHOLDERS.has(name) || (name === 'eta' && ETA_TEMPLATES.has(code)), 'invalid_placeholder', 422);
+        ensure(
+            PLACEHOLDERS.has(name) ||
+                (name === 'eta' && ETA_TEMPLATES.has(code)) ||
+                (name === 'incident_message' && INCIDENT_TEMPLATES.has(code)),
+            'invalid_placeholder',
+            422,
+        );
     }
 }
 

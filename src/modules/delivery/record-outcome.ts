@@ -33,7 +33,7 @@ export async function recordOutcome(
             ]);
         }
 
-        if (delivery.ticket_id && delivery.kind === 'staff' && state === 'delivered') {
+        if (delivery.ticket_id && ['staff', 'incident'].includes(delivery.kind) && state === 'delivered') {
             await markFirstResponse(tx, delivery.ticket_id);
         }
 

@@ -13,6 +13,8 @@ const MENU_TEMPLATES = new Set([
     'ticket_created_eta',
     'outside_hours',
     'ticket_reopened',
+    'incident_known',
+    'incident_closed',
     'auto_closed',
     'rating_accepted',
     'rating_attempts_exhausted',

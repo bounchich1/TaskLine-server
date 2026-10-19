@@ -97,6 +97,8 @@ export class RoutingTimers {
             `SELECT t.id FROM tickets t
          JOIN teams tm ON tm.org_id=t.org_id AND tm.id=t.team_id AND tm.auto_assign AND tm.archived_at IS NULL
          WHERE t.org_id=$1 AND t.status='open' AND t.assignee_id IS NULL AND t.offered_to IS NULL
+           AND NOT EXISTS(SELECT 1 FROM incident_tickets it JOIN incidents i ON i.id=it.incident_id
+             WHERE it.ticket_id=t.id AND i.status='open')
            AND EXISTS(SELECT 1 FROM team_members m JOIN employees e ON e.id=m.employee_id
              WHERE m.team_id=tm.id AND e.presence='online' AND NOT e.blocked)
          ORDER BY t.first_response_due_at NULLS LAST,t.created_at LIMIT $2`,

@@ -49,6 +49,8 @@ tags:
     description: Отчёты руководителя — показатели команды, тем и ИИ (право `reports.view`)
   - name: routing
     description: Команды, правила маршрутизации, статус сотрудника, шаблоны ответов
+  - name: incidents
+    description: Массовые инциденты — обнаружение всплесков, рассылка клиентам, закрытие (право `incidents.manage`)
 security:
   - bearerAuth: []
   - sessionCookie: []
@@ -215,7 +217,16 @@ paths:
       summary: Очередь обращений с фильтрами и постраничной выдачей
       description: Требуется право `tickets.view`.
       parameters:
-        - { name: tab, in: query, schema: { type: string, enum: [open, closed], default: open } }
+        - name: tab
+          in: query
+          description: |
+            `open` — очередь без обращений открытых инцидентов; `incident` — открытые обращения, связанные
+            с открытым инцидентом; `closed` — закрытые; `all` — все
+          schema: { type: string, enum: [open, closed, incident, all], default: open }
+        - name: incident
+          in: query
+          description: Только обращения, связанные с этим инцидентом
+          schema: { type: string, format: uuid }
         - {
             name: q,
             in: query,
@@ -2088,6 +2099,311 @@ paths:
         '401':
           $ref: '#/components/responses/Error'
 
+  /v1/incidents:
+    get:
+      operationId: getIncidents
+      tags: [incidents]
+      summary: Подсказки детектора, открытые и недавно решённые инциденты
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/IncidentStatus' } }
+      responses:
+        '200':
+          description: Инциденты
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, counts]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Incident' } }
+                  counts:
+                    type: object
+                    properties:
+                      suggested: { type: integer }
+                      open: { type: integer }
+                      resolved: { type: integer, description: За 30 дней }
+    post:
+      operationId: postIncidents
+      tags: [incidents]
+      summary: Создать инцидент или принять подсказку детектора
+      description: Связывает выбранные открытые обращения и, если задано сообщение для клиентов, рассылает его.
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IncidentInput' }
+      responses:
+        '200':
+          description: Инцидент
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncidentLinkResult' }
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/incidents/settings:
+    get:
+      operationId: getIncidentsSettings
+      tags: [incidents]
+      summary: Настройки детектора и автоответа
+      responses:
+        '200':
+          description: Настройки
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncidentSettings' }
+    put:
+      operationId: putIncidentsSettings
+      tags: [incidents]
+      summary: Изменить настройки детектора (право `organization.configure`)
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IncidentSettingsInput' }
+      responses:
+        '200':
+          description: Инцидент
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncidentSettings' }
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/incidents/{id}:
+    get:
+      operationId: getIncidentsById
+      tags: [incidents]
+      summary: Инцидент с лентой обновлений и, для подсказки, найденными обращениями
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Инцидент
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncidentDetail' }
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      operationId: patchIncidentsById
+      tags: [incidents]
+      summary: Изменить название, сообщение для клиентов, слова для автопривязки
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IncidentPatch' }
+      responses:
+        '200':
+          description: Инцидент
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Incident' }
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/incidents/{id}/dismiss:
+    post:
+      operationId: postIncidentsByIdDismiss
+      tags: [incidents]
+      summary: Отклонить подсказку («Не инцидент»); тема не предлагается час
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Инцидент
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Incident' }
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/incidents/{id}/messages:
+    post:
+      operationId: postIncidentsByIdMessages
+      tags: [incidents]
+      summary: Написать всем клиентам связанных открытых обращений
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 2000 } } }
+      responses:
+        '200':
+          description: Инцидент
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Incident' }
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/incidents/{id}/eta:
+    post:
+      operationId: postIncidentsByIdEta
+      tags: [incidents]
+      summary: Обновить ожидаемое время восстановления
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IncidentEtaInput' }
+      responses:
+        '200':
+          description: Инцидент
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Incident' }
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/incidents/{id}/resolve:
+    post:
+      operationId: postIncidentsByIdResolve
+      tags: [incidents]
+      summary: 'Завершить инцидент: финальное сообщение всем и закрытие обращений'
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              {
+                type: object,
+                required: [text],
+                properties:
+                  { text: { type: string, minLength: 1, maxLength: 2000 }, request_rating: { type: boolean } },
+              }
+      responses:
+        '200':
+          description: Инцидент
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Incident' }
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/incidents/{id}/reopen:
+    post:
+      operationId: postIncidentsByIdReopen
+      tags: [incidents]
+      summary: Возобновить решённый инцидент; новые обращения недавно закрытых клиентов снова привязываются
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { text: { type: string, maxLength: 2000 } } }
+      responses:
+        '200':
+          description: Инцидент
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Incident' }
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/incidents/{id}/tickets:
+    post:
+      operationId: postIncidentsByIdTickets
+      tags: [incidents]
+      summary: Связать открытые обращения с инцидентом
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              {
+                type: object,
+                required: [ticket_ids],
+                properties:
+                  { ticket_ids: { type: array, minItems: 1, maxItems: 1000, items: { type: string, format: uuid } } },
+              }
+      responses:
+        '200':
+          description: Инцидент
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncidentLinkResult' }
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/incidents/{id}/tickets/{ticketId}:
+    delete:
+      operationId: deleteIncidentsByIdTicketsByTicketId
+      tags: [incidents]
+      summary: 'Отвязать обращение: оно возвращается в очередь со своими сроками SLA (право `tickets.work` на своё обращение)'
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - { name: ticketId, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Инцидент
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncidentLinkResult' }
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
   /v1/dev/inbound:
     post:
       operationId: postDevInbound
@@ -2410,6 +2726,9 @@ components:
         offered_to_name: { type: [string, 'null'] }
         offered_at: { type: [string, 'null'], format: date-time }
         offer_due_at: { type: [string, 'null'], format: date-time, description: Предложение перейдёт к следующему }
+        incident_id: { type: [string, 'null'], format: uuid, description: Открытый или решённый инцидент обращения }
+        incident_title: { type: [string, 'null'] }
+        incident_status: { type: [string, 'null'], enum: [open, resolved, null] }
     TicketDetail:
       allOf:
         - $ref: '#/components/schemas/Ticket'
@@ -2432,6 +2751,7 @@ components:
         open: { type: integer }
         closed: { type: integer }
         at_risk: { type: integer, description: Открытые обращения с пройденным порогом предупреждения SLA }
+        incident: { type: integer, description: Открытые обращения в открытых инцидентах }
         snapshot_at: { type: string, format: date-time }
     TicketPage:
       type: object
@@ -2906,3 +3226,128 @@ components:
         object_id: { type: [string, 'null'] }
         detail: { type: object }
         created_at: { type: string, format: date-time }
+    IncidentStatus:
+      type: string
+      enum: [suggested, open, resolved, dismissed]
+    Incident:
+      type: object
+      required: [id, title, tag, status, version]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        tag: { type: string }
+        tag_label: { type: string }
+        status: { $ref: '#/components/schemas/IncidentStatus' }
+        public_message: { type: string, description: Ответ клиентам при привязке и первая рассылка }
+        final_message: { type: string }
+        eta: { type: [string, 'null'], format: date-time }
+        match_terms: { type: array, items: { type: string }, description: Слова для автопривязки новых обращений }
+        request_rating: { type: boolean, description: Просить оценку при закрытии обращений инцидентом }
+        detection:
+          type: [object, 'null']
+          description: Данные детектора — число обращений, ожидаемое число, окно, общие слова
+          properties:
+            count: { type: integer }
+            baseline: { type: number }
+            window_minutes: { type: integer }
+            terms: { type: array, items: { type: string } }
+            ticket_ids: { type: array, items: { type: string, format: uuid } }
+            cluster_ids: { type: array, items: { type: string, format: uuid } }
+        linked: { type: integer }
+        linked_open: { type: integer }
+        linked_auto: { type: integer }
+        messages_sent: { type: integer }
+        created_by_name: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+        opened_at: { type: [string, 'null'], format: date-time }
+        resolved_at: { type: [string, 'null'], format: date-time }
+        version: { type: integer }
+    IncidentDetail:
+      allOf:
+        - $ref: '#/components/schemas/Incident'
+        - type: object
+          required: [updates, candidates]
+          properties:
+            updates:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  kind: { type: string, enum: [opened, message, eta, resolved, reopened, dismissed] }
+                  text: { type: string }
+                  eta: { type: [string, 'null'], format: date-time }
+                  broadcast: { type: boolean }
+                  recipients: { type: integer }
+                  finished_at: { type: [string, 'null'], format: date-time }
+                  author_name: { type: [string, 'null'] }
+                  created_at: { type: string, format: date-time }
+            candidates:
+              type: array
+              description: Обращения, найденные детектором (для подсказки)
+              items:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  number: { type: string }
+                  description: { type: string }
+                  status: { $ref: '#/components/schemas/TicketStatus' }
+                  created_at: { type: string, format: date-time }
+                  in_cluster: { type: boolean }
+                  linked_elsewhere: { type: boolean }
+    IncidentInput:
+      type: object
+      required: [tag, title]
+      properties:
+        suggestion_id: { type: string, format: uuid, description: Подсказка детектора, которую принимаем }
+        tag: { type: string }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        public_message: { type: string, maxLength: 2000 }
+        match_terms: { type: array, maxItems: 20, items: { type: string, minLength: 3, maxLength: 60 } }
+        request_rating: { type: boolean, default: false }
+        eta: { type: [string, 'null'], format: date-time }
+        ticket_ids: { type: array, maxItems: 1000, items: { type: string, format: uuid } }
+        notify: { type: boolean, default: true, description: Отправить сообщение для клиентов связанным обращениям }
+    IncidentPatch:
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 120 }
+        public_message: { type: string, maxLength: 2000 }
+        match_terms: { type: array, maxItems: 20, items: { type: string, minLength: 3, maxLength: 60 } }
+        request_rating: { type: boolean }
+    IncidentEtaInput:
+      type: object
+      required: [eta]
+      properties:
+        eta: { type: [string, 'null'], format: date-time }
+        text: { type: string, maxLength: 2000, description: По умолчанию — фраза с новым сроком }
+        notify: { type: boolean, default: true }
+    IncidentLinkResult:
+      type: object
+      required: [incident]
+      properties:
+        incident: { $ref: '#/components/schemas/Incident' }
+        linked: { type: array, items: { type: string, format: uuid } }
+        skipped:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              reason: { type: string, enum: [not_found, ticket_closed, other_incident] }
+    IncidentSettingsInput:
+      type: object
+      required: [detection, auto_link, window_minutes, min_tickets, spike_factor, relink_hours]
+      properties:
+        detection: { type: boolean, description: Искать всплески раз в минуту }
+        auto_link: { type: boolean, description: Привязывать новые обращения к открытому инциденту и сразу отвечать }
+        window_minutes: { type: integer, minimum: 5, maximum: 120 }
+        min_tickets: { type: integer, minimum: 2, maximum: 1000 }
+        spike_factor: { type: number, minimum: 1, maximum: 50, description: Во сколько раз выше обычного }
+        relink_hours: { type: integer, minimum: 0, maximum: 72 }
+    IncidentSettings:
+      allOf:
+        - $ref: '#/components/schemas/IncidentSettingsInput'
+        - type: object
+          properties:
+            version: { type: integer }

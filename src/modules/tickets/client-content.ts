@@ -5,6 +5,7 @@ import { emit, enqueue } from '../../shared/events.js';
 import type { ClientInput, InputAttachment } from '../../shared/types/client-input.js';
 import type { Client, Message, Ticket } from '../../shared/types/entities.js';
 import { snapshotActiveDictionaries } from '../dictionaries/index.js';
+import { attachNewTicket, matchIncident, type IncidentMatch } from '../incidents/index.js';
 import { addMessage } from '../messages/index.js';
 import { queueBotMessage } from '../outbox/index.js';
 import { acceptRatingInput } from '../ratings/index.js';
@@ -73,7 +74,9 @@ export async function handleClientContent(
             employeeId: ticket.assignee_id,
         });
     } else {
-        await announceNewTicket(tx, ctx, { client, ticket, message, greeting });
+        const match = await matchIncident(tx, ctx, { client, text: ticket.description });
+
+        await announceNewTicket(tx, ctx, { client, ticket, message, greeting, match });
     }
 }
 
@@ -175,9 +178,20 @@ interface NewTicket {
     ticket: Ticket;
     message: Message;
     greeting?: SlaGreeting;
+    match?: IncidentMatch;
 }
 
-async function announceNewTicket(tx: Sql, ctx: Ctx, { client, ticket, message, greeting }: NewTicket): Promise<void> {
+async function announceNewTicket(tx: Sql, ctx: Ctx, newTicket: NewTicket): Promise<void> {
+    const { client, ticket, greeting, match } = newTicket;
+
+    if (match) {
+        await attachNewTicket(tx, ctx, { client, ticket, match });
+    }
+
+    if (match?.reply) {
+        return;
+    }
+
     await queueBotMessage(tx, ctx, {
         client,
         template: greeting?.template ?? 'ticket_created',
@@ -186,6 +200,12 @@ async function announceNewTicket(tx: Sql, ctx: Ctx, { client, ticket, message, g
         values: greeting ? { eta: greeting.eta } : {},
     });
 
+    if (!match) {
+        await startTriage(tx, ctx, newTicket);
+    }
+}
+
+async function startTriage(tx: Sql, ctx: Ctx, { client, ticket, message }: NewTicket): Promise<void> {
     const dictionaries = await snapshotActiveDictionaries(tx, ctx.org);
 
     if (ctx.config.AI_ENABLED) {

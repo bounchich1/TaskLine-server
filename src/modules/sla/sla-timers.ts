@@ -63,7 +63,7 @@ async function checkTicket(tx: Sql, ctx: Ctx, { id, client_id: clientId }: { id:
     const now = new Date((await requireOne<{ now: Date }>(tx, 'SELECT now() AS now')).now);
     const evaluation = evaluate(clocks, now, settings ? calendarOf(settings) : undefined);
 
-    if (settings) {
+    if (settings && !(await inOpenIncident(tx, ticket.id))) {
         await notify(tx, ctx, { ticket, clocks, evaluation, now, settings });
     }
 
@@ -78,6 +78,17 @@ async function checkTicket(tx: Sql, ctx: Ctx, { id, client_id: clientId }: { id:
             evaluation.breached,
         ],
     );
+}
+
+async function inOpenIncident(tx: Sql, ticketId: string): Promise<boolean> {
+    const linked = await one(
+        tx,
+        `SELECT 1 AS linked FROM incident_tickets it JOIN incidents i ON i.id=it.incident_id
+     WHERE it.ticket_id=$1 AND i.status='open' LIMIT 1`,
+        [ticketId],
+    );
+
+    return Boolean(linked);
 }
 
 function activeClocks(ticket: Ticket): ClockState[] {

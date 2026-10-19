@@ -18,6 +18,7 @@ import { addDemoAccessHook, DemoRoles } from '../../modules/demo-access/index.js
 import { dictionariesRoutes } from '../../modules/dictionaries/index.js';
 import { Files, filesRoutes } from '../../modules/files/index.js';
 import { devInboundRoutes, Inbox, webhookRoutes } from '../../modules/inbox/index.js';
+import { incidentsRoutes } from '../../modules/incidents/index.js';
 import { macrosRoutes } from '../../modules/macros/index.js';
 import { eventsRoutes, notificationsRoutes } from '../../modules/notifications/index.js';
 import { Privacy, privacyRoutes } from '../../modules/privacy/index.js';
@@ -89,6 +90,7 @@ async function registerRoutes(app: FastifyInstance, db: Database, config: Config
     await app.register(dictionariesRoutes, { db, org });
     await app.register(teamsRoutes, { db, org });
     await app.register(macrosRoutes, { db, org });
+    await app.register(incidentsRoutes, { db, config });
     await app.register(notificationsRoutes, { db, org });
     await app.register(deliveryRoutes, { deliveries });
     await app.register(filesRoutes, { files });
