@@ -19,6 +19,9 @@ const PERMISSIONS = [
     'organization.configure',
     'audit.view',
     'clients.privacy',
+    'reports.view',
+    'teams.manage',
+    'tickets.bulk',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -35,6 +38,8 @@ const SUPERVISOR: readonly Permission[] = [
     'deliveries.resolve_unknown',
     'operations.view',
     'operations.retry',
+    'reports.view',
+    'tickets.bulk',
 ];
 
 const ADMIN: readonly Permission[] = [
@@ -43,6 +48,7 @@ const ADMIN: readonly Permission[] = [
     'organization.configure',
     'audit.view',
     'clients.privacy',
+    'teams.manage',
 ];
 
 const ROLE_PERMISSIONS = new Map<string, ReadonlySet<Permission>>([
@@ -65,9 +71,9 @@ export function roleRank(role: string): number {
     return ROLES.indexOf(role as Role);
 }
 
-export type TicketAction = 'take' | 'classify' | 'reply' | 'transfer' | 'close' | 'reopen';
+export type TicketAction = 'take' | 'note' | 'classify' | 'reply' | 'transfer' | 'close' | 'reopen';
 
-const ON_OTHERS_TICKET: Record<Exclude<TicketAction, 'take'>, Permission> = {
+const ON_OTHERS_TICKET: Record<Exclude<TicketAction, 'take' | 'note'>, Permission> = {
     classify: 'tickets.classify_any',
     reply: 'tickets.reply_any',
     transfer: 'tickets.transfer_any',
@@ -80,7 +86,7 @@ export function canOnTicket(actor: Actor, ticket: Pick<Ticket, 'assignee_id'>, a
         return false;
     }
 
-    if (action === 'take') {
+    if (action === 'take' || action === 'note') {
         return true;
     }
 

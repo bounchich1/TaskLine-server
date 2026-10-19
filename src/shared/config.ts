@@ -59,6 +59,9 @@ const schema = z.object({
     AI_TRIAGE_DEADLINE_SECONDS: z.coerce.number().int().min(60).max(600).default(120),
     AI_LEARNING_TIMEOUT_SECONDS: z.coerce.number().int().min(1).max(120).default(90),
     AI_INPUT_CHARS: z.coerce.number().int().min(4000).max(100000).default(24000),
+    AI_PRICE_INPUT_PER_MTOK: z.coerce.number().min(0).max(100000).default(0),
+    AI_PRICE_OUTPUT_PER_MTOK: z.coerce.number().min(0).max(100000).default(0),
+    AI_PRICE_CURRENCY: z.string().min(1).max(8).default('₽'),
     MEMORY_ENABLED: bool,
     AGENTMEMORY_URL: z.url().default('http://localhost:3111'),
     AGENTMEMORY_SECRET: z.string().min(32),
@@ -75,6 +78,7 @@ const schema = z.object({
     BOOTSTRAP_MAX_USER_ID: z.string().default(''),
     BOOTSTRAP_NAME: z.string().default('Администратор'),
     DEMO_ROLE_CODES: z.string().default(''),
+    STAFF_APP_URL: z.union([z.literal(''), z.url()]).default(''),
     DEV_AUTH_ENABLED: bool,
 });
 

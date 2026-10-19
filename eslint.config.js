@@ -23,14 +23,17 @@ const MODULE_DEPENDENCIES = {
     outbox: ['templates', 'messages', 'business'],
     ratings: ['outbox'],
     consent: ['outbox', 'learning', 'business'],
-    tickets: ['messages', 'outbox', 'ratings', 'learning', 'dictionaries', 'sla'],
+    tickets: ['messages', 'outbox', 'ratings', 'learning', 'dictionaries', 'sla', 'routing', 'macros'],
     inbox: ['consent', 'tickets', 'messages', 'outbox', 'business'],
     delivery: ['files', 'sla'],
     notifications: ['staff', 'tickets'],
-    admin: ['templates', 'dictionaries', 'files', 'privacy', 'sla', 'business'],
+    admin: ['templates', 'dictionaries', 'files', 'privacy', 'sla', 'business', 'routing'],
     ai: ['dictionaries', 'sla', 'business'],
     'demo-access': [],
-    privacy: ['consent', 'outbox', 'learning', 'business'],
+    privacy: ['consent', 'outbox', 'learning', 'business', 'reports'],
+    reports: ['sla'],
+    routing: [],
+    macros: [],
 };
 
 const publicApi = (/** @type {string} */ type, /** @type {string[] | undefined} */ names) => ({

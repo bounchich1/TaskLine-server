@@ -2,6 +2,7 @@ import { can } from '../../../../shared/access.js';
 import type { Ctx } from '../../../../shared/context.js';
 import { one, type Sql } from '../../../../shared/db.js';
 import { ensure } from '../../../../shared/errors.js';
+import { recordTicketEvent } from '../../../../shared/events.js';
 import { findActiveEmployee } from '../../../../shared/staff.js';
 import { formatTicketNumber } from '../../../../shared/ticket-number.js';
 import type { Ticket } from '../../../../shared/types/entities.js';
@@ -34,6 +35,13 @@ export const reopen: TicketCommandHandler = async (tx, ctx, command) => {
     );
 
     await restartResolution(tx, ctx.org, ticket.id);
+
+    await recordTicketEvent(tx, ctx.org, {
+        ticketId: ticket.id,
+        employeeId: actor.id,
+        kind: 'reopened',
+        detail: { lifecycle: ticket.lifecycle + 1, assignee_id: assigneeId },
+    });
 
     await addMessage(tx, ctx, ticket, {
         author: 'system',

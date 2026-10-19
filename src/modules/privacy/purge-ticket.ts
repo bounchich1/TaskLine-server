@@ -2,6 +2,7 @@ import type { Ctx } from '../../shared/context.js';
 import type { Sql } from '../../shared/db.js';
 import { emit, enqueue } from '../../shared/events.js';
 import { invalidateLearning } from '../learning/index.js';
+import { refreshTicketFacts } from '../reports/index.js';
 
 export type PurgeReason = 'retention' | 'erasure';
 
@@ -15,6 +16,8 @@ const REMOVED_FILENAME = 'файл удалён';
 const TICKET_JOBS = 'SELECT id FROM jobs WHERE ref_id=$1 OR ref_id IN(SELECT id FROM closures WHERE ticket_id=$1)';
 
 export async function purgeTicketContent(tx: Sql, ctx: Ctx, ticketId: string, reason: PurgeReason): Promise<void> {
+    await refreshTicketFacts(tx, ctx.org, [ticketId]);
+
     await tx.query(
         `UPDATE tickets SET description=$3,suggestion=NULL,suggestion_stale=false,purged_at=now(),purge_reason=$4,
        version=version+1,updated_at=now() WHERE org_id=$1 AND id=$2`,

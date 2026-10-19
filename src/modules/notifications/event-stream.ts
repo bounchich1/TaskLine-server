@@ -4,9 +4,10 @@ import type { FastifyRequest } from 'fastify';
 
 import { one, type Database } from '../../shared/db.js';
 import { sessionToken } from '../../shared/http/request.js';
-import { authenticate } from '../staff/index.js';
+import { authenticate, touchPresence } from '../staff/index.js';
 
-import { changeFrame, HEARTBEAT_FRAME, READY_FRAME, RESYNC_FRAME, SESSION_EXPIRED_FRAME } from './sse.js';
+import { changeFrame, HEARTBEAT_FRAME, READY_FRAME, RESYNC_FRAME, SESSION_EXPIRED_FRAME, viewersFrame } from './sse.js';
+import { ticketViewers } from './viewers.js';
 
 const POLL_INTERVAL_MS = 2000;
 const HEARTBEAT_EVERY_POLLS = 8;
@@ -28,6 +29,7 @@ export interface EventStreamOptions {
 export class UiEventStream {
     private alive = true;
     private polls = 0;
+    private viewersVersion = 0;
 
     constructor(
         private readonly options: EventStreamOptions,
@@ -60,7 +62,8 @@ export class UiEventStream {
     private async poll(): Promise<void> {
         const { db, org, request, raw } = this.options;
 
-        await authenticate(db, org, sessionToken(request));
+        const session = await authenticate(db, org, sessionToken(request));
+
         await this.skipPrunedEvents();
 
         const { rows } = await db.query<UiEvent>(
@@ -78,9 +81,22 @@ export class UiEventStream {
             this.cursor = event.cursor;
         }
 
-        if (++this.polls % HEARTBEAT_EVERY_POLLS === 0) {
+        this.writeViewers();
+
+        if (this.polls++ % HEARTBEAT_EVERY_POLLS === 0) {
+            await touchPresence(db, org, session.employee.id);
             raw.write(HEARTBEAT_FRAME);
         }
+    }
+
+    private writeViewers(): void {
+        const { version, tickets } = ticketViewers.changesSince(this.viewersVersion);
+
+        for (const ticketId of tickets) {
+            this.options.raw.write(viewersFrame(ticketId, ticketViewers.snapshot(ticketId)));
+        }
+
+        this.viewersVersion = version;
     }
 
     private async skipPrunedEvents(): Promise<void> {

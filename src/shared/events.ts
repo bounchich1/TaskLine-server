@@ -91,9 +91,9 @@ async function enqueueAlerts(tx: Sql, org: string, notificationIds: string[]): P
     await tx.query(
         `INSERT INTO jobs(org_id,logical_key,kind,ref_id)
      SELECT n.org_id,'notification-alert:'||n.id,'notification_alert',n.id FROM notifications n
-     JOIN notification_settings s ON s.org_id=n.org_id AND s.employee_id=n.employee_id AND s.max_alerts
+     LEFT JOIN notification_settings s ON s.org_id=n.org_id AND s.employee_id=n.employee_id
      JOIN employees e ON e.org_id=n.org_id AND e.id=n.employee_id AND NOT e.blocked AND e.activated_at IS NOT NULL
-     WHERE n.org_id=$1 AND n.id=ANY($2::uuid[])
+     WHERE n.org_id=$1 AND n.id=ANY($2::uuid[]) AND (s.max_alerts OR n.type='note.mention')
      ON CONFLICT DO NOTHING`,
         [org, notificationIds],
     );
@@ -137,4 +137,23 @@ export async function enqueue(tx: Sql, org: string, job: BackgroundJob): Promise
      ON CONFLICT DO NOTHING`,
         [org, key, kind, refId, JSON.stringify(payload)],
     );
+}
+
+export interface TicketEvent {
+    ticketId: string;
+    employeeId: string | null;
+    kind: string;
+    detail?: unknown;
+}
+
+export async function recordTicketEvent(tx: Sql, org: string, event: TicketEvent): Promise<void> {
+    const { ticketId, employeeId, kind, detail = {} } = event;
+
+    await tx.query('INSERT INTO ticket_events(org_id,ticket_id,employee_id,kind,detail) VALUES($1,$2,$3,$4,$5)', [
+        org,
+        ticketId,
+        employeeId,
+        kind,
+        JSON.stringify(detail),
+    ]);
 }

@@ -9,6 +9,13 @@ export function changeFrame(event: { cursor: string }): string {
     return `id: ${event.cursor}\nevent: change\ndata: ${JSON.stringify(event)}\n\n`;
 }
 
+export function viewersFrame(ticketId: string, viewers: unknown[]): string {
+    return `event: viewers
+data: ${JSON.stringify({ ticket_id: ticketId, viewers })}
+
+`;
+}
+
 export function writeEventStreamHead(raw: ServerResponse, corsOrigin: string | undefined): void {
     raw.writeHead(200, {
         'Content-Type': 'text/event-stream',

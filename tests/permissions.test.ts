@@ -60,14 +60,21 @@ describe('role permissions', () => {
             'deliveries.resolve_unknown',
             'operations.view',
             'operations.retry',
+            'reports.view',
+            'tickets.bulk',
         ]);
 
         expect(permissionsOf('admin')).toEqual([
-            ...permissionsOf('supervisor'),
+            ...permissionsOf('supervisor').filter(
+                (permission) => !['reports.view', 'tickets.bulk'].includes(permission),
+            ),
             'employees.manage',
             'organization.configure',
             'audit.view',
             'clients.privacy',
+            'reports.view',
+            'teams.manage',
+            'tickets.bulk',
         ]);
 
         expect(permissionsOf('unknown')).toEqual([]);

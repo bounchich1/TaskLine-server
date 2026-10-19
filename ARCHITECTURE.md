@@ -26,27 +26,30 @@ Every edge points down a layer, so the graph has no cycles. The table is enforce
 `eslint-plugin-boundaries` (`MODULE_DEPENDENCIES` in `eslint.config.js`); adding an edge is an
 architectural decision and happens there.
 
-| Module        | May import (besides `shared` and `integrations`)       |
-| ------------- | ------------------------------------------------------ |
-| templates     | –                                                      |
-| learning      | –                                                      |
-| dictionaries  | –                                                      |
-| staff         | –                                                      |
-| files         | –                                                      |
-| sla           | –                                                      |
-| business      | –                                                      |
-| messages      | learning                                               |
-| outbox        | templates, messages, business                          |
-| ratings       | outbox                                                 |
-| consent       | outbox, learning, business                             |
-| tickets       | messages, outbox, ratings, learning, dictionaries, sla |
-| inbox         | consent, tickets, messages, outbox, business           |
-| delivery      | files, sla                                             |
-| notifications | staff, tickets                                         |
-| admin         | templates, dictionaries, files, privacy, sla, business |
-| ai            | dictionaries, sla, business                            |
-| demo-access   | –                                                      |
-| privacy       | consent, outbox, learning, business                    |
+| Module        | May import (besides `shared` and `integrations`)                        |
+| ------------- | ----------------------------------------------------------------------- |
+| templates     | –                                                                       |
+| learning      | –                                                                       |
+| dictionaries  | –                                                                       |
+| staff         | –                                                                       |
+| files         | –                                                                       |
+| sla           | –                                                                       |
+| business      | –                                                                       |
+| reports       | sla                                                                     |
+| routing       | –                                                                       |
+| macros        | –                                                                       |
+| messages      | learning                                                                |
+| outbox        | templates, messages, business                                           |
+| ratings       | outbox                                                                  |
+| consent       | outbox, learning, business                                              |
+| tickets       | messages, outbox, ratings, learning, dictionaries, sla, routing, macros |
+| inbox         | consent, tickets, messages, outbox, business                            |
+| delivery      | files, sla                                                              |
+| notifications | staff, tickets                                                          |
+| admin         | templates, dictionaries, files, privacy, sla, business, routing         |
+| ai            | dictionaries, sla, business                                             |
+| demo-access   | –                                                                       |
+| privacy       | consent, outbox, learning, business, reports                            |
 
 `app/` may import any module (through its `index.ts`). `shared/` imports only `shared/`.
 

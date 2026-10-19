@@ -92,8 +92,8 @@ async function autoClose(tx: Sql, ctx: Ctx, { client, ticket }: WaitingTicket): 
     const cycle = await requireOne<{ id: string }>(
         tx,
         `INSERT INTO closures(org_id,ticket_id,cycle_no,lifecycle,cutoff_seq,closed_by,reason,reminder_created,
-       finished_reason,learning_status)
-     SELECT $1,$2,coalesce(max(cycle_no),0)+1,$3,$4,$5,'auto',true,'auto_closed','suppressed'
+       finished_reason,learning_status,assignee_id)
+     SELECT $1,$2,coalesce(max(cycle_no),0)+1,$3,$4,$5,'auto',true,'auto_closed','suppressed',$5
      FROM closures WHERE ticket_id=$2 RETURNING id`,
         [ctx.org, ticket.id, ticket.lifecycle, ticket.last_message_seq, ticket.assignee_id],
     );

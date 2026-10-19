@@ -1,7 +1,9 @@
 export { handleClientContent } from './client-content.js';
 export { sendTicketHistory } from './client-history.js';
 export { TicketCommands } from './commands/ticket-commands.js';
+export { DeferredClose } from './deferred-close.js';
 export { TicketQueries } from './queries/ticket-queries.js';
 export { ticketSummaries } from './queries/ticket-summaries.js';
 export { ticketRoutes } from './ticket.routes.js';
+export { TicketBulk } from './ticket-bulk.js';
 export { WaitingTimers } from './waiting-timers.js';

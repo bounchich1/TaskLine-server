@@ -11,7 +11,7 @@ const TICKETS = `SELECT t.id,lpad(t.ticket_number::text,greatest(6,length(t.tick
  FROM tickets t WHERE t.org_id=$1 AND t.client_id=$2 ORDER BY t.created_at`;
 
 const MESSAGES = `SELECT id,ticket_id,author_type,text,deleted,revision,created_at FROM messages
- WHERE ticket_id IN(${CLIENT_TICKETS}) AND author_type<>'system' ORDER BY ticket_id,seq`;
+ WHERE ticket_id IN(${CLIENT_TICKETS}) AND author_type<>'system' AND visibility='client' ORDER BY ticket_id,seq`;
 
 const FILES = `SELECT message_id,filename,kind,bytes FROM attachments
  WHERE ticket_id IN(${CLIENT_TICKETS}) AND message_id IS NOT NULL`;

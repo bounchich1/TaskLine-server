@@ -9,10 +9,12 @@ import { COMMAND_SCHEMAS } from './commands/command-schemas.js';
 import type { TicketCommands } from './commands/ticket-commands.js';
 import { filtersSchema } from './queries/ticket-filters.js';
 import type { TicketQueries } from './queries/ticket-queries.js';
+import { bulkBody, type TicketBulk } from './ticket-bulk.js';
 
 interface TicketRouteOptions {
     queries: TicketQueries;
     commands: TicketCommands;
+    bulk: TicketBulk;
 }
 
 const messagePageQuery = z
@@ -28,6 +30,10 @@ const memoryIdParam = z.uuid();
 export const ticketRoutes: FastifyPluginAsync<TicketRouteOptions> = async (app, options) => {
     addQueryRoutes(app, options.queries);
     addCommandRoutes(app, options.commands);
+
+    app.post('/v1/tickets/bulk', access('tickets.bulk'), async (request) =>
+        options.bulk.run(staffOf(request).employee, bulkBody.parse(request.body ?? {}), idempotencyKey(request)),
+    );
 };
 
 function addQueryRoutes(app: FastifyInstance, queries: TicketQueries): void {

@@ -14,10 +14,10 @@ export const close: TicketCommandHandler = async (tx, ctx, command) => {
 
     const cycle = await requireOne<Closure>(
         tx,
-        `INSERT INTO closures(org_id,ticket_id,cycle_no,lifecycle,cutoff_seq,closed_by,note)
-     SELECT $1,$2,coalesce(max(cycle_no),0)+1,$3,$4,$5,$6 FROM closures WHERE ticket_id=$2
+        `INSERT INTO closures(org_id,ticket_id,cycle_no,lifecycle,cutoff_seq,closed_by,note,assignee_id)
+     SELECT $1,$2,coalesce(max(cycle_no),0)+1,$3,$4,$5,$6,$7 FROM closures WHERE ticket_id=$2
      RETURNING *`,
-        [ctx.org, ticket.id, ticket.lifecycle, ticket.last_message_seq, actor.id, body.note ?? ''],
+        [ctx.org, ticket.id, ticket.lifecycle, ticket.last_message_seq, actor.id, body.note ?? '', ticket.assignee_id],
     );
 
     await tx.query(

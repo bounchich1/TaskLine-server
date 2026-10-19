@@ -12,6 +12,7 @@ export type Employee = Row & {
     role: Role;
     blocked: boolean;
     activated_at: string | null;
+    presence: 'online' | 'break' | 'offline';
     version: number;
 };
 
@@ -65,6 +66,9 @@ export type Ticket = Row & {
     first_response_stage: number;
     resolution_stage: number;
     sla_breached: string[];
+    team_id: string | null;
+    offered_to: string | null;
+    offer_skipped: string[];
 };
 
 export type Message = Row & {
@@ -76,6 +80,7 @@ export type Message = Row & {
     delivery_state: string;
     deleted: boolean;
     revision: number;
+    visibility: 'client' | 'internal';
 };
 
 export type Closure = Row & {

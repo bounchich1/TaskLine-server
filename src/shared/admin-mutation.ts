@@ -1,11 +1,11 @@
-import { can, type Permission } from '../../shared/access.js';
-import { claimCommandKey, saveCommandResponse } from '../../shared/command-keys.js';
-import { hash } from '../../shared/crypto.js';
-import type { Database, Sql } from '../../shared/db.js';
-import { ensure } from '../../shared/errors.js';
-import { audit, emit } from '../../shared/events.js';
-import { findActiveEmployee } from '../../shared/staff.js';
-import type { Employee, Row } from '../../shared/types/entities.js';
+import { can, type Permission } from './access.js';
+import { claimCommandKey, saveCommandResponse } from './command-keys.js';
+import { hash } from './crypto.js';
+import type { Database, Sql } from './db.js';
+import { ensure } from './errors.js';
+import { audit, emit } from './events.js';
+import { findActiveEmployee } from './staff.js';
+import type { Employee, Row } from './types/entities.js';
 
 export interface AdminMutation {
     actor: Employee;

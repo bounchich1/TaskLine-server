@@ -1,11 +1,12 @@
 import type { Permission } from '../../shared/access.js';
+import { runAdminMutation } from '../../shared/admin-mutation.js';
 import type { Database } from '../../shared/db.js';
 import { ensure } from '../../shared/errors.js';
 import type { Employee } from '../../shared/types/entities.js';
+import { releaseEmployeeWork } from '../routing/index.js';
 import { assertValidConfig, readSlaConfig, saveSlaConfig, slaConfigBody } from '../sla/index.js';
 import { DEFAULT_TEMPLATES, validateTemplate } from '../templates/index.js';
 
-import { runAdminMutation } from './admin-mutation.js';
 import { listAllEmployees, listTemplates, readSettings, recentAudit, retryFailedJob } from './admin-queries.js';
 import { adminDiagnostics } from './diagnostics.js';
 import { dictionaryBody, newDictionaryCode, publishDictionaryEntry } from './dictionaries.js';
@@ -41,9 +42,15 @@ export class Admin {
         const changes = employeeChangesBody.parse(request.body);
         const mutation = { ...request, permission, route: `admin.employee:${employeeId}`, objectId: employeeId };
 
-        return runAdminMutation(this.db, this.org, { ...mutation, body: changes }, (tx, actor) =>
-            updateEmployee(tx, this.org, actor, { id: employeeId, changes, expectedVersion }),
-        );
+        return runAdminMutation(this.db, this.org, { ...mutation, body: changes }, async (tx, actor) => {
+            const updated = await updateEmployee(tx, this.org, actor, { id: employeeId, changes, expectedVersion });
+
+            if (changes.blocked === true) {
+                await releaseEmployeeWork(tx, this.org, employeeId, actor.id);
+            }
+
+            return updated;
+        });
     }
 
     async dictionary(request: AdminRequest) {

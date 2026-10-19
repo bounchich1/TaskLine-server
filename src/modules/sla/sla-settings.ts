@@ -97,3 +97,9 @@ export function calendarOf(settings: Pick<SlaSettings, 'timezone' | 'week' | 'ho
         workdays: new Set(settings.workdays),
     };
 }
+
+export async function loadBusinessCalendar(db: Sql, org: string): Promise<Calendar | undefined> {
+    const settings = await loadSlaSettings(db, org);
+
+    return settings?.enabled ? calendarOf(settings) : undefined;
+}

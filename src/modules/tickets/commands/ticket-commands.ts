@@ -13,8 +13,10 @@ import { finishCommand } from './finish-command.js';
 import { assign } from './handlers/assign.js';
 import { classify } from './handlers/classification.js';
 import { close } from './handlers/close.js';
+import { note } from './handlers/note.js';
 import { reopen } from './handlers/reopen.js';
 import { reply } from './handlers/reply.js';
+import { release, setTeam } from './handlers/routing.js';
 import { transfer } from './handlers/transfer.js';
 import { resume, wait } from './handlers/wait.js';
 import { lockCommandTarget } from './lock-target.js';
@@ -34,6 +36,9 @@ const COMMANDS = new Map<string, CommandDefinition>([
     ['reopen', { action: 'reopen', handle: reopen, event: 'ticket.reopened' }],
     ['wait', { action: 'reply', handle: wait, event: 'ticket.updated' }],
     ['resume', { action: 'reply', handle: resume, event: 'ticket.updated' }],
+    ['notes', { action: 'note', handle: note, event: 'message.note' }],
+    ['release', { action: 'transfer', handle: release, event: 'ticket.updated' }],
+    ['team', { action: 'classify', handle: setTeam, event: 'ticket.updated' }],
 ]);
 
 export interface TicketCommandRequest {

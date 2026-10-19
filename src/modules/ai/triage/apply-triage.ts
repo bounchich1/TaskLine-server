@@ -1,7 +1,7 @@
 import type { Ctx } from '../../../shared/context.js';
 import { hash } from '../../../shared/crypto.js';
 import { one, type Sql } from '../../../shared/db.js';
-import { audit, emit } from '../../../shared/events.js';
+import { audit, emit, recordTicketEvent } from '../../../shared/events.js';
 import type { TriageResult } from '../../../shared/types/ai.js';
 import type { Job, Message, Row, Ticket } from '../../../shared/types/entities.js';
 import { findActiveDictionaryLabel } from '../../dictionaries/index.js';
@@ -58,14 +58,20 @@ export async function applyTriage(
     const success = outcome.success && codesActive;
     const failure = outcome.success ? 'dictionary_value_retired' : outcome.failure;
 
-    await tx.query('UPDATE tickets SET ai_status=$2,suggestion=$3,review_required=$4,version=version+1 WHERE id=$1', [
-        ticket.id,
-        success ? 'done' : 'failed',
-        JSON.stringify(result),
-        !success || result.needs_review,
-    ]);
+    await tx.query(
+        'UPDATE tickets SET ai_status=$2,suggestion=$3,review_required=$4,routed_at=NULL,version=version+1 WHERE id=$1',
+        [ticket.id, success ? 'done' : 'failed', JSON.stringify(result), !success || result.needs_review],
+    );
 
     await auditTriage(tx, ctx, { ticket, success, reason: success ? null : failure, businessVersion });
+
+    await recordTicketEvent(tx, ctx.org, {
+        ticketId: ticket.id,
+        employeeId: null,
+        kind: 'triaged',
+        detail: { success, reason: success ? null : failure },
+    });
+
     await emit(tx, ctx.org, { type: 'ticket.classified', ticketId: ticket.id });
 
     return success ? null : failure;

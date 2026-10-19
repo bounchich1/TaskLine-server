@@ -2,7 +2,16 @@ import type { Ctx } from '../../shared/context.js';
 import { requireOne, type Sql } from '../../shared/db.js';
 import type { Message, Ticket } from '../../shared/types/entities.js';
 
-export interface NewMessage {
+interface MessageExtras {
+    visibility?: 'client' | 'internal';
+    learnable?: boolean;
+    mentions?: string[];
+    draftOrigin?: 'ai' | 'macro' | null;
+    draftEditRatio?: number | null;
+    macroId?: string | null;
+}
+
+export interface NewMessage extends MessageExtras {
     author: 'client' | 'staff' | 'bot' | 'system';
     authorId: string | null;
     text: string;
@@ -25,8 +34,9 @@ export async function addMessage(tx: Sql, ctx: Ctx, ticket: Ticket, message: New
 
     return requireOne<Message>(
         tx,
-        `INSERT INTO messages(org_id,ticket_id,seq,author_type,author_id,text,provider_ref,delivery_state,provider_sent_at)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+        `INSERT INTO messages(org_id,ticket_id,seq,author_type,author_id,text,provider_ref,delivery_state,provider_sent_at,
+       visibility,learnable,mentions,draft_origin,draft_edit_ratio,macro_id)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
         [
             ctx.org,
             ticket.id,
@@ -37,6 +47,12 @@ export async function addMessage(tx: Sql, ctx: Ctx, ticket: Ticket, message: New
             message.providerRef,
             message.state,
             timestamp && Number.isFinite(timestamp) ? new Date(timestamp) : null,
+            message.visibility ?? 'client',
+            message.learnable ?? false,
+            message.mentions ?? [],
+            message.draftOrigin ?? null,
+            message.draftEditRatio ?? null,
+            message.macroId ?? null,
         ],
     );
 }

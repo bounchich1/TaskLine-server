@@ -6,6 +6,8 @@ import { addMessage } from '../../../messages/index.js';
 import { queueStaffReply } from '../../../outbox/index.js';
 import type { TicketCommandHandler } from '../command-context.js';
 
+import { applyFollowUps, assertNoCollision, draftInfo, recordCollision } from './reply-extras.js';
+
 const MAX_REPLY_LENGTH = 4000;
 const MAX_REPLY_ATTACHMENTS = 10;
 
@@ -19,6 +21,9 @@ export const reply: TicketCommandHandler = async (tx, ctx, command) => {
     ensure(text.length <= MAX_REPLY_LENGTH && (text.length > 0 || ids.length > 0), 'invalid_message', 422);
     ensure(ids.length <= MAX_REPLY_ATTACHMENTS && new Set(ids).size === ids.length, 'invalid_attachments', 422);
     await lockReadyUploads(tx, ctx, { ids, ticket, actor });
+    await assertNoCollision(tx, command);
+    await recordCollision(tx, ctx, command);
+    const draft = await draftInfo(tx, ctx, command, text);
 
     const message = await addMessage(tx, ctx, ticket, {
         author: 'staff',
@@ -26,6 +31,9 @@ export const reply: TicketCommandHandler = async (tx, ctx, command) => {
         text,
         providerRef: null,
         state: 'queued',
+        draftOrigin: draft.draftOrigin,
+        draftEditRatio: draft.draftEditRatio,
+        macroId: draft.macro?.id ?? null,
     });
 
     for (const id of ids) {
@@ -33,6 +41,7 @@ export const reply: TicketCommandHandler = async (tx, ctx, command) => {
     }
 
     await queueStaffReply(tx, ctx, { client, ticket, message, actor, text, attachmentIds: ids });
+    await applyFollowUps(tx, ctx, command, { message, macro: draft.macro });
 };
 
 async function lockReadyUploads(

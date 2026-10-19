@@ -11,6 +11,7 @@ export const filtersSchema = z
         complexity: z.string().max(64).optional(),
         status: z.enum(['open', 'in_progress', 'awaiting_rating', 'closed']).optional(),
         assignee: z.uuid().optional(),
+        team: z.union([z.uuid(), z.literal('none')]).optional(),
         sla: z.enum(['at_risk']).optional(),
         from: z.iso.datetime({ offset: true }).optional(),
         to: z.iso.datetime({ offset: true }).optional(),
@@ -58,6 +59,12 @@ export function filterConditions(org: string, filters: Filters): SqlConditions {
 
     if (filters.assignee) {
         conditions.add('t.assignee_id=?', filters.assignee);
+    }
+
+    if (filters.team === 'none') {
+        conditions.clauses.push('t.team_id IS NULL');
+    } else if (filters.team) {
+        conditions.add('t.team_id=?', filters.team);
     }
 
     if (filters.sla === 'at_risk') {

@@ -60,7 +60,8 @@ async function readEntries(
     { ticket, cycle }: { ticket: Ticket; cycle: Closure },
 ): Promise<SnapshotEntry[]> {
     const { rows: messages } = await tx.query<Message>(
-        'SELECT * FROM messages WHERE org_id=$1 AND ticket_id=$2 AND seq<=$3 ORDER BY seq',
+        `SELECT * FROM messages WHERE org_id=$1 AND ticket_id=$2 AND seq<=$3 AND (visibility='client' OR learnable)
+     ORDER BY seq`,
         [ctx.org, ticket.id, cycle.cutoff_seq],
     );
 

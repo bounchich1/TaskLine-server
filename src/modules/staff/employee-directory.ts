@@ -4,7 +4,7 @@ import type { Employee } from '../../shared/types/entities.js';
 
 export async function listEmployees(db: Sql, org: string) {
     const result = await db.query(
-        `SELECT id,name,role,${EMPLOYEE_STATUS_SQL},version FROM employees WHERE org_id=$1 ORDER BY name`,
+        `SELECT id,name,role,${EMPLOYEE_STATUS_SQL},presence,presence_at,version FROM employees WHERE org_id=$1 ORDER BY name`,
         [org],
     );
 

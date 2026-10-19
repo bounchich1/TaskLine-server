@@ -10,5 +10,6 @@ export {
 } from './clocks.js';
 
 export { assertValidConfig, readSlaConfig, saveSlaConfig, slaConfigBody } from './sla-config.js';
-export { ensureSlaDefaults } from './sla-settings.js';
+export { businessMinutesBetween, type Calendar } from './business-time.js';
+export { ensureSlaDefaults, loadBusinessCalendar } from './sla-settings.js';
 export { SlaTimers } from './sla-timers.js';

@@ -31,6 +31,7 @@ export function sessionProfile(employee: Employee) {
             role: employee.role,
             max_user_id: employee.max_user_id,
             status: employeeStatus(employee),
+            presence: employee.presence,
             version: employee.version,
         },
         permissions: permissionsOf(employee.role),

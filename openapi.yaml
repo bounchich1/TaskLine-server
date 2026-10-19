@@ -45,6 +45,10 @@ tags:
     description: Вебхук бота MAX
   - name: ops
     description: Метрики и тревоги для мониторинга
+  - name: reports
+    description: Отчёты руководителя — показатели команды, тем и ИИ (право `reports.view`)
+  - name: routing
+    description: Команды, правила маршрутизации, статус сотрудника, шаблоны ответов
 security:
   - bearerAuth: []
   - sessionCookie: []
@@ -223,6 +227,10 @@ paths:
         - { name: complexity, in: query, schema: { type: string, maxLength: 64 } }
         - { name: status, in: query, schema: { $ref: '#/components/schemas/TicketStatus' } }
         - { name: assignee, in: query, schema: { type: string, format: uuid } }
+        - name: team
+          in: query
+          description: Очередь команды; `none` — обращения без команды
+          schema: { oneOf: [{ type: string, format: uuid }, { type: string, enum: [none] }] }
         - name: sla
           in: query
           description: '`at_risk` — открытые обращения, у которых пройден порог предупреждения SLA или срок'
@@ -326,6 +334,21 @@ paths:
                   maxItems: 10
                   items: { type: string, format: uuid }
                   description: Загруженные через `/v1/uploads` файлы
+                draft_origin:
+                  type: string
+                  enum: [ai]
+                  description: Ответ начат с черновика ИИ («Вставить в черновик») — для отчёта о пользе ИИ
+                macro_id:
+                  type: string
+                  format: uuid
+                  description: Ответ из шаблона; действия шаблона (тема, срочность, ожидание, закрытие) применяются
+                confirm_collision:
+                  type: boolean
+                  description: >-
+                    Отправить, хотя коллега ответил клиенту меньше минуты назад (иначе `409 reply_collision`)
+                close_after:
+                  type: boolean
+                  description: Закрыть обращение, когда ответ будет доставлен
       responses:
         '202':
           description: Ответ принят, обращение после команды
@@ -358,7 +381,10 @@ paths:
     post:
       operationId: postTicketsByIdAssign
       tags: [tickets]
-      summary: Взять обращение в работу
+      summary: Взять обращение в работу или назначить его сотруднику
+      description: >-
+        Без тела — взять себе. `employee_id` другого сотрудника — назначить ему (право `tickets.transfer_any`).
+        Если команда обращения запрещает самостоятельный выбор, взять можно только предложенное вам обращение.
       parameters:
         - $ref: '#/components/parameters/Id'
         - $ref: '#/components/parameters/Origin'
@@ -368,7 +394,11 @@ paths:
       requestBody:
         content:
           application/json:
-            schema: { type: object, additionalProperties: false }
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                employee_id: { type: string, format: uuid }
       responses:
         '200':
           $ref: '#/components/responses/Ticket'
@@ -544,6 +574,196 @@ paths:
         '403':
           $ref: '#/components/responses/Error'
         '409':
+          $ref: '#/components/responses/Error'
+  /v1/tickets/{id}/notes:
+    post:
+      operationId: postTicketsByIdNotes
+      tags: [tickets]
+      summary: Внутренняя заметка с упоминаниями коллег
+      description: >-
+        Заметка не отправляется клиенту, не попадает в выгрузку данных клиента и в обучение ИИ, если не отмечена
+        `learnable`. Упомянутые сотрудники получают уведомление и сообщение от бота сотрудников.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [text]
+              properties:
+                text: { type: string, minLength: 1, maxLength: 4000 }
+                mention_ids: { type: array, maxItems: 20, items: { type: string, format: uuid } }
+                learnable: { type: boolean, default: false }
+      responses:
+        '200':
+          $ref: '#/components/responses/Ticket'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/tickets/{id}/release:
+    post:
+      operationId: postTicketsByIdRelease
+      tags: [tickets]
+      summary: Вернуть обращение в очередь
+      description: Исполнитель или руководитель (`tickets.transfer_any`) снимает исполнителя; обращение снова открыто.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '200':
+          $ref: '#/components/responses/Ticket'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/tickets/{id}/team:
+    post:
+      operationId: postTicketsByIdTeam
+      tags: [tickets]
+      summary: Перевести обращение в очередь команды
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [team_id]
+              properties:
+                team_id: { type: [string, 'null'], format: uuid }
+                release: { type: boolean, default: false, description: Снять исполнителя }
+      responses:
+        '200':
+          $ref: '#/components/responses/Ticket'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/tickets/{id}/events:
+    post:
+      operationId: postTicketsByIdEvents
+      tags: [reports]
+      summary: Отметить действие с подсказкой ИИ (для отчёта о пользе ИИ)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [kind]
+              properties:
+                kind: { type: string, enum: [draft_inserted, tip_viewed] }
+      responses:
+        '202':
+          description: Принято
+        '404':
+          $ref: '#/components/responses/Error'
+  /v1/tickets/{id}/viewing:
+    post:
+      operationId: postTicketsByIdViewing
+      tags: [tickets]
+      summary: Сообщить, что сотрудник смотрит обращение или печатает ответ
+      description: >-
+        Без записи в базу; состояние живёт 30 секунд и приходит другим сотрудникам событием `viewers` в `/v1/events`.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [state]
+              properties:
+                state: { type: string, enum: [viewing, typing, left] }
+      responses:
+        '202':
+          description: Кто сейчас смотрит обращение
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  viewers: { type: array, items: { $ref: '#/components/schemas/Viewer' } }
+  /v1/tickets/bulk:
+    post:
+      operationId: postTicketsBulk
+      tags: [tickets]
+      summary: Массовое действие с обращениями (право `tickets.bulk`)
+      description: Каждое обращение обрабатывается отдельно; результат по каждому — в `results`.
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, ids]
+              properties:
+                action: { type: string, enum: [assign, team, classify, close] }
+                ids: { type: array, minItems: 1, maxItems: 50, items: { type: string, format: uuid } }
+                employee_id: { type: string, format: uuid, description: Для `assign` }
+                comment: { type: string, maxLength: 2000, description: Для `assign` обращений в работе }
+                team_id: { type: [string, 'null'], format: uuid, description: Для `team` }
+                tag: { type: string }
+                urgency: { type: string }
+                complexity: { type: string }
+                text: { type: string, maxLength: 4000, description: Для `close` — ответ клиенту перед закрытием }
+      responses:
+        '200':
+          description: Результаты
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, ok]
+                      properties:
+                        id: { type: string, format: uuid }
+                        number: { type: integer }
+                        ok: { type: boolean }
+                        code: { type: string }
+                        message: { type: string }
+        '403':
           $ref: '#/components/responses/Error'
   /v1/messages/{id}/retry:
     post:
@@ -1500,6 +1720,323 @@ paths:
         '422':
           $ref: '#/components/responses/Error'
 
+  /v1/presence:
+    put:
+      operationId: putPresence
+      tags: [routing]
+      summary: Статус сотрудника — на линии, перерыв, не в сети
+      description: >-
+        «На линии» держится, пока открыт поток `/v1/events`; через 2 минуты без соединения статус сам
+        становится «Не в сети». Автоназначение предлагает обращения только сотрудникам на линии.
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [presence]
+              properties:
+                presence: { $ref: '#/components/schemas/Presence' }
+      responses:
+        '200':
+          description: Текущий статус и число обращений в работе
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  presence: { $ref: '#/components/schemas/Presence' }
+                  presence_at: { type: [string, 'null'], format: date-time }
+                  active: { type: integer }
+  /v1/teams:
+    get:
+      operationId: getTeams
+      tags: [routing]
+      summary: Команды с участниками (для вкладок очереди и назначения)
+      responses:
+        '200':
+          description: Команды
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Team' } }
+  /v1/admin/teams:
+    post:
+      operationId: postAdminTeams
+      tags: [routing]
+      summary: Создать команду (право `teams.manage`)
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TeamInput' }
+      responses:
+        '200':
+          description: Команда
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Team' }
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/admin/teams/{id}:
+    patch:
+      operationId: patchAdminTeamsById
+      tags: [routing]
+      summary: Изменить команду, участников и навыки
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TeamInput' }
+      responses:
+        '200':
+          description: Команда
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Team' }
+        '409':
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteAdminTeamsById
+      tags: [routing]
+      summary: Расформировать команду
+      description: Правила команды удаляются, открытые обращения возвращаются в общую очередь.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Готово
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/admin/routing-rules:
+    get:
+      operationId: getAdminRoutingRules
+      tags: [routing]
+      summary: Правила маршрутизации по порядку
+      responses:
+        '200':
+          description: Правила
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RoutingRules' }
+    put:
+      operationId: putAdminRoutingRules
+      tags: [routing]
+      summary: Заменить правила маршрутизации
+      description: >-
+        Правила проверяются по порядку после разбора ИИ и при ручной смене темы; первое совпавшее задаёт команду.
+        Пустой список значений — любое значение. Изменение правил не переносит уже назначенные обращения.
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [rules]
+              properties:
+                rules: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/RoutingRuleInput' } }
+      responses:
+        '200':
+          description: Правила
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RoutingRules' }
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/macros:
+    get:
+      operationId: getMacros
+      tags: [routing]
+      summary: Общие и личные шаблоны ответов
+      responses:
+        '200':
+          description: Шаблоны
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Macro' } }
+    post:
+      operationId: postMacros
+      tags: [routing]
+      summary: Создать шаблон ответа (общий — право `organization.configure`)
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MacroInput' }
+      responses:
+        '200':
+          description: Шаблон
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Macro' }
+        '403':
+          $ref: '#/components/responses/Error'
+  /v1/macros/{id}:
+    patch:
+      operationId: patchMacrosById
+      tags: [routing]
+      summary: Изменить шаблон ответа
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MacroInput' }
+      responses:
+        '200':
+          description: Шаблон
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Macro' }
+        '409':
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteMacrosById
+      tags: [routing]
+      summary: Удалить шаблон ответа
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Удалено
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/reports/{name}:
+    get:
+      operationId: getReportsByName
+      tags: [reports]
+      summary: Отчёт за период в часовом поясе организации
+      description: >-
+        `overview` — поток обращений, время ответа и решения, оценки, переоткрытия, SLA; `team` — показатели
+        сотрудников (медианы скрыты при выборке меньше 5); `topics` — темы и их рост; `ai` — точность
+        классификации, использование черновиков, подсказки с источниками, база знаний, задержки и стоимость
+        модели; `quality` — обращения с оценкой 6 и ниже. Каждый показатель сравнивается с предыдущим периодом
+        той же длины. Данные берутся из сводной таблицы, которая обновляется не реже раза в минуту при запросе.
+      parameters:
+        - { name: name, in: path, required: true, schema: { $ref: '#/components/schemas/ReportName' } }
+        - { name: from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Отчёт
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Report' }
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /v1/reports/{name}/export:
+    get:
+      operationId: getReportsByNameExport
+      tags: [reports]
+      summary: Выгрузка отчёта в CSV или XLSX
+      parameters:
+        - { name: name, in: path, required: true, schema: { $ref: '#/components/schemas/ReportName' } }
+        - { name: format, in: query, required: true, schema: { type: string, enum: [csv, xlsx] } }
+        - { name: from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Файл
+          content:
+            text/csv: {}
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {}
+  /v1/reports/{name}/export-grant:
+    post:
+      operationId: postReportsByNameExportGrant
+      tags: [reports]
+      summary: Ссылка на выгрузку отчёта для скачивания вне приложения
+      parameters:
+        - { name: name, in: path, required: true, schema: { $ref: '#/components/schemas/ReportName' } }
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [format, from, to]
+              properties:
+                format: { type: string, enum: [csv, xlsx] }
+                from: { type: string, format: date }
+                to: { type: string, format: date }
+      responses:
+        '200':
+          description: Ссылка
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url, filename, expires_at]
+                properties:
+                  url: { type: string, format: uri }
+                  filename: { type: string }
+                  expires_at: { type: string, format: date-time }
+  /download/report/{grant}:
+    get:
+      operationId: getReportByGrant
+      tags: [reports]
+      summary: Скачать выгрузку отчёта по ссылке
+      security: []
+      parameters:
+        - { name: grant, in: path, required: true, schema: { type: string, minLength: 32, maxLength: 128 } }
+      responses:
+        '200':
+          description: Файл
+        '404':
+          $ref: '#/components/responses/Error'
   /metrics:
     get:
       operationId: getMetrics
@@ -1732,6 +2269,13 @@ components:
         - employees.manage
         - organization.configure
         - audit.view
+        - clients.privacy
+        - reports.view
+        - teams.manage
+        - tickets.bulk
+    Presence:
+      type: string
+      enum: [online, break, offline]
     EmployeeStatus:
       type: string
       enum: [pending, active, blocked]
@@ -1750,6 +2294,7 @@ components:
         role: { $ref: '#/components/schemas/Role' }
         max_user_id: { type: string }
         status: { $ref: '#/components/schemas/EmployeeStatus' }
+        presence: { $ref: '#/components/schemas/Presence' }
         version: { type: integer }
     Profile:
       type: object
@@ -1859,6 +2404,12 @@ components:
         sla_breached: { type: array, items: { type: string, enum: [first_response, resolution] } }
         sla_due_at: { type: [string, 'null'], format: date-time, description: Ближайший действующий срок }
         sla_warn_at: { type: [string, 'null'], format: date-time, description: Ближайший порог предупреждения }
+        team_id: { type: [string, 'null'], format: uuid }
+        team_name: { type: [string, 'null'] }
+        offered_to: { type: [string, 'null'], format: uuid, description: Кому предложено автоназначением }
+        offered_to_name: { type: [string, 'null'] }
+        offered_at: { type: [string, 'null'], format: date-time }
+        offer_due_at: { type: [string, 'null'], format: date-time, description: Предложение перейдёт к следующему }
     TicketDetail:
       allOf:
         - $ref: '#/components/schemas/Ticket'
@@ -1940,6 +2491,11 @@ components:
         delivery_state: { type: string, examples: [received, sending, delivered, unknown, failed, canceled] }
         deleted: { type: boolean }
         revision: { type: integer }
+        visibility: { type: string, enum: [client, internal], description: '`internal` — заметка сотрудников' }
+        learnable: { type: boolean }
+        mentions: { type: array, items: { type: string, format: uuid } }
+        draft_origin: { type: [string, 'null'], enum: [ai, macro, null] }
+        macro_id: { type: [string, 'null'], format: uuid }
     MessagePage:
       type: object
       required: [items, has_more, next_before]
@@ -1997,6 +2553,8 @@ components:
         name: { type: string }
         role: { $ref: '#/components/schemas/Role' }
         status: { $ref: '#/components/schemas/EmployeeStatus' }
+        presence: { $ref: '#/components/schemas/Presence' }
+        presence_at: { type: [string, 'null'], format: date-time }
         version: { type: integer }
     AdminEmployee:
       type: object
@@ -2222,6 +2780,122 @@ components:
               number: { type: string }
               status: { type: string }
               messages: { type: array, items: { type: object } }
+    Viewer:
+      type: object
+      required: [id, name, typing]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        typing: { type: boolean }
+    TeamMember:
+      type: object
+      required: [employee_id, skills]
+      properties:
+        employee_id: { type: string, format: uuid }
+        skills:
+          type: array
+          description: '`tag:<код>` и `complexity:<код>` — темы и уровни сложности, которые ведёт сотрудник'
+          items: { type: string, pattern: '^(tag|complexity):[a-z][a-z0-9_]*$' }
+    TeamInput:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        supervisor_id: { type: [string, 'null'], format: uuid }
+        auto_assign: { type: boolean, default: false, description: Предлагать обращения сотрудникам на линии }
+        strategy: { type: string, enum: [round_robin, least_loaded, skills], default: least_loaded }
+        capacity: { type: integer, minimum: 1, maximum: 100, default: 5, description: Обращений в работе на сотрудника }
+        offer_timeout_seconds: { type: integer, minimum: 30, maximum: 3600, default: 180 }
+        allow_self_take: { type: boolean, default: true, description: Сотрудники сами берут обращения из очереди }
+        members: { type: array, maxItems: 500, items: { $ref: '#/components/schemas/TeamMember' } }
+    Team:
+      allOf:
+        - $ref: '#/components/schemas/TeamInput'
+        - type: object
+          required: [id, version, queue, online]
+          properties:
+            id: { type: string, format: uuid }
+            version: { type: integer }
+            queue: { type: integer, description: Открытых обращений в очереди команды }
+            online: { type: integer, description: Участников на линии }
+    RoutingRuleInput:
+      type: object
+      additionalProperties: false
+      required: [team_id, match]
+      properties:
+        team_id: { type: string, format: uuid }
+        match:
+          type: object
+          additionalProperties: false
+          properties:
+            tag: { type: array, items: { type: string } }
+            urgency: { type: array, items: { type: string } }
+            complexity: { type: array, items: { type: string } }
+    RoutingRules:
+      type: object
+      required: [items, version]
+      properties:
+        version: { type: integer }
+        items:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/RoutingRuleInput'
+              - type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  priority: { type: integer }
+    MacroInput:
+      type: object
+      additionalProperties: false
+      required: [title, body]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 80 }
+        body:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          description: 'Переменные `{ticket_number}`, `{agent_name}`, `{eta}` подставляет мини-приложение'
+        shared: { type: boolean, default: false }
+        actions:
+          type: object
+          additionalProperties: false
+          properties:
+            tag: { type: string }
+            urgency: { type: string }
+            complexity: { type: string }
+            wait: { type: boolean, description: Ждать ответа клиента }
+            close: { type: boolean, description: Закрыть после доставки ответа }
+    Macro:
+      allOf:
+        - $ref: '#/components/schemas/MacroInput'
+        - type: object
+          required: [id, owner_id, uses, version]
+          properties:
+            id: { type: string, format: uuid }
+            owner_id: { type: [string, 'null'], format: uuid, description: '`null` — общий шаблон' }
+            uses: { type: integer }
+            version: { type: integer }
+    ReportName:
+      type: string
+      enum: [overview, team, topics, ai, quality]
+    Report:
+      type: object
+      required: [report, period, refreshed_at]
+      additionalProperties: true
+      description: Набор полей зависит от отчёта; длительности — в секундах, доли — от 0 до 1, `null` — нет данных
+      properties:
+        report: { $ref: '#/components/schemas/ReportName' }
+        refreshed_at: { type: [string, 'null'], format: date-time }
+        period:
+          type: object
+          properties:
+            from: { type: string, format: date }
+            to: { type: string, format: date }
+            previous_from: { type: string, format: date }
+            previous_to: { type: string, format: date }
+            timezone: { type: string }
     AuditEntry:
       type: object
       required: [id, action, created_at]

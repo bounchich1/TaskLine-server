@@ -1,3 +1,4 @@
+import { runAdminMutation } from '../../shared/admin-mutation.js';
 import type { Config } from '../../shared/config.js';
 import { createCtx, type Ctx } from '../../shared/context.js';
 import type { Database } from '../../shared/db.js';
@@ -13,7 +14,6 @@ import {
     saveProfile,
 } from '../business/index.js';
 
-import { runAdminMutation } from './admin-mutation.js';
 import type { AdminRequest } from './admin.js';
 import { applyPreset, previewPreset } from './apply-preset.js';
 

@@ -1,6 +1,7 @@
 import { ensure } from '../../../../shared/errors.js';
 import type { Row } from '../../../../shared/types/entities.js';
 import { findActiveDictionaryEntry } from '../../../dictionaries/index.js';
+import { routeTicket } from '../../../routing/index.js';
 import { reclassifySla } from '../../../sla/index.js';
 import type { TicketCommandHandler } from '../command-context.js';
 
@@ -32,4 +33,6 @@ export const classify: TicketCommandHandler = async (tx, ctx, { ticket, body }) 
     if (body.urgency !== undefined || body.tag !== undefined) {
         await reclassifySla(tx, ctx.org, ticket.id);
     }
+
+    await routeTicket(tx, ctx.org, ticket.id);
 };

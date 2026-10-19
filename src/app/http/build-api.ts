@@ -18,10 +18,13 @@ import { addDemoAccessHook, DemoRoles } from '../../modules/demo-access/index.js
 import { dictionariesRoutes } from '../../modules/dictionaries/index.js';
 import { Files, filesRoutes } from '../../modules/files/index.js';
 import { devInboundRoutes, Inbox, webhookRoutes } from '../../modules/inbox/index.js';
+import { macrosRoutes } from '../../modules/macros/index.js';
 import { eventsRoutes, notificationsRoutes } from '../../modules/notifications/index.js';
 import { Privacy, privacyRoutes } from '../../modules/privacy/index.js';
+import { Reports, reportsRoutes } from '../../modules/reports/index.js';
+import { teamsRoutes } from '../../modules/routing/index.js';
 import { alertRoutes, authRoutes, employeesRoutes, StaffBot, staffBotRoutes } from '../../modules/staff/index.js';
-import { TicketCommands, TicketQueries, ticketRoutes } from '../../modules/tickets/index.js';
+import { TicketBulk, TicketCommands, TicketQueries, ticketRoutes } from '../../modules/tickets/index.js';
 import type { Config } from '../../shared/config.js';
 import type { Database } from '../../shared/db.js';
 
@@ -81,9 +84,11 @@ async function registerRoutes(app: FastifyInstance, db: Database, config: Config
     await app.register(healthRoutes, { db, config });
     await app.register(webhookRoutes, { inbox, config });
     await app.register(authRoutes, { db, config });
-    await app.register(ticketRoutes, { queries, commands });
+    await app.register(ticketRoutes, { queries, commands, bulk: new TicketBulk(db, config) });
     await app.register(employeesRoutes, { db, org });
     await app.register(dictionariesRoutes, { db, org });
+    await app.register(teamsRoutes, { db, org });
+    await app.register(macrosRoutes, { db, org });
     await app.register(notificationsRoutes, { db, org });
     await app.register(deliveryRoutes, { deliveries });
     await app.register(filesRoutes, { files });
@@ -91,6 +96,7 @@ async function registerRoutes(app: FastifyInstance, db: Database, config: Config
     await app.register(opsRoutes, { admin });
     await app.register(businessAdminRoutes, { business: new BusinessAdmin(db, config) });
     await app.register(privacyRoutes, { privacy: new Privacy(db, config) });
+    await app.register(reportsRoutes, { reports: new Reports(db, config), db });
     await app.register(eventsRoutes, { db, config });
 
     if (config.MAX_STAFF_WEBHOOK_SECRET) {

@@ -4,6 +4,7 @@ import { Files } from '../../modules/files/index.js';
 import { applyDeferredRevision } from '../../modules/messages/index.js';
 import { NotificationAlerts } from '../../modules/notifications/index.js';
 import { sendStaffAlert, type AlertSender } from '../../modules/staff/index.js';
+import { DeferredClose } from '../../modules/tickets/index.js';
 import type { Config } from '../../shared/config.js';
 import { createCtx, type Ctx } from '../../shared/context.js';
 import { one, type Database, type Sql } from '../../shared/db.js';
@@ -20,6 +21,7 @@ export class JobRunner {
     private readonly workflows: Workflows;
     private readonly staffAlerts: AlertSender;
     private readonly notificationAlerts: NotificationAlerts;
+    private readonly deferredClose: DeferredClose;
 
     constructor(
         private readonly db: Database,
@@ -38,6 +40,7 @@ export class JobRunner {
         );
 
         this.notificationAlerts = new NotificationAlerts(db, this.ctx.org, this.staffAlerts);
+        this.deferredClose = new DeferredClose(db, config);
     }
 
     async run(id: string): Promise<void> {
@@ -106,6 +109,10 @@ export class JobRunner {
                 return true;
             case 'notification_alert':
                 await this.notificationAlerts.send(job.ref_id);
+
+                return true;
+            case 'deferred_close':
+                await this.deferredClose.run(job);
 
                 return true;
             default:

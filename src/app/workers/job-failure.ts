@@ -2,7 +2,7 @@ import { markDownloadFailed } from '../../modules/files/index.js';
 import type { Ctx } from '../../shared/context.js';
 import type { Sql } from '../../shared/db.js';
 import { AppError } from '../../shared/errors.js';
-import { emit } from '../../shared/events.js';
+import { emit, recordTicketEvent } from '../../shared/events.js';
 import type { Job } from '../../shared/types/entities.js';
 
 const MAX_ATTEMPTS = 6;
@@ -17,6 +17,7 @@ const DEFERRED_CODES = [
     'memory_disabled',
     'ai_disabled',
     'gateway_unavailable',
+    'close_waiting_delivery',
 ];
 
 const UNCERTAIN_CODES = ['ai_uncertain', 'memory_write_unknown', 'memory_still_unknown'];
@@ -108,6 +109,13 @@ export async function recordJobFailure(
             "UPDATE tickets SET ai_status='failed',review_required=true WHERE id=$1 AND ai_status='pending'",
             [job.ref_id],
         );
+
+        await recordTicketEvent(tx, ctx.org, {
+            ticketId: job.ref_id,
+            employeeId: null,
+            kind: 'triaged',
+            detail: { success: false, reason: code },
+        });
 
         await emit(tx, ctx.org, { type: 'ticket.classified', ticketId: job.ref_id });
     }

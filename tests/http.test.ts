@@ -97,6 +97,7 @@ it('refreshes, describes and ends a staff session', async () => {
             role: 'support',
             max_user_id: '1',
             status: 'active',
+            presence: 'offline',
             version: 1,
         },
         permissions: ['tickets.view', 'tickets.work'],

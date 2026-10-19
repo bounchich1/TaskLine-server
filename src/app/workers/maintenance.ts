@@ -1,17 +1,24 @@
 import { PreconsentExpiry } from '../../modules/consent/index.js';
 import { applyRetention } from '../../modules/privacy/index.js';
 import { RatingTimers } from '../../modules/ratings/index.js';
+import { refreshFacts, ReportDigest } from '../../modules/reports/index.js';
+import { RoutingTimers } from '../../modules/routing/index.js';
 import { SlaTimers } from '../../modules/sla/index.js';
+import { expirePresence } from '../../modules/staff/index.js';
 import { WaitingTimers } from '../../modules/tickets/index.js';
 import type { Ctx } from '../../shared/context.js';
 import type { Database, Sql } from '../../shared/db.js';
-import { emit } from '../../shared/events.js';
+import { emit, recordTicketEvent } from '../../shared/events.js';
+
+const FACTS_REFRESH_SECONDS = 300;
 
 export async function runMaintenance(db: Database, ctx: Ctx): Promise<void> {
     await new RatingTimers(db, ctx.config).run();
     await new PreconsentExpiry(db, ctx.config).run();
     await new SlaTimers(db, ctx.config).run();
     await new WaitingTimers(db, ctx.config).run();
+    await expirePresence(db, ctx.org);
+    await new RoutingTimers(db, ctx.config).run();
 
     await db.tx(async (tx) => {
         await expireOverdueTriage(tx, ctx);
@@ -20,6 +27,8 @@ export async function runMaintenance(db: Database, ctx: Ctx): Promise<void> {
     });
 
     await db.tx(async (tx) => applyRetention(tx, ctx));
+    await refreshFacts(db, ctx.org, FACTS_REFRESH_SECONDS);
+    await new ReportDigest(db, ctx.config).run();
 }
 
 async function expireOverdueTriage(tx: Sql, ctx: Ctx): Promise<void> {
@@ -35,6 +44,13 @@ async function expireOverdueTriage(tx: Sql, ctx: Ctx): Promise<void> {
        WHERE kind='triage' AND ref_id=$1 AND state IN('pending','running')`,
             [ticket.id],
         );
+
+        await recordTicketEvent(tx, ctx.org, {
+            ticketId: ticket.id,
+            employeeId: null,
+            kind: 'triaged',
+            detail: { success: false, reason: 'triage_deadline' },
+        });
 
         await emit(tx, ctx.org, { type: 'ticket.classified', ticketId: ticket.id });
     }
@@ -60,6 +76,7 @@ async function recoverAbandonedWork(tx: Sql, ctx: Ctx): Promise<void> {
 async function pruneExpiredRows(tx: Sql): Promise<void> {
     await tx.query("DELETE FROM download_grants WHERE expires_at<now()-interval '1 hour'");
     await tx.query("DELETE FROM export_grants WHERE expires_at<now()-interval '1 hour'");
+    await tx.query("DELETE FROM report_grants WHERE expires_at<now()-interval '1 hour'");
     await tx.query("DELETE FROM callback_actions WHERE expires_at<now()-interval '1 day'");
     await tx.query("DELETE FROM staff_sessions WHERE expires_at<now()-interval '1 day'");
     await tx.query("DELETE FROM command_keys WHERE created_at<now()-interval '7 days'");
